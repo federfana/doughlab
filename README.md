@@ -5,8 +5,8 @@
 Laboratorio digitale per impasti pizza/pane. Prevede **quando** l'impasto è davvero maturo, non solo che ora segna il piano. Si installa come PWA sull'iPhone.
 
 - **Backend**: FastAPI + SQLAlchemy 2.0 async + SQLite
-- **Frontend**: Jinja2 + HTMX + Tailwind (CDN) + Chart.js, PWA installabile
-- **Modelli scientifici**: Newton (termico) + Q10 (fermentazione)
+- **Frontend**: Jinja2 + HTMX + Alpine.js + Chart.js + CSS variables (dark/light auto + toggle)
+- **Modelli scientifici**: Newton (termico) + Q10 (fermentazione) + baker's % (ingredienti)
 - **Tooling**: `uv` + ruff + mypy + pytest
 
 ---
@@ -73,6 +73,8 @@ doughlab/
 │   ├── services/
 │   │   ├── thermal.py             # modello di Newton (τ per profilo)
 │   │   ├── fermentation.py        # modello Q10 del lievito
+│   │   ├── ingredients.py         # calcolo baker's percentage
+│   │   ├── presets.py             # ricette predefinite
 │   │   └── scheduler.py           # orchestra tutto in un PlanResult
 │   ├── templates/
 │   │   ├── base.html              # layout Tailwind + HTMX + Chart.js
@@ -262,6 +264,37 @@ Tre modelli ORM:
 | `simulate(curve, kind, yeast_pct, target_work)` | funzione | integra W(t), interpola `ready_at_h` quando W=target |
 | `suggest_yeast_pct(curve, kind, target_work)` | funzione | % di lievito che fa W_final = target |
 
+### [services/ingredients.py](src/doughlab/services/ingredients.py)
+
+Calcolo grammature con il sistema **baker's percentage**: tutto è relativo al 100% di farina.
+
+| Simbolo | Tipo | Scopo |
+|---|---|---|
+| `RecipeStyle` | `StrEnum` | 7 stili (napoletana, teglia, pala, pinsa, romana, pane, panettone) |
+| `STYLE_LABELS` | `dict[RecipeStyle, str]` | etichette italiane |
+| `RecipeIngredients` | `dataclass` | input: `panetto_g`, `n_panetti`, %idratazione, %sale, %lievito, %olio, %zucchero, %prefermento, %idratazione prefermento |
+| `IngredientWeights` | `dataclass` | output: grammi di farina/acqua/sale/lievito/olio/zucchero + quota prefermento vs rinfresco |
+| `compute(ri)` | funzione | risolve `farina * (1 + idratazione + sale + ...) = peso_totale` e distribuisce |
+
+La logica: dato peso_panetto×n_panetti = peso_totale, si imposta `denominatore = 1 + sum(percentuali)` e si ricava `farina = peso_totale / denominatore`. Da lì tutte le grammature sono `farina × percentuale`.
+
+### [services/presets.py](src/doughlab/services/presets.py)
+
+Ricette predefinite caricabili con un click dalla UI (`/?preset=<key>`).
+
+| Simbolo | Tipo | Scopo |
+|---|---|---|
+| `Preset` | `dataclass` | `(key, label, style, ingredients, yeast_kind, target_work, phases)` |
+| `PRESETS` | `list[Preset]` | lista di preset (5 al momento) |
+| `PRESETS_BY_KEY` | `dict[str, Preset]` | lookup O(1) |
+
+Preset inclusi:
+- `napoletana` — 8h a 22°C diretto
+- `napoletana_frigo` — 24h con maturazione in frigo
+- `teglia` — teglia romana 24h+ con olio
+- `pinsa` — pinsa 48h ad alta idratazione
+- `pane_biga` — pane con biga al 30%
+
 ### [services/scheduler.py](src/doughlab/services/scheduler.py)
 
 Il "direttore d'orchestra". Converte una lista di fasi in un `PlanResult` completo.
@@ -283,18 +316,24 @@ L'app FastAPI. Route attuali:
 
 | Metodo | Path | Scopo |
 |---|---|---|
-| `GET` | `/` | pagina `planner.html` con form precompilato |
+| `GET` | `/` | pagina `planner.html`, usa primo preset come default |
+| `GET` | `/?preset=<key>` | carica preset specifico (reload intero per server-side state) |
 | `POST` | `/plan` | ritorna il **fragment HTML** `plan_result.html` (HTMX swap) |
 | `POST` | `/plan.ics` | ritorna il piano come file `.ics` da aprire in Calendario |
 | `GET` | `/static/*` | asset statici (PWA, icone, SW) |
 
-Il parser del form (`_parse_phase_form`) legge campi index-based tipo `phase_kind_0`, `phase_hours_0`, `phase_kind_1`, ... → questo permette aggiunta/rimozione dinamica di righe dal frontend senza payload JSON.
+Helper interni:
+- `_common_ctx()` → dropdown e metadati sempre serviti al template
+- `_parse_phase_form(data)` → legge campi index-based `phase_kind_0`, `phase_hours_0`, ...
+- `_parse_ingredients(data)` → estrae grammature e percentuali dal form
+- `_default_recipe_ctx()` / `_preset_ctx(key)` → struttura dati per il template
+- `_compute_plan_and_ingredients(data)` → pacchetto unificato per `/plan` e `/plan.ics`
 
 ### [templates/](src/doughlab/templates/)
 
-- **`base.html`**: layout minimale, import di Tailwind + HTMX + Chart.js da CDN, registra il service worker. Niente Node, niente build step.
-- **`planner.html`**: form del pianificatore. Ogni cambio su un input triggera `hx-post="/plan"` con swap su `#result`. Rendering iniziale invocato con `htmx.trigger('#planForm','submit')` al load.
-- **`partials/plan_result.html`**: fragment con tabella fasi + canvas Chart.js. Il grafico ha 3 serie (T° impasto, T° ambiente, maturità %) su due assi y.
+- **`base.html`**: layout minimale con variabili CSS semantiche (`--bg`, `--surface`, `--ac`…), dark mode automatica (preferenza di sistema) + toggle manuale persistente in `localStorage`. Alpine.js + HTMX + Chart.js caricati da CDN. Niente Node, niente build step.
+- **`planner.html`**: pagina principale con **scroll-reveal layout**: in alto `#result` (aggiornato live via HTMX), poi barra ricette (preset), poi form con intestazione ricetta (nome/stile/panetti/%), fasi, pannello collassabile "Parametri avanzati" (olio/zucchero/prefermento/target). Alpine gestisce reindex righe + preset loading.
+- **`partials/plan_result.html`**: fragment ritornato da `/plan`. Grid 2 colonne (su desktop): colonna sinistra sticky con riepilogo chiave (pronto alle / fine piano / durata / maturità / lievito suggerito), colonna destra con card ingredienti (grammi + %), grafico Chart.js (T° impasto / T° ambiente / maturità %), tabella timeline fasi.
 
 ### [static/](src/doughlab/static/)
 
@@ -306,7 +345,7 @@ Il parser del form (`_parse_phase_form`) legge campi index-based tipo `phase_kin
 
 ## Testing
 
-14 test (al 2026-10-02). Lanciali con `uv run pytest`.
+19 test (al 2026-10-02). Lanciali con `uv run pytest`.
 
 ### [tests/test_thermal.py](tests/test_thermal.py)
 
@@ -337,6 +376,16 @@ Il parser del form (`_parse_phase_form`) legge campi index-based tipo `phase_kin
 | `test_end_and_phase_consistency` | ultima `PhaseResult.end_at` == `end_at` globale |
 | `test_maturity_increases_in_fermenting_phases` | nell'appretto la maturità cresce |
 
+### [tests/test_ingredients.py](tests/test_ingredients.py)
+
+| Test | Proprietà verificata |
+|---|---|
+| `test_total_mass_matches_panetti` | somma grammature == `panetto_g × n_panetti` |
+| `test_hydration_ratio` | `acqua / farina == idratazione%` |
+| `test_salt_ratio` | `sale / farina == sale%` |
+| `test_preferment_split` | prefermento + rinfresco == totale |
+| `test_oil_included_in_total` | l'olio entra nel bilancio massico |
+
 ---
 
 ## Convenzioni di sviluppo
@@ -357,16 +406,17 @@ Il parser del form (`_parse_phase_form`) legge campi index-based tipo `phase_kin
 ### ✅ MVP (fatto)
 - Modello termico Newton con profili contenitore/ambiente
 - Modello fermentazione Q10 (fresco/secco/LM)
+- Calcolatore grammature baker's percentage (con prefermento)
+- 5 preset ricette (napoletana / napoletana frigo / teglia / pinsa / pane biga)
 - Pianificatore HTMX con grafico Chart.js
 - Export `.ics` per Calendario iOS
 - PWA installabile
-- 14 test unitari verdi
-- UI in italiano con etichette leggibili
+- UI con palette rivista + dark mode (auto + toggle)
+- 19 test unitari verdi
 
 ### 🔜 Fase 2 — Il tool completo per il pizzaiolo
-- Calcolatore ingredienti integrato (napoletana, teglia, pinsa, biga, poolish, LM)
 - Persistenza ricette con versioning (ORM già pronto)
-- UI load/save/elenco ricette
+- UI load/save/elenco ricette (unificare con preset bar)
 - **Live Bake mode**: timer mobile per fase corrente + checkpoint
 - Diario infornate con upload foto e rating
 

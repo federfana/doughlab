@@ -1,50 +1,227 @@
 <!DOCTYPE html>
-<html lang="it">
+<html lang="it" x-data="{ dark: localStorage.getItem('dl-theme') === 'dark' || (localStorage.getItem('dl-theme') === null && matchMedia('(prefers-color-scheme: dark)').matches) }" :class="dark ? 'dark' : ''">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#8a4b12">
+<meta name="theme-color" content="#1f1a16" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#faf6ef" media="(prefers-color-scheme: light)">
 <title>{{ app_name }}</title>
 <link rel="manifest" href="/static/manifest.webmanifest">
 <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
-<script src="https://cdn.tailwindcss.com"></script>
 <script>
-tailwind.config = {
-  theme: {
-    extend: {
-      colors: {
-        bg:  '#f6efe4',
-        card:'#fffaf1',
-        ink: '#2b1d12',
-        mut: '#7a6248',
-        ac:  '#8a4b12',
-        rc:  '#2f6b57',
-      }
-    }
-  }
-}
+  // Previene flash: applica il tema prima del render.
+  (function(){
+    try {
+      var saved = localStorage.getItem('dl-theme');
+      var dark = saved === 'dark' || (saved === null && matchMedia('(prefers-color-scheme: dark)').matches);
+      document.documentElement.classList.toggle('dark', dark);
+    } catch(e){}
+  })();
 </script>
+<style>
+:root {
+  color-scheme: light dark;
+  /* Palette chiara */
+  --bg: #faf6ef;
+  --surface: #ffffff;
+  --surface-2: #f3ebdd;
+  --border: #e4d6bf;
+  --ink: #221811;
+  --ink-2: #5c4a37;
+  --mut: #8a7659;
+  --ac: #c2410c;        /* arancione terracotta */
+  --ac-ink: #ffffff;
+  --ac-soft: #fed7aa;
+  --ok: #15803d;
+  --warn: #b45309;
+  --bad: #b91c1c;
+  --shadow: 0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.04);
+  --radius: 10px;
+}
+html.dark {
+  --bg: #15110d;
+  --surface: #221a14;
+  --surface-2: #2b211a;
+  --border: #3b2e23;
+  --ink: #f5ede0;
+  --ink-2: #c9b89a;
+  --mut: #938168;
+  --ac: #fb923c;
+  --ac-ink: #1a0e05;
+  --ac-soft: #4a2d12;
+  --ok: #4ade80;
+  --warn: #fbbf24;
+  --bad: #f87171;
+  --shadow: 0 2px 6px rgba(0,0,0,.4);
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  padding-top: env(safe-area-inset-top, 0);
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+a { color: var(--ac); }
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.card-2 {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.btn {
+  background: var(--ac);
+  color: var(--ac-ink);
+  border: 1px solid var(--ac);
+  border-radius: 6px;
+  padding: .5rem .9rem;
+  font: 600 inherit;
+  cursor: pointer;
+  transition: filter .1s;
+}
+.btn:hover { filter: brightness(1.08); }
+.btn:focus-visible { outline: 2px solid var(--ac); outline-offset: 2px; }
+.btn-ghost {
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: .45rem .8rem;
+  font: inherit;
+  cursor: pointer;
+}
+.btn-ghost:hover { border-color: var(--ac); color: var(--ac); }
+.btn-ghost.active {
+  background: var(--ac-soft);
+  color: var(--ac);
+  border-color: var(--ac);
+}
+input, select, textarea {
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: .4rem .55rem;
+  font: inherit;
+}
+input:focus, select:focus { outline: 2px solid var(--ac); outline-offset: 1px; }
+input[type=number] { width: 5.2rem; text-align: center; }
+input[type=datetime-local] { width: auto; }
+label.field { display: flex; flex-direction: column; gap: .25rem; min-width: 0; }
+label.field .lab {
+  font-size: .7rem;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--mut);
+  font-weight: 600;
+}
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+thead { background: var(--surface-2); color: var(--ink-2); }
+th, td { padding: .45rem .5rem; text-align: center; }
+th { font-weight: 600; }
+tbody tr { border-top: 1px solid var(--border); }
+tbody tr:hover td { background: var(--surface-2); }
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: .3rem;
+  padding: .2rem .55rem;
+  border-radius: 999px;
+  font-size: .78rem;
+  font-weight: 600;
+  background: var(--ac-soft);
+  color: var(--ac);
+}
+details.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0;
+  overflow: hidden;
+}
+details.panel > summary {
+  padding: .6rem .9rem;
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--ink);
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  user-select: none;
+}
+details.panel > summary::-webkit-details-marker { display: none; }
+details.panel > summary::after {
+  content: "▸";
+  color: var(--mut);
+  transition: transform .15s;
+}
+details.panel[open] > summary::after { transform: rotate(90deg); }
+details.panel > .panel-body { padding: .9rem; border-top: 1px solid var(--border); }
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  backdrop-filter: saturate(1.2) blur(6px);
+}
+.topbar-inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: .6rem 1rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.toggle {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: .35rem .55rem;
+  cursor: pointer;
+  font-size: .95rem;
+}
+.toggle:hover { border-color: var(--ac); }
+.row-reset td { background: transparent !important; }
+.lab-row { font-size: .72rem; letter-spacing: .04em; text-transform: uppercase; color: var(--mut); font-weight: 600; margin-bottom: .4rem; }
+[hidden] { display: none !important; }
+.hint { font-size: .78rem; color: var(--mut); }
+
+/* Grid helpers */
+.grid { display: grid; gap: 1rem; }
+.grid-planner { grid-template-columns: 1fr; }
+@media (min-width: 980px) {
+  .grid-planner { grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr); align-items: start; }
+  .sticky-side { position: sticky; top: 72px; max-height: calc(100vh - 90px); overflow-y: auto; }
+}
+.space-y > * + * { margin-top: 1rem; }
+.flex-wrap-row { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js" defer></script>
 <script src="https://unpkg.com/htmx.org@1.9.12"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
-<style>
-  body { background: var(--bg, #f6efe4); color: var(--ink, #2b1d12); font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
-  .card { background: #fffaf1; border: 1px solid #d3b078; border-radius: 10px; }
-  .ac { color: #8a4b12; }
-  .btn { background: #8a4b12; color: #fffaf1; padding: .5rem .9rem; border-radius: 6px; font-weight: 600; }
-  .btn-ghost { background: #fffaf1; border: 1px solid #d3b078; color: #2b1d12; padding: .5rem .9rem; border-radius: 6px; }
-  input, select { background: #fffaf1; border: 1px solid #d3b078; border-radius: 5px; padding: .3rem .5rem; color: #2b1d12; }
-  input[type=number] { width: 5rem; text-align: center; }
-  input[type=datetime-local] { width: auto; }
-  table { border-collapse: collapse; width: 100%; }
-  thead { background: #6b3f1d; color: #fff; }
-  th, td { padding: .4rem .5rem; text-align: center; }
-  tr:nth-child(even) td { background: #fbeed0; }
-  tr:nth-child(odd) td { background: #f7dfa8; }
-  .lab { font-size: .72rem; letter-spacing: .04em; text-transform: uppercase; color: #7a6248; }
-</style>
 </head>
 <body>
-<main class="max-w-5xl mx-auto p-4 pb-24">
+<header class="topbar">
+  <div class="topbar-inner">
+    <strong style="color: var(--ac); font-size: 1.1rem">🍕 {{ app_name }}</strong>
+    <span class="hint" style="margin-left:auto"></span>
+    <button class="toggle" type="button" @click="dark = !dark; localStorage.setItem('dl-theme', dark ? 'dark' : 'light'); document.documentElement.classList.toggle('dark', dark)" :aria-label="dark ? 'Passa al tema chiaro' : 'Passa al tema scuro'">
+      <span x-show="!dark">🌙</span>
+      <span x-show="dark">☀️</span>
+    </button>
+  </div>
+</header>
+<main style="max-width: 1100px; margin: 0 auto; padding: 1rem; padding-bottom: 4rem;">
 {% block content %}{% endblock %}
 </main>
 <script>

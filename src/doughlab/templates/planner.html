@@ -1,99 +1,179 @@
 {% extends "base.html" %}
 {% block content %}
-<header class="mb-4">
-  <h1 class="text-2xl font-bold ac">🍕 DoughLab</h1>
-  <p class="text-sm text-mut">Pianifica l'impasto. Il modello di maturazione ti dice <em>quando</em> è davvero pronto, non solo che ora segna il piano.</p>
-</header>
+<div class="space-y" x-data="plannerUI()">
 
-<form id="planForm"
-      hx-post="/plan"
-      hx-trigger="change delay:300ms, submit"
-      hx-target="#result"
-      hx-swap="innerHTML"
-      class="card p-4 space-y-4">
-
-  <section class="grid grid-cols-2 md:grid-cols-4 gap-3">
-    <label class="flex flex-col gap-1">
-      <span class="lab">Partenza</span>
-      <input type="datetime-local" name="start_at" value="{{ start_default }}" required>
-    </label>
-    <label class="flex flex-col gap-1">
-      <span class="lab">T° impasto iniziale</span>
-      <input type="number" name="initial_dough_c" value="24" step="0.5" min="0" max="40">
-    </label>
-    <label class="flex flex-col gap-1">
-      <span class="lab">Lievito</span>
-      <select name="yeast_kind">
-        {% for v, label in yeast_kinds %}
-          <option value="{{ v }}">{{ label }}</option>
-        {% endfor %}
-      </select>
-    </label>
-    <label class="flex flex-col gap-1">
-      <span class="lab">% lievito su farina</span>
-      <input type="number" name="yeast_pct" value="0.3" step="0.01" min="0" max="10">
-    </label>
-    <label class="flex flex-col gap-1 col-span-2">
-      <span class="lab">Lavoro target (maturità)</span>
-      <input type="number" name="target_work" value="24" step="1" min="1" max="200">
-    </label>
-  </section>
-
-  <section>
-    <div class="flex items-center justify-between mb-2">
-      <h2 class="font-semibold ac">Fasi</h2>
-      <button type="button" class="btn-ghost text-sm" onclick="addPhase()">+ aggiungi fase</button>
-    </div>
-    <div class="overflow-x-auto">
-      <table>
-        <thead>
-          <tr>
-            <th>Tipo</th><th>Etichetta</th><th>Ore</th><th>T° amb (°C)</th><th>Contenitore</th><th>Ambiente</th><th></th>
-          </tr>
-        </thead>
-        <tbody id="phases">
-          {% for p in default_phases %}
-          {% set i = loop.index0 %}
-          <tr data-row>
-            <td>
-              <select name="phase_kind_{{ i }}">
-                {% for v, label in phase_kinds %}
-                  <option value="{{ v }}" {% if p.kind.value==v %}selected{% endif %}>{{ label }}</option>
-                {% endfor %}
-              </select>
-            </td>
-            <td><input type="text" name="phase_label_{{ i }}" value="{{ p.label }}" style="width:9rem"></td>
-            <td><input type="number" name="phase_hours_{{ i }}" value="{{ p.hours }}" step="0.25" min="0" max="720"></td>
-            <td><input type="number" name="phase_ambient_{{ i }}" value="{{ p.ambient_c }}" step="0.5" min="-5" max="50"></td>
-            <td>
-              <select name="phase_container_{{ i }}">
-                {% for v, label in containers %}
-                  <option value="{{ v }}" {% if p.container.value==v %}selected{% endif %}>{{ label }}</option>
-                {% endfor %}
-              </select>
-            </td>
-            <td>
-              <select name="phase_env_{{ i }}">
-                {% for v, label in environments %}
-                  <option value="{{ v }}" {% if p.environment.value==v %}selected{% endif %}>{{ label }}</option>
-                {% endfor %}
-              </select>
-            </td>
-            <td><button type="button" class="btn-ghost text-xs" onclick="this.closest('tr').remove(); reindex(); htmx.trigger('#planForm','change')">✕</button></td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+  {# ───── RISULTATO (in testa, aggiornato live via HTMX) ───── #}
+  <section id="result" aria-live="polite">
+    <div class="card" style="padding: 1rem; color: var(--mut); text-align: center">
+      Calcolo del piano in corso…
     </div>
   </section>
 
-  <div class="flex gap-2 flex-wrap">
-    <button type="submit" class="btn">Calcola piano</button>
-    <button type="button" class="btn-ghost" onclick="exportIcs()">📅 Esporta .ics</button>
-  </div>
-</form>
+  {# ───── BARRA RICETTE (preset + salvate uniti in futuro) ───── #}
+  <section class="card" style="padding: .8rem 1rem">
+    <div class="lab-row">Ricette</div>
+    <div class="flex-wrap-row">
+      {% for p in presets %}
+      <button type="button" class="btn-ghost {% if recipe.active_preset==p.key %}active{% endif %}"
+              @click="loadPreset('{{ p.key }}')">
+        {{ p.label }}
+      </button>
+      {% endfor %}
+      <span class="hint" style="margin-left:auto">Le tue ricette salvate compariranno qui (fase 2)</span>
+    </div>
+  </section>
 
-<section id="result" class="mt-5"></section>
+  {# ───── FORM ───── #}
+  <form id="planForm"
+        hx-post="/plan"
+        hx-trigger="change delay:300ms from:#planForm, load"
+        hx-target="#result"
+        hx-swap="innerHTML"
+        class="space-y">
+
+    {# Intestazione: identità della ricetta #}
+    <section class="card" style="padding: 1rem">
+      <div class="lab-row">Ricetta</div>
+      <div style="display:grid; gap:.8rem; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr))">
+        <label class="field">
+          <span class="lab">Nome</span>
+          <input type="text" name="recipe_name" value="{{ recipe.recipe_name }}" maxlength="60">
+        </label>
+        <label class="field">
+          <span class="lab">Stile</span>
+          <select name="style">
+            {% for v, label in styles %}
+              <option value="{{ v }}" {% if recipe.style==v %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label class="field">
+          <span class="lab">N° panetti</span>
+          <input type="number" name="n_panetti" value="{{ recipe.ingredients.n_panetti }}" min="1" max="200">
+        </label>
+        <label class="field">
+          <span class="lab">Peso panetto (g)</span>
+          <input type="number" name="panetto_g" value="{{ '%.0f'|format(recipe.ingredients.panetto_g) }}" min="30" max="2000" step="10">
+        </label>
+        <label class="field">
+          <span class="lab">Idratazione %</span>
+          <input type="number" name="hydration_pct" value="{{ '%.2f'|format(recipe.ingredients.hydration_pct) }}" step="0.01" min="0.3" max="1.2">
+        </label>
+        <label class="field">
+          <span class="lab">Sale %</span>
+          <input type="number" name="salt_pct" value="{{ '%.3f'|format(recipe.ingredients.salt_pct) }}" step="0.001" min="0" max="0.1">
+        </label>
+        <label class="field">
+          <span class="lab">Lievito %</span>
+          <input type="number" name="yeast_pct" value="{{ '%.4f'|format(recipe.ingredients.yeast_pct) }}" step="0.0001" min="0" max="0.1">
+        </label>
+      </div>
+    </section>
+
+    {# Partenza + lievito tipo #}
+    <section class="card" style="padding: 1rem">
+      <div class="lab-row">Partenza</div>
+      <div style="display:grid; gap:.8rem; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr))">
+        <label class="field">
+          <span class="lab">Giorno e ora</span>
+          <input type="datetime-local" name="start_at" value="{{ recipe.start_at }}" required>
+        </label>
+        <label class="field">
+          <span class="lab">T° impasto iniziale</span>
+          <input type="number" name="initial_dough_c" value="{{ recipe.initial_dough_c }}" step="0.5" min="0" max="40">
+        </label>
+        <label class="field">
+          <span class="lab">Tipo di lievito</span>
+          <select name="yeast_kind">
+            {% for v, label in yeast_kinds %}
+              <option value="{{ v }}" {% if recipe.yeast_kind==v %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </label>
+      </div>
+    </section>
+
+    {# Fasi #}
+    <section class="card" style="padding: 1rem">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:.5rem">
+        <div class="lab-row" style="margin: 0">Fasi di lavorazione</div>
+        <button type="button" class="btn-ghost" @click="addPhase()">+ Aggiungi fase</button>
+      </div>
+      <div style="overflow-x: auto">
+        <table>
+          <thead>
+            <tr><th>Fase</th><th>Etichetta</th><th>Ore</th><th>T° amb</th><th>Avanzato</th><th></th></tr>
+          </thead>
+          <tbody id="phases">
+            {% for p in recipe.phases %}
+            {% set i = loop.index0 %}
+            <tr data-row>
+              <td>
+                <select name="phase_kind_{{ i }}">
+                  {% for v, label in phase_kinds %}
+                    <option value="{{ v }}" {% if p.kind==v %}selected{% endif %}>{{ label }}</option>
+                  {% endfor %}
+                </select>
+              </td>
+              <td><input type="text" name="phase_label_{{ i }}" value="{{ p.label }}" style="width: 10rem"></td>
+              <td><input type="number" name="phase_hours_{{ i }}" value="{{ p.hours }}" step="0.25" min="0" max="720"></td>
+              <td><input type="number" name="phase_ambient_{{ i }}" value="{{ p.ambient_c }}" step="0.5" min="-5" max="50"></td>
+              <td>
+                <span class="hint">
+                  <select name="phase_container_{{ i }}" style="font-size: .8rem">
+                    {% for v, label in containers %}
+                      <option value="{{ v }}" {% if p.container==v %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                  </select>
+                  <select name="phase_env_{{ i }}" style="font-size: .8rem">
+                    {% for v, label in environments %}
+                      <option value="{{ v }}" {% if p.environment==v %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                  </select>
+                </span>
+              </td>
+              <td><button type="button" class="btn-ghost" style="padding: .2rem .5rem" @click="removePhase($event)">✕</button></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    {# Pannello Avanzato #}
+    <details class="panel">
+      <summary>Parametri avanzati</summary>
+      <div class="panel-body" style="display:grid; gap:.8rem; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr))">
+        <label class="field">
+          <span class="lab">Olio %</span>
+          <input type="number" name="oil_pct" value="{{ '%.3f'|format(recipe.ingredients.oil_pct) }}" step="0.001" min="0" max="0.2">
+        </label>
+        <label class="field">
+          <span class="lab">Zucchero/malto %</span>
+          <input type="number" name="sugar_pct" value="{{ '%.3f'|format(recipe.ingredients.sugar_pct) }}" step="0.001" min="0" max="0.2">
+        </label>
+        <label class="field">
+          <span class="lab">Prefermento % farina</span>
+          <input type="number" name="preferment_pct" value="{{ '%.2f'|format(recipe.ingredients.preferment_pct) }}" step="0.01" min="0" max="1">
+        </label>
+        <label class="field">
+          <span class="lab">Idratazione prefermento</span>
+          <input type="number" name="preferment_hydration_pct" value="{{ '%.2f'|format(recipe.ingredients.preferment_hydration_pct) }}" step="0.05" min="0.3" max="1.5">
+        </label>
+        <label class="field">
+          <span class="lab">Target maturità (W)</span>
+          <input type="number" name="target_work" value="{{ recipe.target_work }}" step="1" min="1" max="200">
+          <span class="hint">24 = napoletana standard; 28-32 = pane; 48 = pinsa lunga</span>
+        </label>
+      </div>
+    </details>
+
+    <div class="flex-wrap-row">
+      <button type="button" class="btn-ghost" @click="exportIcs()">📅 Esporta in Calendario (.ics)</button>
+      <span class="hint" style="margin-left:auto">Il piano si ricalcola automaticamente ad ogni modifica.</span>
+    </div>
+  </form>
+</div>
 
 <template id="rowTpl">
   <tr data-row>
@@ -104,54 +184,61 @@
         {% endfor %}
       </select>
     </td>
-    <td><input type="text" name="phase_label_IDX" value="Nuova fase" style="width:9rem"></td>
+    <td><input type="text" name="phase_label_IDX" value="Nuova fase" style="width: 10rem"></td>
     <td><input type="number" name="phase_hours_IDX" value="1" step="0.25" min="0" max="720"></td>
     <td><input type="number" name="phase_ambient_IDX" value="22" step="0.5" min="-5" max="50"></td>
     <td>
-      <select name="phase_container_IDX">
-        {% for v, label in containers %}
-          <option value="{{ v }}">{{ label }}</option>
-        {% endfor %}
-      </select>
+      <span class="hint">
+        <select name="phase_container_IDX" style="font-size: .8rem">
+          {% for v, label in containers %}<option value="{{ v }}">{{ label }}</option>{% endfor %}
+        </select>
+        <select name="phase_env_IDX" style="font-size: .8rem">
+          {% for v, label in environments %}<option value="{{ v }}">{{ label }}</option>{% endfor %}
+        </select>
+      </span>
     </td>
-    <td>
-      <select name="phase_env_IDX">
-        {% for v, label in environments %}
-          <option value="{{ v }}">{{ label }}</option>
-        {% endfor %}
-      </select>
-    </td>
-    <td><button type="button" class="btn-ghost text-xs" onclick="this.closest('tr').remove(); reindex(); htmx.trigger('#planForm','change')">✕</button></td>
+    <td><button type="button" class="btn-ghost" style="padding: .2rem .5rem" @click="removePhase($event)">✕</button></td>
   </tr>
 </template>
 
 <script>
-function reindex() {
-  document.querySelectorAll('#phases tr[data-row]').forEach((tr, i) => {
-    tr.querySelectorAll('[name]').forEach(el => {
-      el.name = el.name.replace(/_(\d+|IDX)$/, '_' + i);
-    });
-  });
+function plannerUI() {
+  return {
+    reindex() {
+      document.querySelectorAll('#phases tr[data-row]').forEach((tr, i) => {
+        tr.querySelectorAll('[name]').forEach(el => {
+          el.name = el.name.replace(/_(\d+|IDX)$/, '_' + i);
+        });
+      });
+    },
+    addPhase() {
+      const tpl = document.getElementById('rowTpl').content.cloneNode(true);
+      document.getElementById('phases').appendChild(tpl);
+      this.reindex();
+      htmx.trigger('#planForm', 'change');
+    },
+    removePhase(ev) {
+      ev.target.closest('tr').remove();
+      this.reindex();
+      htmx.trigger('#planForm', 'change');
+    },
+    loadPreset(key) {
+      // Reload intera pagina sul preset: tiene il server source-of-truth per fasi/ingredienti.
+      window.location.href = '/?preset=' + encodeURIComponent(key);
+    },
+    exportIcs() {
+      const form = document.getElementById('planForm');
+      const fd = new FormData(form);
+      fetch('/plan.ics', { method: 'POST', body: fd })
+        .then(r => r.blob())
+        .then(b => {
+          const url = URL.createObjectURL(b);
+          const a = document.createElement('a');
+          a.href = url; a.download = 'doughlab-plan.ics'; a.click();
+          setTimeout(() => URL.revokeObjectURL(url), 2000);
+        });
+    },
+  };
 }
-function addPhase() {
-  const tpl = document.getElementById('rowTpl').content.cloneNode(true);
-  document.getElementById('phases').appendChild(tpl);
-  reindex();
-  htmx.trigger('#planForm', 'change');
-}
-function exportIcs() {
-  const form = document.getElementById('planForm');
-  const fd = new FormData(form);
-  fetch('/plan.ics', { method: 'POST', body: fd })
-    .then(r => r.blob())
-    .then(b => {
-      const url = URL.createObjectURL(b);
-      const a = document.createElement('a');
-      a.href = url; a.download = 'doughlab-plan.ics'; a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 2000);
-    });
-}
-// prima render
-window.addEventListener('load', () => htmx.trigger('#planForm', 'submit'));
 </script>
 {% endblock %}
