@@ -1,0 +1,94 @@
+{# Risultato del piano: tabella fasi + grafico temperatura + maturità. #}
+{% set ready = plan.ready_at %}
+<div class="card p-4 space-y-4">
+  <div class="flex flex-wrap items-baseline gap-x-6 gap-y-2">
+    <div>
+      <div class="lab">Fine piano</div>
+      <div class="text-lg font-semibold">{{ plan.end_at.strftime('%a %d %b · %H:%M') }}</div>
+    </div>
+    <div>
+      <div class="lab">Totale</div>
+      <div class="text-lg font-semibold">{{ '%.1f'|format(plan.total_hours) }} h</div>
+    </div>
+    <div>
+      <div class="lab">Maturità finale</div>
+      <div class="text-lg font-semibold {% if plan.fermentation.final_pct < 85 %}text-red-700{% elif plan.fermentation.final_pct > 115 %}text-red-700{% else %}text-emerald-700{% endif %}">
+        {{ '%.0f'|format(plan.fermentation.final_pct) }}%
+      </div>
+    </div>
+    <div>
+      <div class="lab">Pronto alle</div>
+      <div class="text-lg font-semibold">
+        {% if ready %}{{ ready.strftime('%a %d %b · %H:%M') }}{% else %}non raggiunta{% endif %}
+      </div>
+    </div>
+    <div class="ml-auto">
+      <div class="lab">Suggerimento</div>
+      <div class="text-sm">
+        Per centrare il target con lo stesso piano: <b>{{ '%.3f'|format(suggested_pct) }}%</b> di {{ yeast_label | lower }}
+        (ora: {{ '%.3f'|format(yeast_pct) }}%).
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <canvas id="chart" height="140"></canvas>
+  </div>
+
+  <div class="overflow-x-auto">
+    <table>
+      <thead>
+        <tr><th>Fase</th><th>Inizio</th><th>Fine</th><th>Ore</th><th>T° amb</th><th>Maturità</th></tr>
+      </thead>
+      <tbody>
+        {% for pr in plan.phases %}
+        <tr>
+          <td class="text-left pl-2">{{ pr.phase.label }}</td>
+          <td>{{ pr.start_at.strftime('%a %H:%M') }}</td>
+          <td>{{ pr.end_at.strftime('%a %H:%M') }}</td>
+          <td>{{ '%.2f'|format(pr.phase.hours) }}</td>
+          <td>{{ '%.1f'|format(pr.phase.ambient_c) }} °C</td>
+          <td>{{ '%.0f'|format(pr.maturity_start_pct) }}% → {{ '%.0f'|format(pr.maturity_end_pct) }}%</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script id="chartData" type="application/json">
+{
+  "t": {{ plan.thermal.time_h.tolist() | tojson }},
+  "dough": {{ plan.thermal.temp_c.tolist() | tojson }},
+  "amb": {{ plan.thermal.ambient_c.tolist() | tojson }},
+  "mat": {{ plan.fermentation.maturity_pct.tolist() | tojson }}
+}
+</script>
+<script>
+(function() {
+  const d = JSON.parse(document.getElementById('chartData').textContent);
+  const ctx = document.getElementById('chart');
+  if (window.__chart) window.__chart.destroy();
+  window.__chart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: d.t,
+      datasets: [
+        { label: 'T° impasto', data: d.dough, borderColor: '#8a4b12', borderWidth: 2, pointRadius: 0, yAxisID: 'y' },
+        { label: 'T° ambiente', data: d.amb, borderColor: '#7a6248', borderWidth: 1, borderDash: [6,4], pointRadius: 0, yAxisID: 'y' },
+        { label: 'Maturità %', data: d.mat, borderColor: '#2f6b57', borderWidth: 2, pointRadius: 0, yAxisID: 'y1' }
+      ]
+    },
+    options: {
+      responsive: true,
+      interaction: { mode: 'index', intersect: false },
+      scales: {
+        x: { title: { display: true, text: 'ore dall\'inizio' }, ticks: { callback: v => (+v).toFixed(1) } },
+        y: { title: { display: true, text: '°C' }, suggestedMin: 0, suggestedMax: 30 },
+        y1: { position: 'right', title: { display: true, text: 'maturità %' }, suggestedMin: 0, suggestedMax: 120, grid: { drawOnChartArea: false } }
+      },
+      plugins: { legend: { position: 'bottom' } }
+    }
+  });
+})();
+</script>

@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#8a4b12">
+<title>{{ app_name }}</title>
+<link rel="manifest" href="/static/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/static/icons/icon-192.png">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      colors: {
+        bg:  '#f6efe4',
+        card:'#fffaf1',
+        ink: '#2b1d12',
+        mut: '#7a6248',
+        ac:  '#8a4b12',
+        rc:  '#2f6b57',
+      }
+    }
+  }
+}
+</script>
+<script src="https://unpkg.com/htmx.org@1.9.12"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<style>
+  body { background: var(--bg, #f6efe4); color: var(--ink, #2b1d12); font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .card { background: #fffaf1; border: 1px solid #d3b078; border-radius: 10px; }
+  .ac { color: #8a4b12; }
+  .btn { background: #8a4b12; color: #fffaf1; padding: .5rem .9rem; border-radius: 6px; font-weight: 600; }
+  .btn-ghost { background: #fffaf1; border: 1px solid #d3b078; color: #2b1d12; padding: .5rem .9rem; border-radius: 6px; }
+  input, select { background: #fffaf1; border: 1px solid #d3b078; border-radius: 5px; padding: .3rem .5rem; color: #2b1d12; }
+  input[type=number] { width: 5rem; text-align: center; }
+  input[type=datetime-local] { width: auto; }
+  table { border-collapse: collapse; width: 100%; }
+  thead { background: #6b3f1d; color: #fff; }
+  th, td { padding: .4rem .5rem; text-align: center; }
+  tr:nth-child(even) td { background: #fbeed0; }
+  tr:nth-child(odd) td { background: #f7dfa8; }
+  .lab { font-size: .72rem; letter-spacing: .04em; text-transform: uppercase; color: #7a6248; }
+</style>
+</head>
+<body>
+<main class="max-w-5xl mx-auto p-4 pb-24">
+{% block content %}{% endblock %}
+</main>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('/static/sw.js').catch(() => {}));
+}
+</script>
+</body>
+</html>
