@@ -26,7 +26,7 @@
   {# ───── FORM ───── #}
   <form id="planForm"
         hx-post="/plan"
-        hx-trigger="change delay:300ms from:#planForm, load"
+      hx-trigger="input delay:450ms from:#planForm, change delay:200ms from:#planForm, load"
         hx-target="#result"
         hx-swap="innerHTML"
         class="space-y">
@@ -57,16 +57,20 @@
         </label>
         <label class="field">
           <span class="lab">Idratazione %</span>
-          <input type="number" name="hydration_pct" value="{{ '%.2f'|format(recipe.ingredients.hydration_pct) }}" step="0.01" min="0.3" max="1.2">
+          <input type="number" name="hydration_pct" value="{{ '%.1f'|format(recipe.ingredients.hydration_pct * 100) }}" step="0.1" min="40" max="120">
         </label>
         <label class="field">
           <span class="lab">Sale %</span>
-          <input type="number" name="salt_pct" value="{{ '%.3f'|format(recipe.ingredients.salt_pct) }}" step="0.001" min="0" max="0.1">
+          <input type="number" name="salt_pct" value="{{ '%.2f'|format(recipe.ingredients.salt_pct * 100) }}" step="0.01" min="0" max="10">
         </label>
         <label class="field">
           <span class="lab">Lievito %</span>
-          <input type="number" name="yeast_pct" value="{{ '%.4f'|format(recipe.ingredients.yeast_pct) }}" step="0.0001" min="0" max="0.1">
+          <input type="number" name="yeast_pct" value="{{ '%.3f'|format(recipe.ingredients.yeast_pct * 100) }}" step="0.001" min="0" max="5">
         </label>
+      </div>
+      <div class="hint" style="margin-top: .45rem;">
+        Minimo da compilare: n° panetti, peso panetto, idratazione, sale, lievito.
+        Percentuali in formato umano: idratazione <strong>62</strong>, sale <strong>2.8</strong>, lievito <strong>0.15</strong>.
       </div>
     </section>
 
@@ -146,19 +150,19 @@
       <div class="panel-body" style="display:grid; gap:.8rem; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr))">
         <label class="field">
           <span class="lab">Olio %</span>
-          <input type="number" name="oil_pct" value="{{ '%.3f'|format(recipe.ingredients.oil_pct) }}" step="0.001" min="0" max="0.2">
+          <input type="number" name="oil_pct" value="{{ '%.2f'|format(recipe.ingredients.oil_pct * 100) }}" step="0.01" min="0" max="20">
         </label>
         <label class="field">
           <span class="lab">Zucchero/malto %</span>
-          <input type="number" name="sugar_pct" value="{{ '%.3f'|format(recipe.ingredients.sugar_pct) }}" step="0.001" min="0" max="0.2">
+          <input type="number" name="sugar_pct" value="{{ '%.2f'|format(recipe.ingredients.sugar_pct * 100) }}" step="0.01" min="0" max="20">
         </label>
         <label class="field">
           <span class="lab">Prefermento % farina</span>
-          <input type="number" name="preferment_pct" value="{{ '%.2f'|format(recipe.ingredients.preferment_pct) }}" step="0.01" min="0" max="1">
+          <input type="number" name="preferment_pct" value="{{ '%.1f'|format(recipe.ingredients.preferment_pct * 100) }}" step="0.1" min="0" max="100">
         </label>
         <label class="field">
-          <span class="lab">Idratazione prefermento</span>
-          <input type="number" name="preferment_hydration_pct" value="{{ '%.2f'|format(recipe.ingredients.preferment_hydration_pct) }}" step="0.05" min="0.3" max="1.5">
+          <span class="lab">Idratazione prefermento %</span>
+          <input type="number" name="preferment_hydration_pct" value="{{ '%.0f'|format(recipe.ingredients.preferment_hydration_pct * 100) }}" step="1" min="30" max="150">
         </label>
         <label class="field">
           <span class="lab">Target maturità (W)</span>

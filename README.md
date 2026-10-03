@@ -335,6 +335,8 @@ Helper interni:
 - **`planner.html`**: pagina principale con **scroll-reveal layout**: in alto `#result` (aggiornato live via HTMX), poi barra ricette (preset), poi form con intestazione ricetta (nome/stile/panetti/%), fasi, pannello collassabile "Parametri avanzati" (olio/zucchero/prefermento/target). Alpine gestisce reindex righe + preset loading.
 - **`partials/plan_result.html`**: fragment ritornato da `/plan`. Grid 2 colonne (su desktop): colonna sinistra sticky con riepilogo chiave (pronto alle / fine piano / durata / maturità / lievito suggerito), colonna destra con card ingredienti (grammi + %), grafico Chart.js (T° impasto / T° ambiente / maturità %), tabella timeline fasi.
 
+Nota UX: nel form le percentuali sono inserite in formato umano (`62`, `2.8`, `0.15`) e convertite server-side in frazioni per i calcoli.
+
 ### [static/](src/doughlab/static/)
 
 - **`manifest.webmanifest`**: nome, colori, icone 192/512 → "installabile" come PWA.

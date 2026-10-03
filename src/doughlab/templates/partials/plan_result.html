@@ -34,8 +34,8 @@
       <div>
         <dt class="hint">Lievito suggerito</dt>
         <dd style="margin:0">
-          <span style="font-family: ui-monospace, monospace">{{ '%.4f'|format(suggested_pct) }}%</span>
-          <span class="hint">(ora: {{ '%.4f'|format(ingredients.yeast_pct) }}%)</span>
+          <span style="font-family: ui-monospace, monospace">{{ '%.3f'|format(suggested_pct * 100) }}%</span>
+          <span class="hint">(ora: {{ '%.3f'|format(ingredients.yeast_pct * 100) }}%)</span>
         </dd>
       </div>
     </dl>

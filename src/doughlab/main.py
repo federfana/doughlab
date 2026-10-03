@@ -75,6 +75,10 @@ def _parse_ingredients(data: dict) -> RecipeIngredients:
         except ValueError:
             return default
 
+    def pct(key: str, default_fraction: float) -> float:
+        # L'interfaccia usa percentuali umane (es. 62, 2.8, 0.15), qui convertiamo in frazione.
+        return f(key, default_fraction * 100.0) / 100.0
+
     def i(key: str, default: int) -> int:
         try:
             return int(float(data.get(key) or default))
@@ -84,13 +88,13 @@ def _parse_ingredients(data: dict) -> RecipeIngredients:
     return RecipeIngredients(
         panetto_g=f("panetto_g", 250),
         n_panetti=i("n_panetti", 4),
-        hydration_pct=f("hydration_pct", 0.60),
-        salt_pct=f("salt_pct", 0.025),
-        yeast_pct=f("yeast_pct", 0.003),
-        oil_pct=f("oil_pct", 0.0),
-        sugar_pct=f("sugar_pct", 0.0),
-        preferment_pct=f("preferment_pct", 0.0),
-        preferment_hydration_pct=f("preferment_hydration_pct", 1.0),
+        hydration_pct=pct("hydration_pct", 0.60),
+        salt_pct=pct("salt_pct", 0.025),
+        yeast_pct=pct("yeast_pct", 0.003),
+        oil_pct=pct("oil_pct", 0.0),
+        sugar_pct=pct("sugar_pct", 0.0),
+        preferment_pct=pct("preferment_pct", 0.0),
+        preferment_hydration_pct=pct("preferment_hydration_pct", 1.0),
     )
 
 
