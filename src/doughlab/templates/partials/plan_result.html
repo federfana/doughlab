@@ -1,110 +1,53 @@
 {# Fragment ritornato da POST /plan. Scroll-reveal: sta in testa alla pagina. #}
 {% set ready = plan.ready_at %}
+{% set completion_matches = ready and ready == plan.end_at %}
 {% set final_pct = plan.fermentation.final_pct %}
 {% set final_class = 'ok' if 85 <= final_pct <= 115 else ('warn' if 70 <= final_pct <= 130 else 'bad') %}
 
-<div class="grid grid-planner">
-  {# ───── Riepilogo sticky ───── #}
-  <aside class="card sticky-side" style="padding: 1rem">
-    <div class="lab-row">Riepilogo</div>
-    <dl style="display:grid; gap:.7rem; margin: 0">
-      <div>
-        <dt class="hint">Pronto alle</dt>
-        <dd style="margin:0; font-size: 1.1rem; font-weight: 700; color: var(--ac)">
-          {% if ready %}{{ ready.strftime('%a %d %b · %H:%M') }}
-          {% else %}<span style="color: var(--warn)">non raggiunta</span>{% endif %}
-        </dd>
-      </div>
-      <div>
-        <dt class="hint">Fine piano</dt>
-        <dd style="margin:0; font-weight: 600">{{ plan.end_at.strftime('%a %d %b · %H:%M') }}</dd>
-      </div>
-      <div>
-        <dt class="hint">Durata totale</dt>
-        <dd style="margin:0; font-weight: 600">{{ '%.1f'|format(plan.total_hours) }} h</dd>
-      </div>
-      <div>
-        <dt class="hint">Maturità finale</dt>
-        <dd style="margin:0">
-          <span class="chip" style="background: {% if final_class=='ok' %}#dcfce7{% elif final_class=='warn' %}#fef3c7{% else %}#fee2e2{% endif %}; color: {% if final_class=='ok' %}var(--ok){% elif final_class=='warn' %}var(--warn){% else %}var(--bad){% endif %}">
-            {{ '%.0f'|format(final_pct) }}%
-          </span>
-        </dd>
-      </div>
-      <div>
-        <dt class="hint">Lievito suggerito</dt>
-        <dd style="margin:0">
-          <span style="font-family: ui-monospace, monospace">{{ '%.3f'|format(suggested_pct * 100) }}%</span>
-          <span class="hint">(ora: {{ '%.3f'|format(ingredients.yeast_pct * 100) }}%)</span>
-        </dd>
-      </div>
-    </dl>
-  </aside>
-
+<div class="result-layout">
   <div class="space-y">
     {# ───── Ingredienti ───── #}
-    <section class="card" style="padding: 1rem">
-      <div class="lab-row">Ingredienti ({{ '%.0f'|format(weights.total_g) }} g totali)</div>
-      <div style="display: grid; gap: .5rem; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr))">
-        <div class="card-2" style="padding: .6rem">
-          <div class="hint">Farina</div>
-          <div style="font-weight: 700; font-size: 1.1rem">{{ '%.0f'|format(weights.flour_g) }} g</div>
-          <div class="hint">= 100%</div>
-        </div>
-        <div class="card-2" style="padding: .6rem">
-          <div class="hint">Acqua</div>
-          <div style="font-weight: 700; font-size: 1.1rem">{{ '%.0f'|format(weights.water_g) }} g</div>
-          <div class="hint">{{ '%.0f'|format(ingredients.hydration_pct * 100) }}%</div>
-        </div>
-        <div class="card-2" style="padding: .6rem">
-          <div class="hint">Sale</div>
-          <div style="font-weight: 700; font-size: 1.1rem">{{ '%.1f'|format(weights.salt_g) }} g</div>
-          <div class="hint">{{ '%.1f'|format(ingredients.salt_pct * 100) }}%</div>
-        </div>
-        <div class="card-2" style="padding: .6rem">
-          <div class="hint">{{ yeast_label }}</div>
-          <div style="font-weight: 700; font-size: 1.1rem">{{ '%.2f'|format(weights.yeast_g) }} g</div>
-          <div class="hint">{{ '%.3f'|format(ingredients.yeast_pct * 100) }}%</div>
-        </div>
-        {% if weights.oil_g > 0 %}
-        <div class="card-2" style="padding: .6rem">
-          <div class="hint">Olio</div>
-          <div style="font-weight: 700; font-size: 1.1rem">{{ '%.1f'|format(weights.oil_g) }} g</div>
-          <div class="hint">{{ '%.1f'|format(ingredients.oil_pct * 100) }}%</div>
-        </div>
-        {% endif %}
-        {% if weights.sugar_g > 0 %}
-        <div class="card-2" style="padding: .6rem">
-          <div class="hint">Zucchero</div>
-          <div style="font-weight: 700; font-size: 1.1rem">{{ '%.1f'|format(weights.sugar_g) }} g</div>
-          <div class="hint">{{ '%.1f'|format(ingredients.sugar_pct * 100) }}%</div>
-        </div>
-        {% endif %}
+    <section class="card ingredient-section">
+      <div class="section-title-row">
+        <div><h2>Ingredienti</h2><p>{{ '%.0f'|format(weights.total_g) }} g totali. Panetti, idratazione e sale definiscono la formula; fasi e temperature definiscono durata e lievito consigliato.</p></div>
       </div>
+      <dl class="ingredient-list">
+        <div><dt>Farina</dt><dd>{{ '%.0f'|format(weights.flour_g) }} g</dd><small>100%</small></div>
+        <div><dt>Acqua</dt><dd>{{ '%.0f'|format(weights.water_g) }} g</dd><small>{{ '%.1f'|format(ingredients.hydration_pct * 100) }}%</small></div>
+        <div><dt>Sale</dt><dd>{{ '%.1f'|format(weights.salt_g) }} g</dd><small>{{ '%.1f'|format(ingredients.salt_pct * 100) }}%</small></div>
+        <div><dt>{{ yeast_label }}</dt><dd>{{ '%.2f'|format(weights.yeast_g) }} g</dd><small>{{ '%.3f'|format(ingredients.yeast_pct * 100) }}%</small></div>
+        {% if weights.oil_g > 0 %}<div><dt>Olio</dt><dd>{{ '%.1f'|format(weights.oil_g) }} g</dd><small>{{ '%.1f'|format(ingredients.oil_pct * 100) }}%</small></div>{% endif %}
+        {% if weights.sugar_g > 0 %}<div><dt>Zucchero/malto</dt><dd>{{ '%.1f'|format(weights.sugar_g) }} g</dd><small>{{ '%.1f'|format(ingredients.sugar_pct * 100) }}%</small></div>{% endif %}
+      </dl>
       {% if weights.preferment_flour_g > 0 %}
-      <div style="margin-top: .8rem; padding-top: .8rem; border-top: 1px dashed var(--border)">
-        <div class="hint" style="margin-bottom: .4rem"><strong>Prefermento</strong> ({{ '%.0f'|format(ingredients.preferment_pct * 100) }}% della farina)</div>
-        <div style="display: grid; gap: .5rem; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr))">
-          <div class="card-2" style="padding: .5rem">
-            <div class="hint">Farina (biga)</div>
-            <div style="font-weight: 600">{{ '%.0f'|format(weights.preferment_flour_g) }} g</div>
-          </div>
-          <div class="card-2" style="padding: .5rem">
-            <div class="hint">Acqua (biga)</div>
-            <div style="font-weight: 600">{{ '%.0f'|format(weights.preferment_water_g) }} g</div>
-          </div>
-          <div class="card-2" style="padding: .5rem">
-            <div class="hint">Farina (rinfresco)</div>
-            <div style="font-weight: 600">{{ '%.0f'|format(weights.final_dough_flour_g) }} g</div>
-          </div>
-          <div class="card-2" style="padding: .5rem">
-            <div class="hint">Acqua (rinfresco)</div>
-            <div style="font-weight: 600">{{ '%.0f'|format(weights.final_dough_water_g) }} g</div>
-          </div>
-        </div>
+      <div class="preferment-split">
+        <strong>Ripartizione del prefermento</strong>
+        <span>{{ '%.0f'|format(weights.preferment_flour_g) }} g farina + {{ '%.0f'|format(weights.preferment_water_g) }} g acqua nella biga</span>
+        <span>{{ '%.0f'|format(weights.final_dough_flour_g) }} g farina + {{ '%.0f'|format(weights.final_dough_water_g) }} g acqua nell'impasto finale</span>
       </div>
       {% endif %}
     </section>
+
+    <section class="summary-strip card" aria-label="Riepilogo piano">
+      <dl class="summary-metrics">
+        <div>
+          <dt>{% if completion_matches %}Pronto e fine ultima fase{% else %}Pronto per la cottura{% endif %}</dt>
+          <dd class="metric-primary">{% if ready %}{{ weekdays_it[ready.weekday()] }} {{ ready.day }} {{ months_it[ready.month - 1] }} · {{ ready.strftime('%H:%M') }}{% else %}<span class="metric-warning">target non raggiunto</span>{% endif %}</dd>
+        </div>
+        {% if not completion_matches %}<div><dt>Fine ultima fase</dt><dd>{{ weekdays_it[plan.end_at.weekday()] }} {{ plan.end_at.day }} {{ months_it[plan.end_at.month - 1] }} · {{ plan.end_at.strftime('%H:%M') }}</dd></div>{% endif %}
+        <div><dt>Durata totale</dt><dd>{{ '%.1f'|format(plan.total_hours) }} h</dd></div>
+        <div><dt>Maturità finale</dt><dd><span class="maturity-value {{ final_class }}">{{ '%.0f'|format(final_pct) }}%</span></dd></div>
+        <div><dt>Lievito consigliato</dt><dd>{{ '%.3f'|format(suggested_pct * 100) }}%</dd><small>Stimato da tempi e temperature impostati</small></div>
+      </dl>
+    </section>
+  </div>
+</div>
+
+{% set bake_oob = true %}
+{% include "partials/bake_history.html" %}
+
+<section id="detailsResult" hx-swap-oob="innerHTML">
+  <div class="space-y">
 
     {# ───── Grafico ───── #}
     <section class="card" style="padding: 1rem">
@@ -124,8 +67,8 @@
             {% for pr in plan.phases %}
             <tr>
               <td style="text-align: left">{{ pr.phase.label }}</td>
-              <td>{{ pr.start_at.strftime('%a %H:%M') }}</td>
-              <td>{{ pr.end_at.strftime('%a %H:%M') }}</td>
+              <td>{{ weekdays_it[pr.start_at.weekday()] }} {{ pr.start_at.strftime('%H:%M') }}</td>
+              <td>{{ weekdays_it[pr.end_at.weekday()] }} {{ pr.end_at.strftime('%H:%M') }}</td>
               <td>{{ '%.2f'|format(pr.phase.hours) }}</td>
               <td>{{ '%.1f'|format(pr.phase.ambient_c) }} °C</td>
               <td class="hint">{{ '%.0f'|format(pr.maturity_start_pct) }}% → {{ '%.0f'|format(pr.maturity_end_pct) }}%</td>
@@ -135,8 +78,8 @@
         </table>
       </div>
     </section>
+
   </div>
-</div>
 
 <script id="chartData" type="application/json">
 {
@@ -157,18 +100,17 @@
   window.__chart = new Chart(document.getElementById('chart'), {
     type: 'line',
     data: {
-      labels: d.t,
       datasets: [
-        { label: 'T° impasto', data: d.dough, borderColor: acc, borderWidth: 2, pointRadius: 0, yAxisID: 'y' },
-        { label: 'T° ambiente', data: d.amb, borderColor: mut, borderWidth: 1, borderDash: [6,4], pointRadius: 0, yAxisID: 'y' },
-        { label: 'Maturità %', data: d.mat, borderColor: ok, borderWidth: 2, pointRadius: 0, yAxisID: 'y1' }
+        { label: 'T° impasto', data: d.t.map((x, i) => ({ x, y: d.dough[i] })), borderColor: acc, borderWidth: 2, pointRadius: 0, yAxisID: 'y' },
+        { label: 'T° ambiente', data: d.t.map((x, i) => ({ x, y: d.amb[i] })), borderColor: mut, borderWidth: 1, borderDash: [6,4], pointRadius: 0, yAxisID: 'y' },
+        { label: 'Maturità %', data: d.t.map((x, i) => ({ x, y: d.mat[i] })), borderColor: ok, borderWidth: 2, pointRadius: 0, yAxisID: 'y1' }
       ]
     },
     options: {
       responsive: true,
       interaction: { mode: 'index', intersect: false },
       scales: {
-        x: { title: { display: true, text: "ore dall'inizio" }, ticks: { callback: v => (+v).toFixed(1) } },
+        x: { type: 'linear', min: 0, max: d.t[d.t.length - 1], title: { display: true, text: "ore dall'inizio" }, ticks: { maxTicksLimit: 7, callback: v => `${Number(v).toFixed(1)} h` } },
         y: { title: { display: true, text: '°C' }, suggestedMin: 0, suggestedMax: 30 },
         y1: { position: 'right', title: { display: true, text: 'maturità %' }, suggestedMin: 0, suggestedMax: 120, grid: { drawOnChartArea: false } }
       },
@@ -177,3 +119,4 @@
   });
 })();
 </script>
+</section>

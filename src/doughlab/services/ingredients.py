@@ -85,7 +85,8 @@ def compute(ri: RecipeIngredients) -> IngredientWeights:
     oil = flour * ri.oil_pct
     sugar = flour * ri.sugar_pct
     pref_flour = flour * ri.preferment_pct
-    pref_water = pref_flour * ri.preferment_hydration_pct
+    # Il prefermento non può contenere più acqua di tutto l'impasto.
+    pref_water = min(pref_flour * ri.preferment_hydration_pct, water)
 
     return IngredientWeights(
         flour_g=flour,

@@ -1,0 +1,128 @@
+<section id="bakeHistory" class="card bake-log-panel" {% if bake_oob|default(false) %}hx-swap-oob="outerHTML"{% endif %}>
+  <div class="section-title-row">
+    <div>
+      <h2>Esito reale</h2>
+      <p>Registra quando hai trovato l'impasto pronto: confronteremo l'orario con la stima di questo piano.</p>
+    </div>
+  </div>
+
+  {% if bake_saved %}
+  <p class="bake-status" role="status">
+    Prova salvata.
+    {% if saved_delta_hours is not none %}
+      {% if saved_delta_hours < -0.05 %}Pronto {{ '%.1f'|format(saved_delta_hours|abs) }} h prima della stima.
+      {% elif saved_delta_hours > 0.05 %}Pronto {{ '%.1f'|format(saved_delta_hours) }} h dopo la stima.
+      {% else %}Pronto in linea con la stima.{% endif %}
+    {% endif %}
+  </p>
+  {% elif bake_error %}
+  <p class="bake-status error" role="alert">{{ bake_error }}</p>
+  {% endif %}
+
+  {% if bake_snapshot %}
+  {% set bake_advice = bake_snapshot.get('baking') if bake_snapshot.get('baking') is mapping else {} %}
+  {% set bake_options = bake_snapshot.get('baking_options') if bake_snapshot.get('baking_options') is mapping else {'home' if bake_advice.get('oven_profile') == 'home' else 'split': bake_advice} %}
+  <form id="bakeLogForm" x-data='{ actualOven: ovenProfile, advice: {{ bake_options | tojson }}, adv() { return this.advice[this.actualOven] || {}; } }' x-init="$watch('ovenProfile', value => actualOven = value)" hx-post="/bakes" hx-target="#bakeHistory" hx-swap="outerHTML">
+    <input type="hidden" name="snapshot_json" value="{{ bake_snapshot | tojson | forceescape }}">
+    <fieldset class="bake-cooking-fields">
+      <legend>Parametri di cottura usati, facoltativi</legend>
+      <label class="field">
+        <span class="lab">Tipo di forno</span>
+        <select name="actual_oven_profile" x-model="actualOven">
+          <option value="split">Elettrico · cielo e platea</option>
+          <option value="home">Forno domestico</option>
+        </select>
+      </label>
+      <label class="field">
+        <span class="lab">Preriscaldamento (min)</span>
+        <input type="number" name="actual_preheat_minutes" min="0" max="180" step="1" :placeholder="adv().preheat_minutes ?? ''">
+      </label>
+      <div class="bake-profile-fields" x-show="actualOven === 'split'" x-cloak>
+        <label class="field"><span class="lab">Platea (°C)</span><input type="number" name="actual_plate_c" min="100" max="510" step="5" :placeholder="adv().plate_c ?? ''"></label>
+        <label class="field"><span class="lab">Cielo (°C)</span><input type="number" name="actual_ceiling_c" min="100" max="510" step="5" :placeholder="adv().ceiling_c ?? ''"></label>
+      </div>
+      <div class="bake-profile-fields" x-show="actualOven === 'home'" x-cloak>
+        <label class="field"><span class="lab">Temperatura preriscaldamento (°C)</span><input type="number" name="actual_preheat_c" min="100" max="300" step="5" :placeholder="adv().preheat_c ?? ''"></label>
+        <label class="field"><span class="lab">Temperatura forno (°C)</span><input type="number" name="actual_bake_c" min="100" max="300" step="5" :placeholder="adv().bake_c ?? ''"></label>
+      </div>
+      <label class="field">
+        <span class="lab">Durata cottura (min)</span>
+        <input type="number" name="actual_bake_minutes" min="0.5" max="180" step="0.5" :placeholder="adv().bake_minutes ?? ''">
+      </label>
+      <label class="field">
+        <span class="lab">Posizione usata</span>
+        <input type="text" name="actual_bake_position" maxlength="100" :placeholder="adv().position ?? ''">
+      </label>
+    </fieldset>
+    <div class="bake-observation-fields">
+      <label class="field">
+        <span class="lab">Quando era pronto?</span>
+        <input type="datetime-local" name="actual_ready_at" required>
+      </label>
+      <label class="field">
+        <span class="lab">Temperatura impasto (°C), facoltativa</span>
+        <input type="number" name="observed_dough_c" min="0" max="40" step="0.5" placeholder="es. 22">
+      </label>
+      <label class="field">
+        <span class="lab">Valutazione, facoltativa</span>
+        <select name="rating">
+          <option value="">Non valutato</option>
+          <option value="1">1 · Da rivedere</option>
+          <option value="2">2</option>
+          <option value="3">3 · Buono</option>
+          <option value="4">4</option>
+          <option value="5">5 · Ottimo</option>
+        </select>
+      </label>
+      <label class="field bake-notes-field">
+        <span class="lab">Note</span>
+        <textarea name="notes" maxlength="2000" rows="2" placeholder="Forza impasto, stesura, cottura..."></textarea>
+      </label>
+    </div>
+    <button class="btn" type="submit">Registra questa prova</button>
+  </form>
+  {% else %}
+  <p class="hint bake-history-empty">Calcola un piano nella scheda “Pianifica” per associare la prova a una previsione.</p>
+  {% endif %}
+
+  {% if bake_history %}
+  <details class="bake-history-list">
+    <summary>Prove precedenti ({{ bake_history|length }})</summary>
+    <div class="bake-history-scroll">
+      <table>
+        <thead><tr><th>Ricetta</th><th>Previsto</th><th>Pronto</th><th>Scarto</th><th>Cottura</th><th>Voto</th></tr></thead>
+        <tbody>
+          {% for item in bake_history %}
+          <tr>
+            <td>{{ item.recipe_name }}</td>
+            <td>{% if item.predicted_ready_at %}{{ weekdays_it[item.predicted_ready_at.weekday()] }} {{ item.predicted_ready_at.strftime('%d/%m %H:%M') }}{% else %}Non stimato{% endif %}</td>
+            <td>{% if item.actual_ready_at %}{{ weekdays_it[item.actual_ready_at.weekday()] }} {{ item.actual_ready_at.strftime('%d/%m %H:%M') }}{% else %}Non registrato{% endif %}</td>
+            <td>
+              {% if item.delta_hours is none %}—
+              {% elif item.delta_hours < -0.05 %}{{ '%.1f'|format(item.delta_hours|abs) }} h prima
+              {% elif item.delta_hours > 0.05 %}{{ '%.1f'|format(item.delta_hours) }} h dopo
+              {% else %}In linea{% endif %}
+            </td>
+            <td>
+              {% if item.baking %}
+                {% if item.baking.oven_profile == 'split' %}
+                  {% if item.baking.plate_c is not none %}Platea {{ item.baking.plate_c|int }} °C{% endif %}
+                  {% if item.baking.ceiling_c is not none %}{% if item.baking.plate_c is not none %} / {% endif %}cielo {{ item.baking.ceiling_c|int }} °C{% endif %}
+                {% else %}
+                  {% if item.baking.preheat_c is not none %}Prerisc. {{ item.baking.preheat_c|int }} °C / {% endif %}
+                  {% if item.baking.bake_c is not none %}forno {{ item.baking.bake_c|int }} °C{% endif %}
+                {% endif %}
+                {% if item.baking.preheat_minutes is not none or item.baking.bake_minutes is not none %}<br><small>{% if item.baking.preheat_minutes is not none %}Prerisc. {{ item.baking.preheat_minutes|int }} min{% endif %}{% if item.baking.bake_minutes is not none %}{% if item.baking.preheat_minutes is not none %} · {% endif %}Cottura {{ item.baking.bake_minutes }} min{% endif %}</small>{% endif %}
+                {% if item.baking.bake_position %}<br><small>{{ item.baking.bake_position }}</small>{% endif %}
+              {% else %}—{% endif %}
+            </td>
+            <td>{% if item.rating %}{{ item.rating }}/5{% else %}—{% endif %}</td>
+          </tr>
+          {% if item.notes %}<tr class="bake-note-row"><td colspan="6">{{ item.notes }}</td></tr>{% endif %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </details>
+  {% endif %}
+</section>

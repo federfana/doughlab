@@ -10,11 +10,11 @@ Il "lavoro cumulato" W = ∫ k(T(t)) · [lievito%] dt è una grandezza
 adimensionale che correla con la maturazione: raggiunto W_target
 l'impasto è "pronto".
 
-Parametri di default calibrati su esperienza panificatoria casalinga
-(valori di Q10 ≈ 2.3-2.8 per il Saccharomyces cerevisiae industriale,
-più bassi per lievito madre perché più tollerante al freddo).
+Fresco e secco attivo sono tarati su dosi pubblicate da calcolatori
+indipendenti (PizzApp, Dough School, when.pizza): Q10 ≈ 3.0 (regola di
+Hamelman, x3 ogni 9 °C). Il lievito madre non ha riferimenti ed è invariato.
 
-Questi parametri sono tarabili: in futuro potremo calibrarli sui tuoi
+I parametri restano tarabili: in futuro potremo calibrarli sui tuoi
 log reali con una regressione.
 """
 from __future__ import annotations
@@ -26,10 +26,12 @@ import numpy as np
 
 from .thermal import ThermalCurve
 
+DEFAULT_TARGET_WORK = 1.0
+
 
 class YeastKind(StrEnum):
     FRESH = "fresh"  # lievito di birra fresco
-    DRY = "dry"  # lievito di birra secco (potenza ~3x il fresco)
+    DRY = "dry"  # lievito di birra secco attivo (potenza ~2.4x il fresco)
     SOURDOUGH = "sourdough"  # lievito madre (licoli o solido)
 
 
@@ -44,8 +46,9 @@ class YeastParams:
 
 
 YEAST_PARAMS: dict[YeastKind, YeastParams] = {
-    YeastKind.FRESH: YeastParams(q10=2.7, t_ref_c=25.0, k_ref=1.0, label="Lievito di birra fresco"),
-    YeastKind.DRY: YeastParams(q10=2.7, t_ref_c=25.0, k_ref=3.0, label="Lievito di birra secco"),
+    YeastKind.FRESH: YeastParams(q10=3.0, t_ref_c=25.0, k_ref=0.56, label="Lievito di birra fresco"),
+    # Secco attivo = 1/2.4 del peso del fresco (conversioni di Yeasto, when.pizza, mypizzanight).
+    YeastKind.DRY: YeastParams(q10=3.0, t_ref_c=25.0, k_ref=0.56 * 2.4, label="Lievito di birra secco attivo"),
     YeastKind.SOURDOUGH: YeastParams(
         q10=2.2, t_ref_c=26.0, k_ref=0.45, label="Lievito madre"
     ),
@@ -72,15 +75,16 @@ def simulate(
     curve: ThermalCurve,
     yeast_kind: YeastKind,
     yeast_pct: float,
-    target_work: float = 24.0,
+    target_work: float = DEFAULT_TARGET_WORK,
+    active_mask: np.ndarray | None = None,
 ) -> FermentationResult:
     """Simula la maturazione lungo una curva termica.
 
-    - `yeast_pct` è la percentuale di lievito sul peso farina.
-    - `target_work` è il "lavoro" adimensionale al quale consideriamo
-      la pasta matura. Default calibrato su una napoletana standard
-      (~24 h di attività cumulata equivalenti a 24h a 25 °C con 1%
-      di lievito fresco → prodotto nel modello = 24).
+        - `yeast_pct` è la percentuale sul peso farina come frazione
+            (0.0015 = 0.15%).
+        - `target_work` usa punti percentuali lievito per ora: il fattore
+            100 converte la frazione in punti percentuali. Il target predefinito
+            è un riferimento iniziale, da calibrare con prove reali.
 
     I numeri assoluti vanno letti come indicativi: la cosa utile è il
     confronto fra scenari e la ricerca del lievito % ottimale.
@@ -90,21 +94,34 @@ def simulate(
         return FermentationResult(empty, empty, empty, empty, None, 0.0)
 
     k = np.asarray(rate(curve.temp_c, yeast_kind), dtype=float)
-    integrand = k * yeast_pct
+    integrand = k * yeast_pct * 100.0
     # Integrale cumulativo con trapezi.
     dt = np.diff(curve.time_h)
     mid = 0.5 * (integrand[:-1] + integrand[1:])
+    if active_mask is not None:
+        if active_mask.shape != dt.shape:
+            raise ValueError("active_mask must have one value per time interval")
+        mid = np.where(active_mask, mid, 0.0)
     cum = np.concatenate([[0.0], np.cumsum(mid * dt)])
 
     maturity_pct = cum / target_work * 100.0
 
-    ready_idx = int(np.searchsorted(cum, target_work))
     ready_at_h: float | None
-    if 0 < ready_idx < cum.size:
+    reached_target = cum[-1] >= target_work or np.isclose(
+        cum[-1], target_work, rtol=1e-12, atol=1e-12
+    )
+    if reached_target:
+        search_target = min(target_work, float(cum[-1]))
+        ready_idx = int(np.searchsorted(cum, search_target))
+        if ready_idx >= cum.size:
+            ready_at_h = float(curve.time_h[-1])
+        elif ready_idx == 0:
+            ready_at_h = float(curve.time_h[0])
+        else:
         # Interpolazione lineare per precisione al minuto.
-        t0, t1 = float(curve.time_h[ready_idx - 1]), float(curve.time_h[ready_idx])
-        w0, w1 = float(cum[ready_idx - 1]), float(cum[ready_idx])
-        ready_at_h = t0 + (target_work - w0) / (w1 - w0) * (t1 - t0) if w1 > w0 else t1
+            t0, t1 = float(curve.time_h[ready_idx - 1]), float(curve.time_h[ready_idx])
+            w0, w1 = float(cum[ready_idx - 1]), float(cum[ready_idx])
+            ready_at_h = t0 + (target_work - w0) / (w1 - w0) * (t1 - t0) if w1 > w0 else t1
     else:
         ready_at_h = None
 
@@ -121,11 +138,19 @@ def simulate(
 def suggest_yeast_pct(
     curve: ThermalCurve,
     yeast_kind: YeastKind,
-    target_work: float = 24.0,
+    target_work: float = DEFAULT_TARGET_WORK,
+    active_mask: np.ndarray | None = None,
 ) -> float:
-    """Trova la percentuale di lievito che fa combaciare il piano con la maturità target."""
-    unit = simulate(curve, yeast_kind, yeast_pct=1.0, target_work=target_work)
-    final_work = unit.cumulative[-1] if unit.cumulative.size else 0.0
-    if final_work <= 0:
+    """Trova la frazione di lievito che fa combaciare il piano col target."""
+    reference_pct = 0.01
+    reference = simulate(
+        curve,
+        yeast_kind,
+        yeast_pct=reference_pct,
+        target_work=target_work,
+        active_mask=active_mask,
+    )
+    reference_work = reference.cumulative[-1] if reference.cumulative.size else 0.0
+    if reference_work <= 0:
         return 0.0
-    return float(target_work / final_work)
+    return float(reference_pct * target_work / reference_work)

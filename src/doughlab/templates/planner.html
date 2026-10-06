@@ -1,52 +1,33 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="space-y" x-data="plannerUI()">
-
-  {# ───── RISULTATO (in testa, aggiornato live via HTMX) ───── #}
-  <section id="result" aria-live="polite">
-    <div class="card" style="padding: 1rem; color: var(--mut); text-align: center">
-      Calcolo del piano in corso…
+<div class="space-y" x-data="plannerUI('{{ recipe.oven_profile }}')">
+  <header class="page-heading">
+    <div>
+      <h1>Pianifica un impasto</h1>
+      <p>La formula definisce le grammature; tempi e temperature definiscono il piano e la stima del lievito.</p>
     </div>
-  </section>
+  </header>
 
-  {# ───── BARRA RICETTE (preset + salvate uniti in futuro) ───── #}
-  <section class="card" style="padding: .8rem 1rem">
-    <div class="lab-row">Ricette</div>
-    <div class="flex-wrap-row">
-      {% for p in presets %}
-      <button type="button" class="btn-ghost {% if recipe.active_preset==p.key %}active{% endif %}"
-              @click="loadPreset('{{ p.key }}')">
-        {{ p.label }}
-      </button>
-      {% endfor %}
-      <span class="hint" style="margin-left:auto">Le tue ricette salvate compariranno qui (fase 2)</span>
-    </div>
-  </section>
+  <div class="workspace-tabs" role="tablist" aria-label="Aree DoughLab">
+    <button id="tab-planner" class="workspace-tab" type="button" role="tab" aria-controls="panel-planner" :aria-selected="activeTab === 'planner'" :tabindex="activeTab === 'planner' ? 0 : -1" x-ref="plannerTab" @click="focusTab('planner')" @keydown.right.prevent="focusTab('registry')">Pianifica</button>
+    <button id="tab-registry" class="workspace-tab" type="button" role="tab" aria-controls="panel-registry" :aria-selected="activeTab === 'registry'" :tabindex="activeTab === 'registry' ? 0 : -1" x-ref="registryTab" @click="focusTab('registry')" @keydown.left.prevent="focusTab('planner')">Registro prove</button>
+  </div>
 
-  {# ───── FORM ───── #}
+  <section id="panel-planner" class="workspace-panel space-y" role="tabpanel" aria-labelledby="tab-planner" x-show="activeTab === 'planner'" x-cloak>
   <form id="planForm"
         hx-post="/plan"
-      hx-trigger="input delay:450ms from:#planForm, change delay:200ms from:#planForm, load"
+        hx-trigger="input delay:450ms, change delay:200ms, submit"
         hx-target="#result"
         hx-swap="innerHTML"
         class="space-y">
+      <input type="hidden" name="recipe_name" value="{{ recipe.recipe_name }}">
+      <input type="hidden" name="preset_key" value="{{ recipe.active_preset }}">
 
-    {# Intestazione: identità della ricetta #}
-    <section class="card" style="padding: 1rem">
-      <div class="lab-row">Ricetta</div>
-      <div style="display:grid; gap:.8rem; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr))">
-        <label class="field">
-          <span class="lab">Nome</span>
-          <input type="text" name="recipe_name" value="{{ recipe.recipe_name }}" maxlength="60">
-        </label>
-        <label class="field">
-          <span class="lab">Stile</span>
-          <select name="style">
-            {% for v, label in styles %}
-              <option value="{{ v }}" {% if recipe.style==v %}selected{% endif %}>{{ label }}</option>
-            {% endfor %}
-          </select>
-        </label>
+    {# Dati essenziali dell'impasto #}
+    <section class="card-2" style="padding: 1rem; border-color: var(--ac)">
+      <div class="lab-row">Imposta l'impasto</div>
+      <p class="hint" style="margin: -.2rem 0 .8rem">Imposta la formula e scegli il lievito. La dose viene stimata dal piano e aggiunta automaticamente alle grammature.</p>
+      <div class="dough-input-grid">
         <label class="field">
           <span class="lab">N° panetti</span>
           <input type="number" name="n_panetti" value="{{ recipe.ingredients.n_panetti }}" min="1" max="200">
@@ -57,24 +38,68 @@
         </label>
         <label class="field">
           <span class="lab">Idratazione %</span>
-          <input type="number" name="hydration_pct" value="{{ '%.1f'|format(recipe.ingredients.hydration_pct * 100) }}" step="0.1" min="40" max="120">
+          <span class="number-stepper">
+            <input type="number" name="hydration_pct" value="{{ '%.1f'|format(recipe.ingredients.hydration_pct * 100) }}" step="any" min="40" max="120">
+            <span class="number-stepper-controls">
+              <button type="button" aria-label="Aumenta idratazione di 1 punto" title="Aumenta di 1" onclick="adjustPercent(this, 1)">↑</button>
+              <button type="button" aria-label="Riduci idratazione di 1 punto" title="Riduci di 1" onclick="adjustPercent(this, -1)">↓</button>
+            </span>
+          </span>
         </label>
         <label class="field">
           <span class="lab">Sale %</span>
-          <input type="number" name="salt_pct" value="{{ '%.2f'|format(recipe.ingredients.salt_pct * 100) }}" step="0.01" min="0" max="10">
+          <span class="number-stepper">
+            <input type="number" name="salt_pct" value="{{ '%.2f'|format(recipe.ingredients.salt_pct * 100) }}" step="any" min="0" max="10">
+            <span class="number-stepper-controls">
+              <button type="button" aria-label="Aumenta sale di 1 punto" title="Aumenta di 1" onclick="adjustPercent(this, 1)">↑</button>
+              <button type="button" aria-label="Riduci sale di 1 punto" title="Riduci di 1" onclick="adjustPercent(this, -1)">↓</button>
+            </span>
+          </span>
         </label>
-        <label class="field">
-          <span class="lab">Lievito %</span>
-          <input type="number" name="yeast_pct" value="{{ '%.3f'|format(recipe.ingredients.yeast_pct * 100) }}" step="0.001" min="0" max="5">
-        </label>
+        <fieldset class="field yeast-kind-control">
+          <legend class="lab">Tipo di lievito</legend>
+          <div class="yeast-segments" role="group" aria-label="Tipo di lievito">
+            {% for v, short_label, full_label in yeast_kinds %}
+            <label class="yeast-segment">
+              <input type="radio" name="yeast_kind" value="{{ v }}" aria-label="{{ full_label }}" {% if recipe.yeast_kind==v %}checked{% endif %}>
+              <span>{{ short_label }}</span>
+            </label>
+            {% endfor %}
+          </div>
+          <span class="hint">La dose viene stimata in base al piano.</span>
+        </fieldset>
       </div>
       <div class="hint" style="margin-top: .45rem;">
-        Minimo da compilare: n° panetti, peso panetto, idratazione, sale, lievito.
-        Percentuali in formato umano: idratazione <strong>62</strong>, sale <strong>2.8</strong>, lievito <strong>0.15</strong>.
+        Le frecce cambiano le percentuali di 1 punto; puoi anche digitare valori decimali, per esempio 62.5%.
       </div>
     </section>
 
-    {# Partenza + lievito tipo #}
+    <section id="result" aria-live="polite">
+      <div class="card" style="padding: 1rem; color: var(--mut); text-align: center">
+        Le grammature appariranno qui appena imposti la formula.
+      </div>
+    </section>
+
+    <section class="card" style="padding: 1rem">
+      <div class="preset-layout">
+        <label class="field">
+          <span class="lab">Ricetta base</span>
+          <select aria-label="Ricetta base" @change="loadPreset($event.target.value)">
+            {% for p in presets %}
+              <option value="{{ p.key }}" {% if recipe.active_preset==p.key %}selected{% endif %}>{{ p.label }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <div class="preset-description">
+          <strong>{{ recipe.recipe_name }}</strong>
+          <span>{{ recipe.preset_description }}</span>
+          <span class="preset-flour-hint"><strong>Farina:</strong> {{ recipe.flour_hint }} Le proteine sono indicative: se disponibile, verifica anche il valore W e la scheda del molino.</span>
+        </div>
+      </div>
+      <p class="hint preset-hint">Scegliere una base sostituisce quantità, percentuali e fasi. Dopo puoi modificare ogni valore.</p>
+    </section>
+
+    {# Partenza #}
     <section class="card" style="padding: 1rem">
       <div class="lab-row">Partenza</div>
       <div style="display:grid; gap:.8rem; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr))">
@@ -86,61 +111,102 @@
           <span class="lab">T° impasto iniziale</span>
           <input type="number" name="initial_dough_c" value="{{ recipe.initial_dough_c }}" step="0.5" min="0" max="40">
         </label>
-        <label class="field">
-          <span class="lab">Tipo di lievito</span>
-          <select name="yeast_kind">
-            {% for v, label in yeast_kinds %}
-              <option value="{{ v }}" {% if recipe.yeast_kind==v %}selected{% endif %}>{{ label }}</option>
-            {% endfor %}
-          </select>
-        </label>
       </div>
     </section>
 
     {# Fasi #}
     <section class="card" style="padding: 1rem">
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:.5rem">
-        <div class="lab-row" style="margin: 0">Fasi di lavorazione</div>
-        <button type="button" class="btn-ghost" @click="addPhase()">+ Aggiungi fase</button>
-      </div>
-      <div style="overflow-x: auto">
-        <table>
-          <thead>
-            <tr><th>Fase</th><th>Etichetta</th><th>Ore</th><th>T° amb</th><th>Avanzato</th><th></th></tr>
-          </thead>
-          <tbody id="phases">
-            {% for p in recipe.phases %}
-            {% set i = loop.index0 %}
-            <tr data-row>
-              <td>
-                <select name="phase_kind_{{ i }}">
-                  {% for v, label in phase_kinds %}
-                    <option value="{{ v }}" {% if p.kind==v %}selected{% endif %}>{{ label }}</option>
-                  {% endfor %}
-                </select>
-              </td>
-              <td><input type="text" name="phase_label_{{ i }}" value="{{ p.label }}" style="width: 10rem"></td>
-              <td><input type="number" name="phase_hours_{{ i }}" value="{{ p.hours }}" step="0.25" min="0" max="720"></td>
-              <td><input type="number" name="phase_ambient_{{ i }}" value="{{ p.ambient_c }}" step="0.5" min="-5" max="50"></td>
-              <td>
-                <span class="hint">
-                  <select name="phase_container_{{ i }}" style="font-size: .8rem">
-                    {% for v, label in containers %}
-                      <option value="{{ v }}" {% if p.container==v %}selected{% endif %}>{{ label }}</option>
-                    {% endfor %}
-                  </select>
-                  <select name="phase_env_{{ i }}" style="font-size: .8rem">
-                    {% for v, label in environments %}
-                      <option value="{{ v }}" {% if p.environment==v %}selected{% endif %}>{{ label }}</option>
-                    {% endfor %}
-                  </select>
-                </span>
-              </td>
-              <td><button type="button" class="btn-ghost" style="padding: .2rem .5rem" @click="removePhase($event)">✕</button></td>
-            </tr>
+      <div class="section-heading">
+        <div>
+          <h2>Fasi e temperature</h2>
+          <p>Durata e temperatura di ogni fase determinano il piano e la stima del lievito. Il tipo di fase organizza la timeline; non cambia da solo le grammature. TA = temperatura ambiente; TC = temperatura controllata.</p>
+        </div>
+        <div class="flex-wrap-row">
+          <select id="newPhaseKind" aria-label="Nuova fase">
+            {% for v, label in phase_kinds %}
+              <option value="{{ v }}" {% if v=='bulk' %}selected{% endif %}>{{ label }}</option>
             {% endfor %}
-          </tbody>
-        </table>
+          </select>
+          <button type="button" class="btn-ghost" @click="addPhase()">Aggiungi fase</button>
+        </div>
+      </div>
+      <div id="phases" class="phase-grid">
+        {% for p in recipe.phases %}
+        {% set i = loop.index0 %}
+        <article class="phase-card" data-row>
+          <div class="phase-card-head">
+            <span class="phase-number">{{ loop.index }}</span>
+            <select class="phase-kind" name="phase_kind_{{ i }}" aria-label="Fase {{ loop.index }}" onchange="syncPhaseLabel(this)">
+              {% for v, label in phase_kinds %}
+                <option value="{{ v }}" {% if p.kind==v %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+            <button type="button" class="icon-button phase-move" aria-label="Sposta fase {{ loop.index }} in alto" title="Sposta in alto" @click="movePhase($event, -1)">↑</button>
+            <button type="button" class="icon-button phase-move" aria-label="Sposta fase {{ loop.index }} in basso" title="Sposta in basso" @click="movePhase($event, 1)">↓</button>
+            <button type="button" class="icon-button" aria-label="Rimuovi fase" title="Rimuovi fase" @click="removePhase($event)">×</button>
+          </div>
+          <input type="hidden" name="phase_label_{{ i }}" value="{{ p.label }}">
+          <div class="phase-fields">
+            <label class="field"><span class="lab">Durata (ore)</span><input type="number" name="phase_hours_{{ i }}" value="{{ p.hours }}" step="0.25" min="0" max="720"></label>
+            <label class="field"><span class="lab">Condizione</span>
+              <select name="phase_env_{{ i }}">
+                {% for v, label in environments %}
+                  <option value="{{ v }}" {% if p.environment==v %}selected{% endif %}>{% if v=='ambient' %}TA · {% else %}TC · {% endif %}{{ label }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            <label class="field"><span class="lab">Temperatura (°C)</span><input type="number" name="phase_ambient_{{ i }}" value="{{ p.ambient_c }}" step="0.5" min="-5" max="50"></label>
+          </div>
+          <details class="phase-advanced">
+            <summary>Contenitore</summary>
+            <select name="phase_container_{{ i }}" aria-label="Contenitore fase {{ loop.index }}">
+              {% for v, label in containers %}<option value="{{ v }}" {% if p.container==v %}selected{% endif %}>{{ label }}</option>{% endfor %}
+            </select>
+          </details>
+        </article>
+        {% endfor %}
+      </div>
+      <p class="hint phase-help">Gli orari di inizio e fine si ricavano in sequenza dalla partenza e dalla durata di ogni fase.</p>
+    </section>
+
+    <section class="card baking-section">
+      <div class="section-heading">
+        <div>
+          <h2>Suggerimenti di cottura</h2>
+          <p>Indicazioni orientative del preset, separate da TA/TC e dalla stima del lievito.</p>
+        </div>
+      </div>
+      <fieldset class="oven-profile-choice">
+        <legend class="lab">Mostra indicazioni per</legend>
+        <div class="oven-profile-segments" role="group" aria-label="Profilo forno">
+          <label><input type="radio" name="oven_profile" value="split" x-model="ovenProfile" @input.stop @change.stop><span>Elettrico · cielo e platea</span></label>
+          <label><input type="radio" name="oven_profile" value="home" x-model="ovenProfile" @input.stop @change.stop><span>Forno domestico</span></label>
+        </div>
+      </fieldset>
+      <div class="split-bake-fields" x-show="ovenProfile === 'split'" x-cloak>
+        <dl class="baking-suggestions">
+          <div><dt>Platea</dt><dd>{% if recipe.baking.split_plate_c is not none %}{{ recipe.baking.split_plate_c }} °C{% else %}Da calibrare{% endif %}</dd></div>
+          <div><dt>Cielo</dt><dd>{% if recipe.baking.split_ceiling_c is not none %}{{ recipe.baking.split_ceiling_c }} °C{% else %}Da calibrare{% endif %}</dd></div>
+          <div><dt>Durata</dt><dd>{% if recipe.baking.split_minutes is not none %}{{ recipe.baking.split_minutes }} min{% else %}Da calibrare{% endif %}</dd></div>
+          <div><dt>Preriscaldamento</dt><dd>{{ recipe.baking.preheat_minutes }} min</dd></div>
+          <div><dt>Posizione</dt><dd>Pietra</dd></div>
+        </dl>
+        <p class="hint baking-note">{{ recipe.baking.split_hint }} Verifica i limiti del tuo forno e registra i parametri effettivi nel registro delle prove.</p>
+      </div>
+      <div class="home-bake-fields" x-show="ovenProfile === 'home'" x-cloak>
+        <dl class="baking-suggestions">
+          <div><dt>Temperatura forno</dt><dd>{{ recipe.baking.bake_c }} °C</dd></div>
+          <div><dt>Durata</dt><dd>{{ recipe.baking.bake_minutes }} min</dd></div>
+          <div><dt>Preriscaldamento</dt><dd>{{ recipe.baking.preheat_c }} °C · {{ recipe.baking.preheat_minutes }} min</dd></div>
+          <div><dt>Posizione</dt><dd>{{ recipe.baking.position }}</dd></div>
+        </dl>
+        <p class="hint baking-note">{{ recipe.baking.note }} Registra i parametri effettivi nel registro delle prove.</p>
+      </div>
+    </section>
+
+    <section id="detailsResult" aria-live="polite">
+      <div class="card" style="padding: 1rem; color: var(--mut); text-align: center">
+        Grafico e timeline appariranno qui dopo aver impostato le fasi.
       </div>
     </section>
 
@@ -150,24 +216,43 @@
       <div class="panel-body" style="display:grid; gap:.8rem; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr))">
         <label class="field">
           <span class="lab">Olio %</span>
-          <input type="number" name="oil_pct" value="{{ '%.2f'|format(recipe.ingredients.oil_pct * 100) }}" step="0.01" min="0" max="20">
+          <span class="number-stepper">
+            <input type="number" name="oil_pct" value="{{ '%.2f'|format(recipe.ingredients.oil_pct * 100) }}" step="any" min="0" max="20">
+            <span class="number-stepper-controls">
+              <button type="button" aria-label="Aumenta olio di 1 punto" title="Aumenta di 1" onclick="adjustPercent(this, 1)">↑</button>
+              <button type="button" aria-label="Riduci olio di 1 punto" title="Riduci di 1" onclick="adjustPercent(this, -1)">↓</button>
+            </span>
+          </span>
         </label>
         <label class="field">
           <span class="lab">Zucchero/malto %</span>
-          <input type="number" name="sugar_pct" value="{{ '%.2f'|format(recipe.ingredients.sugar_pct * 100) }}" step="0.01" min="0" max="20">
+          <span class="number-stepper">
+            <input type="number" name="sugar_pct" value="{{ '%.2f'|format(recipe.ingredients.sugar_pct * 100) }}" step="any" min="0" max="20">
+            <span class="number-stepper-controls">
+              <button type="button" aria-label="Aumenta zucchero di 1 punto" title="Aumenta di 1" onclick="adjustPercent(this, 1)">↑</button>
+              <button type="button" aria-label="Riduci zucchero di 1 punto" title="Riduci di 1" onclick="adjustPercent(this, -1)">↓</button>
+            </span>
+          </span>
         </label>
         <label class="field">
           <span class="lab">Prefermento % farina</span>
-          <input type="number" name="preferment_pct" value="{{ '%.1f'|format(recipe.ingredients.preferment_pct * 100) }}" step="0.1" min="0" max="100">
+          <span class="number-stepper">
+            <input type="number" name="preferment_pct" value="{{ '%.1f'|format(recipe.ingredients.preferment_pct * 100) }}" step="any" min="0" max="100">
+            <span class="number-stepper-controls">
+              <button type="button" aria-label="Aumenta prefermento di 1 punto" title="Aumenta di 1" onclick="adjustPercent(this, 1)">↑</button>
+              <button type="button" aria-label="Riduci prefermento di 1 punto" title="Riduci di 1" onclick="adjustPercent(this, -1)">↓</button>
+            </span>
+          </span>
         </label>
         <label class="field">
           <span class="lab">Idratazione prefermento %</span>
-          <input type="number" name="preferment_hydration_pct" value="{{ '%.0f'|format(recipe.ingredients.preferment_hydration_pct * 100) }}" step="1" min="30" max="150">
-        </label>
-        <label class="field">
-          <span class="lab">Target maturità (W)</span>
-          <input type="number" name="target_work" value="{{ recipe.target_work }}" step="1" min="1" max="200">
-          <span class="hint">24 = napoletana standard; 28-32 = pane; 48 = pinsa lunga</span>
+          <span class="number-stepper">
+            <input type="number" name="preferment_hydration_pct" value="{{ '%.0f'|format(recipe.ingredients.preferment_hydration_pct * 100) }}" step="any" min="30" max="150">
+            <span class="number-stepper-controls">
+              <button type="button" aria-label="Aumenta idratazione prefermento di 1 punto" title="Aumenta di 1" onclick="adjustPercent(this, 1)">↑</button>
+              <button type="button" aria-label="Riduci idratazione prefermento di 1 punto" title="Riduci di 1" onclick="adjustPercent(this, -1)">↓</button>
+            </span>
+          </span>
         </label>
       </div>
     </details>
@@ -177,58 +262,135 @@
       <span class="hint" style="margin-left:auto">Il piano si ricalcola automaticamente ad ogni modifica.</span>
     </div>
   </form>
+  </section>
+
+  <section id="panel-registry" class="workspace-panel space-y" role="tabpanel" aria-labelledby="tab-registry" x-show="activeTab === 'registry'" x-cloak>
+    <header class="section-heading">
+      <div>
+        <h2>Registro prove</h2>
+        <p>Confronta l'orario in cui l'impasto era pronto con la stima salvata dal piano.</p>
+      </div>
+    </header>
+    {% set bake_history = bake_history|default([]) %}
+    {% set bake_snapshot = none %}
+    {% set bake_saved = false %}
+    {% set bake_error = none %}
+    {% set bake_oob = false %}
+    {% include "partials/bake_history.html" %}
+  </section>
 </div>
 
 <template id="rowTpl">
-  <tr data-row>
-    <td>
-      <select name="phase_kind_IDX">
-        {% for v, label in phase_kinds %}
+  <article class="phase-card" data-row>
+    <div class="phase-card-head">
+      <span class="phase-number"></span>
+      <select class="phase-kind" name="phase_kind_IDX" aria-label="Fase" onchange="syncPhaseLabel(this)">
+          {% for v, label in phase_kinds %}
           <option value="{{ v }}" {% if v=='bulk' %}selected{% endif %}>{{ label }}</option>
         {% endfor %}
       </select>
-    </td>
-    <td><input type="text" name="phase_label_IDX" value="Nuova fase" style="width: 10rem"></td>
-    <td><input type="number" name="phase_hours_IDX" value="1" step="0.25" min="0" max="720"></td>
-    <td><input type="number" name="phase_ambient_IDX" value="22" step="0.5" min="-5" max="50"></td>
-    <td>
-      <span class="hint">
-        <select name="phase_container_IDX" style="font-size: .8rem">
-          {% for v, label in containers %}<option value="{{ v }}">{{ label }}</option>{% endfor %}
+      <button type="button" class="icon-button phase-move" aria-label="Sposta fase in alto" title="Sposta in alto" @click="movePhase($event, -1)">↑</button>
+      <button type="button" class="icon-button phase-move" aria-label="Sposta fase in basso" title="Sposta in basso" @click="movePhase($event, 1)">↓</button>
+      <button type="button" class="icon-button" aria-label="Rimuovi fase" title="Rimuovi fase" @click="removePhase($event)">×</button>
+    </div>
+    <input type="hidden" name="phase_label_IDX" value="Puntata">
+    <div class="phase-fields">
+      <label class="field"><span class="lab">Durata (ore)</span><input type="number" name="phase_hours_IDX" value="1" step="0.25" min="0" max="720"></label>
+      <label class="field"><span class="lab">Condizione</span>
+        <select name="phase_env_IDX">
+          {% for v, label in environments %}<option value="{{ v }}">{% if v=='ambient' %}TA · {% else %}TC · {% endif %}{{ label }}</option>{% endfor %}
         </select>
-        <select name="phase_env_IDX" style="font-size: .8rem">
-          {% for v, label in environments %}<option value="{{ v }}">{{ label }}</option>{% endfor %}
-        </select>
-      </span>
-    </td>
-    <td><button type="button" class="btn-ghost" style="padding: .2rem .5rem" @click="removePhase($event)">✕</button></td>
-  </tr>
+      </label>
+      <label class="field"><span class="lab">Temperatura (°C)</span><input type="number" name="phase_ambient_IDX" value="22" step="0.5" min="-5" max="50"></label>
+    </div>
+    <details class="phase-advanced">
+      <summary>Contenitore</summary>
+      <select name="phase_container_IDX" aria-label="Contenitore fase">
+        {% for v, label in containers %}<option value="{{ v }}">{{ label }}</option>{% endfor %}
+      </select>
+    </details>
+  </article>
 </template>
 
 <script>
-function plannerUI() {
+function adjustPercent(button, delta) {
+  const input = button.closest('.number-stepper').querySelector('input');
+  const current = Number(input.value) || 0;
+  const min = input.min === '' ? -Infinity : Number(input.min);
+  const max = input.max === '' ? Infinity : Number(input.max);
+  const next = Math.min(max, Math.max(min, current + delta));
+  input.value = String(Number(next.toFixed(3)));
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+}
+
+function syncPhaseLabel(select) {
+  const card = select.closest('[data-row]');
+  card.querySelector('[name^="phase_label_"]').value = select.selectedOptions[0].textContent.trim();
+}
+
+function plannerUI(initialOvenProfile) {
   return {
+    activeTab: 'planner',
+    ovenProfile: initialOvenProfile,
+    focusTab(tab) {
+      this.activeTab = tab;
+      this.$nextTick(() => this.$refs[tab === 'planner' ? 'plannerTab' : 'registryTab'].focus());
+    },
     reindex() {
-      document.querySelectorAll('#phases tr[data-row]').forEach((tr, i) => {
-        tr.querySelectorAll('[name]').forEach(el => {
+      const cards = document.querySelectorAll('#phases [data-row]');
+      cards.forEach((card, i) => {
+        card.querySelector('.phase-number').textContent = String(i + 1);
+        card.querySelectorAll('.phase-move').forEach((button, direction) => {
+          button.disabled = direction === 0 ? i === 0 : i === cards.length - 1;
+          button.setAttribute('aria-label', `Sposta fase ${i + 1} ${direction === 0 ? 'in alto' : 'in basso'}`);
+        });
+        card.querySelectorAll('[name]').forEach(el => {
           el.name = el.name.replace(/_(\d+|IDX)$/, '_' + i);
         });
       });
     },
     addPhase() {
+      if (document.querySelectorAll('#phases [data-row]').length >= 30) return;
       const tpl = document.getElementById('rowTpl').content.cloneNode(true);
+      const type = document.getElementById('newPhaseKind').value;
+      const card = tpl.querySelector('[data-row]');
+      const kind = card.querySelector('[name^="phase_kind_"]');
+      kind.value = type;
+      card.querySelector('[name^="phase_label_"]').value = kind.selectedOptions[0].textContent.trim();
+      const phaseDefaults = {
+        preferment: { environment: 'ambient', temperature: 18, container: 'mass_box' },
+        maturation: { environment: 'fridge_home', temperature: 4, container: 'mass_box' },
+        shape: { environment: 'ambient', temperature: 22, container: 'balls_box' },
+        proof: { environment: 'ambient', temperature: 22, container: 'balls_box' },
+      };
+      const defaults = phaseDefaults[type] || { environment: 'ambient', temperature: 22, container: 'mass_bowl' };
+      card.querySelector('[name^="phase_env_"]').value = defaults.environment;
+      card.querySelector('[name^="phase_ambient_"]').value = defaults.temperature;
+      card.querySelector('[name^="phase_container_"]').value = defaults.container;
       document.getElementById('phases').appendChild(tpl);
       this.reindex();
       htmx.trigger('#planForm', 'change');
     },
     removePhase(ev) {
-      ev.target.closest('tr').remove();
+      ev.target.closest('[data-row]').remove();
+      this.reindex();
+      htmx.trigger('#planForm', 'change');
+    },
+    movePhase(ev, delta) {
+      const card = ev.target.closest('[data-row]');
+      if (delta < 0 && card.previousElementSibling) card.previousElementSibling.before(card);
+      if (delta > 0 && card.nextElementSibling) card.nextElementSibling.after(card);
       this.reindex();
       htmx.trigger('#planForm', 'change');
     },
     loadPreset(key) {
-      // Reload intera pagina sul preset: tiene il server source-of-truth per fasi/ingredienti.
-      window.location.href = '/?preset=' + encodeURIComponent(key);
+      if (!key) return;
+      const params = new URLSearchParams({ preset: key });
+      const yeast = document.querySelector('[name="yeast_kind"]:checked')?.value;
+      const oven = document.querySelector('[name="oven_profile"]:checked')?.value;
+      if (yeast) params.set('yeast', yeast);
+      if (oven) params.set('oven', oven);
+      window.location.href = '/?' + params.toString();
     },
     exportIcs() {
       const form = document.getElementById('planForm');
@@ -244,5 +406,6 @@ function plannerUI() {
     },
   };
 }
+window.addEventListener('load', () => document.getElementById('planForm').requestSubmit());
 </script>
 {% endblock %}

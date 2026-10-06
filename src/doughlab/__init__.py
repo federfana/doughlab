@@ -5,6 +5,8 @@ __version__ = "0.1.0"
 
 def main() -> None:
     """Entry point del comando `doughlab`: avvia il server di sviluppo."""
+    from pathlib import Path
+
     import uvicorn
 
     uvicorn.run(
@@ -12,4 +14,5 @@ def main() -> None:
         host="0.0.0.0",
         port=8000,
         reload=True,
+        reload_dirs=[str(Path(__file__).parent)],  # senza, anche tests/ riavvia il server
     )

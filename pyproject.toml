@@ -54,3 +54,7 @@ python_version = "3.12"
 strict = true
 packages = ["doughlab"]
 mypy_path = ["src"]
+
+[[tool.mypy.overrides]]
+module = ["ics", "ics.*"]
+ignore_missing_imports = true

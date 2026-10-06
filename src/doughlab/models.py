@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 
 from sqlalchemy import JSON, DateTime, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -34,7 +35,7 @@ class RecipeVersion(Base):
     message: Mapped[str] = mapped_column(String(200), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     # payload: fasi, ingredienti, parametri — JSON per flessibilità in MVP.
-    payload: Mapped[dict] = mapped_column(JSON, default=dict)
+    payload: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
 
     recipe: Mapped[Recipe] = relationship(back_populates="versions")
 
@@ -50,4 +51,4 @@ class Bake(Base):
     notes: Mapped[str] = mapped_column(Text, default="")
     rating: Mapped[int | None] = mapped_column(default=None)
     # log fase per fase (nome fase, start, end, temp_amb, temp_impasto, nota, photo_path)
-    log: Mapped[list] = mapped_column(JSON, default=list)
+    log: Mapped[list[Any]] = mapped_column(JSON, default=list)

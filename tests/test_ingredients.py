@@ -40,6 +40,15 @@ def test_preferment_split() -> None:
     assert w.final_dough_water_g == pytest.approx(w.water_g - w.preferment_water_g)
 
 
+def test_preferment_water_never_exceeds_total_water() -> None:
+    ri = RecipeIngredients(panetto_g=500, n_panetti=2, hydration_pct=0.60,
+                           salt_pct=0.022, yeast_pct=0.001,
+                           preferment_pct=1.0, preferment_hydration_pct=1.5)
+    w = compute(ri)
+    assert w.final_dough_water_g >= 0
+    assert w.preferment_water_g == pytest.approx(w.water_g)
+
+
 def test_oil_included_in_total() -> None:
     ri = RecipeIngredients(panetto_g=800, n_panetti=1, hydration_pct=0.75,
                            salt_pct=0.025, yeast_pct=0.002, oil_pct=0.03)

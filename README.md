@@ -180,24 +180,31 @@ Parametri in [services/fermentation.py](src/doughlab/services/fermentation.py):
 
 | Lievito | Q10 | T_ref | k_ref | Note |
 |---|---|---|---|---|
-| Fresco | 2.7 | 25 °C | 1.0 | riferimento |
-| Secco | 2.7 | 25 °C | 3.0 | ~3× il fresco a parità di grammi |
-| Madre | 2.2 | 26 °C | 0.45 | più tollerante al freddo (microbiota misto) |
+| Fresco | 3.0 | 25 °C | 0.56 | tarato sui calcolatori di riferimento |
+| Secco attivo | 3.0 | 25 °C | 1.34 | 2.4× il fresco a parità di grammi (1 g secco ≈ 2.4 g fresco) |
+| Madre | 2.2 | 26 °C | 0.45 | non tarato: nessun riferimento; più tollerante al freddo |
+
+Fresco e secco attivo sono tarati con un fit su 9 dosi pubblicate da PizzApp, Dough School e when.pizza (room temperature da 2 a 12 h, 16 e 28 °C, programmi con frigo): errore logaritmico medio 0.13 contro 0.68 con i parametri precedenti. Un caso di verifica: 9 h a 22 °C danno 0.115% di secco attivo (PizzApp 0.119%, Dough School 0.096%).
 
 Dalla velocità al **lavoro cumulato** (= maturità):
 
-$$W(t) = \int_0^t k(T(\tau)) \cdot [\text{lievito}\%] \, d\tau$$
+$$W(t) = \int_0^t k(T(\tau)) \cdot 100 \cdot p_{\text{lievito}} \, d\tau$$
 
-Integrato con trapezi (O(n)). Quando $W(t) \ge W_{\text{target}}$ l'impasto è "maturo al 100%".
+`p_lievito` è la frazione usata nei calcoli (`0.0015` = 0.15%); il fattore 100 la converte in punti percentuali. L'integrale è calcolato con trapezi (O(n)). Quando $W(t) \ge W_{\text{target}}$ l'impasto raggiunge il target.
 
-**Suggerimento del lievito ottimale** (`suggest_yeast_pct`): calcola $W$ assumendo lievito=1%, poi divide il target per il risultato → trova la % che fa atterrare la maturità esattamente al 100%.
+**Lievito consigliato** (`suggest_yeast_pct`): calcola il lavoro di riferimento con una dose dell'1% e scala linearmente per trovare la dose che raggiunge il target. Il calcolo è automatico: la stessa dose viene usata per la maturità e per i grammi mostrati. Il target predefinito (`DEFAULT_TARGET_WORK = 1`) è un riferimento iniziale, non una previsione scientificamente validata: temperatura reale dell'impasto, forza del lievito e farina richiedono calibrazione con prove.
 
 ### Limiti onesti del modello
 
 - Ignora calore generato dalla fermentazione (trascurabile < 2 kg)
 - Ignora evaporazione (assume impasto coperto)
 - `T_ambiente` costante nel segmento (frigo in realtà oscilla)
-- `target_work = 24` è arbitrario → ha senso solo come confronto *relativo* finché non lo calibri sui tuoi log
+- il target di maturità è un riferimento sperimentale, non una misura universale; il dosaggio consigliato va confrontato con risultati reali prima di affidarcisi
+- i riferimenti usati per la taratura non coincidono tra loro (tabelle generiche da 0.05% a 0.5% per lo stesso scenario): il fit privilegia i tre calcolatori convergenti. Su frigo puro (24-72 h) il modello suggerisce ancora circa il 25-35% in più di when.pizza; le ricette con puntata a temperatura ambiente prima del frigo sono entro ±22%
+- non distingue secco attivo e istantaneo: il tipo "secco" è calibrato sull'attivo (istantaneo ≈ 0.8× l'attivo)
+- con un prefermento la dose di lievito è calcolata sulla farina totale e conta come presente dall'inizio: è un'approssimazione, perché di solito il lievito sta tutto nel prefermento
+- orari in ora locale senza fuso: un piano che attraversa il cambio ora legale (ultima domenica di ottobre/marzo) può risultare sfasato di un'ora
+- i valori del form sono limitati lato server agli stessi intervalli degli input HTML (fasi ≤ 30, durata ≤ 720 h, ecc.); valori non numerici tornano al default
 
 ---
 
@@ -284,16 +291,19 @@ Ricette predefinite caricabili con un click dalla UI (`/?preset=<key>`).
 
 | Simbolo | Tipo | Scopo |
 |---|---|---|
-| `Preset` | `dataclass` | `(key, label, style, ingredients, yeast_kind, target_work, phases)` |
+| `BakingAdvice` | `dataclass` | profilo casa + setpoint indipendenti cielo/platea (`split_plate_c`, `split_ceiling_c`), durata e hint |
+| `Preset` | `dataclass` | `(key, label, style, description, flour_hint, baking, ingredients, yeast_kind, target_work, phases)` |
 | `PRESETS` | `list[Preset]` | lista di preset (5 al momento) |
 | `PRESETS_BY_KEY` | `dict[str, Preset]` | lookup O(1) |
 
-Preset inclusi:
+Preset inclusi (ogni base comprende anche un orientamento sulla farina; percentuali proteiche indicative, da valutare insieme a W e alle indicazioni del molino):
 - `napoletana` — 8h a 22°C diretto
 - `napoletana_frigo` — 24h con maturazione in frigo
 - `teglia` — teglia romana 24h+ con olio
 - `pinsa` — pinsa 48h ad alta idratazione
 - `pane_biga` — pane con biga al 30%
+
+I suggerimenti per napoletana e teglia sono orientativi e non modificabili nel pianificatore; nel registro delle prove si annotano i parametri effettivamente usati. Gli intervalli riportati seguono la [guida Macte sulle temperature](https://macteovens.com/blogs/ricette-consigli/temperatura-forno-pizza-quanti-gradi-per-ogni-tipo-da-napoletana-a-teglia). Il profilo a resistenze separate mostra setpoint distinti per cielo e platea fino a 510 °C; verifica sempre i limiti del tuo forno. Per pinsa e pane, senza un riferimento univoco, i setpoint restano da calibrare.
 
 ### [services/scheduler.py](src/doughlab/services/scheduler.py)
 
@@ -303,7 +313,7 @@ Il "direttore d'orchestra". Converte una lista di fasi in un `PlanResult` comple
 |---|---|---|
 | `PhaseKind` | `StrEnum` | 10 fasi (preferment, autolyse, mix, bulk, maturation, temper, shape, proof, open, bake) |
 | `PHASE_LABELS` | `dict[PhaseKind, str]` | etichette italiane |
-| `FERMENTING_PHASES` | `set[PhaseKind]` | fasi in cui conta il lievito (usato per UI/validazione futura) |
+| `FERMENTING_PHASES` | `set[PhaseKind]` | fasi la cui durata contribuisce all'attività del lievito; esclude autolisi e cottura |
 | `PlanPhase` | `dataclass` | input: `(kind, label, hours, ambient_c, container, environment)` |
 | `PlanInput` | `dataclass` | wrapper: `(start_at, initial_dough_c, phases, yeast_kind, yeast_pct, target_work)` |
 | `PhaseResult` | `dataclass` | output per fase: `(phase, start_at, end_at, maturity_start_pct, maturity_end_pct)` |
@@ -316,9 +326,10 @@ L'app FastAPI. Route attuali:
 
 | Metodo | Path | Scopo |
 |---|---|---|
-| `GET` | `/` | pagina `planner.html`, usa primo preset come default |
-| `GET` | `/?preset=<key>` | carica preset specifico (reload intero per server-side state) |
+| `GET` | `/` | pagina `planner.html` con tab Piano/Registro, primo preset e storico recente |
+| `GET` | `/?preset=<key>&yeast=<kind>&oven=<profile>` | carica preset mantenendo lievito e profilo forno |
 | `POST` | `/plan` | ritorna il **fragment HTML** `plan_result.html` (HTMX swap) |
+| `POST` | `/bakes` | salva nel database una prova reale e restituisce lo scarto dalla maturità prevista |
 | `POST` | `/plan.ics` | ritorna il piano come file `.ics` da aprire in Calendario |
 | `GET` | `/static/*` | asset statici (PWA, icone, SW) |
 
@@ -332,10 +343,10 @@ Helper interni:
 ### [templates/](src/doughlab/templates/)
 
 - **`base.html`**: layout minimale con variabili CSS semantiche (`--bg`, `--surface`, `--ac`…), dark mode automatica (preferenza di sistema) + toggle manuale persistente in `localStorage`. Alpine.js + HTMX + Chart.js caricati da CDN. Niente Node, niente build step.
-- **`planner.html`**: pagina principale con **scroll-reveal layout**: in alto `#result` (aggiornato live via HTMX), poi barra ricette (preset), poi form con intestazione ricetta (nome/stile/panetti/%), fasi, pannello collassabile "Parametri avanzati" (olio/zucchero/prefermento/target). Alpine gestisce reindex righe + preset loading.
-- **`partials/plan_result.html`**: fragment ritornato da `/plan`. Grid 2 colonne (su desktop): colonna sinistra sticky con riepilogo chiave (pronto alle / fine piano / durata / maturità / lievito suggerito), colonna destra con card ingredienti (grammi + %), grafico Chart.js (T° impasto / T° ambiente / maturità %), tabella timeline fasi.
+- **`planner.html`**: una tab bar nella stessa pagina separa **Pianifica** da **Registro prove**. La scheda Piano contiene input base, ricetta, fasi e suggerimenti di cottura in sola lettura, selezionabili per forno domestico o elettrico con cielo e platea. I parametri reali si annotano nel Registro e non influenzano la maturazione.
+- **`partials/plan_result.html`**: HTMX aggiorna ingredienti e riepilogo in `#result`, grafico e timeline in `#detailsResult`, e lo snapshot nel tab nascosto `#bakeHistory` con `hx-swap-oob`. Il tab Registro può quindi essere aperto senza ricalcolare o perdere il piano. Le prove sono salvate in `Bake.log` con snapshot, esito reale e parametri di cottura usati; l'asse X è il tempo trascorso in ore.
 
-Nota UX: nel form le percentuali sono inserite in formato umano (`62`, `2.8`, `0.15`) e convertite server-side in frazioni per i calcoli.
+Nota UX: nel form le percentuali sono inserite in formato umano (`62`, `2.8`) e convertite server-side in frazioni per i calcoli. I decimali si possono digitare liberamente. Il lievito non è un input: la percentuale suggerita dall'app determina anche i grammi mostrati. Giorni e mesi nel risultato sono localizzati in italiano.
 
 ### [static/](src/doughlab/static/)
 
@@ -347,7 +358,7 @@ Nota UX: nel form le percentuali sono inserite in formato umano (`62`, `2.8`, `0
 
 ## Testing
 
-19 test (al 2026-10-02). Lanciali con `uv run pytest`.
+52 test (al 2026-10-05). Lanciali con `uv run pytest`.
 
 ### [tests/test_thermal.py](tests/test_thermal.py)
 
@@ -387,6 +398,33 @@ Nota UX: nel form le percentuali sono inserite in formato umano (`62`, `2.8`, `0
 | `test_salt_ratio` | `sale / farina == sale%` |
 | `test_preferment_split` | prefermento + rinfresco == totale |
 | `test_oil_included_in_total` | l'olio entra nel bilancio massico |
+| `test_preferment_water_never_exceeds_total_water` | il prefermento non porta l'acqua dell'impasto finale sotto zero |
+
+### [tests/test_main.py](tests/test_main.py)
+
+| Test | Proprietà verificata |
+|---|---|
+| `test_suggested_yeast_is_used_for_plan_and_weights` | dose suggerita usata nel piano e nei grammi |
+| `test_hydration_change_recalculates_all_ingredient_weights` | variazione idratazione aggiorna pesi ingredienti a peso totale costante |
+| `test_planner_shows_primary_inputs_and_hides_manual_yeast_dose` | UI mostra i quattro input base e non chiede la dose di lievito |
+| `test_selected_yeast_type_survives_recipe_change` | la selezione del lievito viene mantenuta cambiando preset |
+| `test_oven_profile_survives_recipe_change` | la scelta del profilo forno si conserva cambiando preset |
+| `test_legacy_nettuno_oven_profile_maps_to_split_heaters` | i vecchi URL Nettuno vengono convertiti nel profilo generico |
+| `test_schedule_duration_changes_yeast_suggestion_not_formula_percentages` | il piano cambia il lievito stimato ma non idratazione e sale impostati |
+| `test_phase_cards_explain_temperature_and_preset_effects` | UI spiega preset, fasi, TA/TC e ordine degli input |
+| `test_non_fermenting_phase_duration_does_not_change_yeast_suggestion` | autolisi e cottura non contribuiscono alla stima del lievito |
+| `test_summary_combines_ready_and_end_when_they_match` | evita date duplicate se maturità e fine piano coincidono |
+| `test_summary_separates_ready_from_later_bake_phase` | distingue la maturità dalla fine del piano se segue la cottura |
+| `test_chart_x_axis_uses_elapsed_hours_not_sample_indexes` | asse X in ore reali, non in indici dei campioni |
+| `test_bake_observation_saves_snapshot_and_prediction_delta` | conserva lo snapshot e calcola lo scarto temporale |
+| `test_bake_route_persists_observation_in_sqlite` | `/bakes` conserva snapshot e risultato nel DB |
+| `test_cooking_advice_is_not_overridden_by_planner_form` | il planner mantiene i suggerimenti del preset |
+| `test_split_oven_profile_keeps_preset_platea_and_ceiling_advice` | i suggerimenti cielo/platea restano quelli del preset |
+| `test_teglia_preset_shows_split_oven_cielo_and_platea_advice` | il preset teglia mostra setpoint separati e hint di cottura |
+| `test_hostile_form_values_never_hang_or_produce_non_finite_plans` | inf/NaN, ore enormi o negative, date ed enum non validi non bloccano né producono piani non finiti |
+| `test_phase_count_is_capped` | il server accetta al massimo 30 fasi |
+| `test_ics_export_uses_local_time_not_utc` | l'export `.ics` non sposta gli orari di fuso |
+| `test_bake_form_never_embeds_snapshot_text_in_javascript` | uno snapshot ostile o non-oggetto non genera JS iniettato né errori 500 |
 
 ---
 
@@ -414,7 +452,7 @@ Nota UX: nel form le percentuali sono inserite in formato umano (`62`, `2.8`, `0
 - Export `.ics` per Calendario iOS
 - PWA installabile
 - UI con palette rivista + dark mode (auto + toggle)
-- 19 test unitari verdi
+- 52 test unitari verdi
 
 ### 🔜 Fase 2 — Il tool completo per il pizzaiolo
 - Persistenza ricette con versioning (ORM già pronto)
