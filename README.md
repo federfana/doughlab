@@ -358,7 +358,7 @@ Nota UX: nel form le percentuali sono inserite in formato umano (`62`, `2.8`) e 
 
 ## Testing
 
-52 test (al 2026-10-05). Lanciali con `uv run pytest`.
+53 test (al 2026-10-06). Lanciali con `uv run pytest`.
 
 ### [tests/test_thermal.py](tests/test_thermal.py)
 
@@ -416,6 +416,7 @@ Nota UX: nel form le percentuali sono inserite in formato umano (`62`, `2.8`) e 
 | `test_summary_combines_ready_and_end_when_they_match` | evita date duplicate se maturità e fine piano coincidono |
 | `test_summary_separates_ready_from_later_bake_phase` | distingue la maturità dalla fine del piano se segue la cottura |
 | `test_chart_x_axis_uses_elapsed_hours_not_sample_indexes` | asse X in ore reali, non in indici dei campioni |
+| `test_chart_has_fixed_responsive_height_and_follows_theme` | il grafico ha altezza responsive fissa e si ridisegna al cambio tema |
 | `test_bake_observation_saves_snapshot_and_prediction_delta` | conserva lo snapshot e calcola lo scarto temporale |
 | `test_bake_route_persists_observation_in_sqlite` | `/bakes` conserva snapshot e risultato nel DB |
 | `test_cooking_advice_is_not_overridden_by_planner_form` | il planner mantiene i suggerimenti del preset |
@@ -452,7 +453,7 @@ Nota UX: nel form le percentuali sono inserite in formato umano (`62`, `2.8`) e 
 - Export `.ics` per Calendario iOS
 - PWA installabile
 - UI con palette rivista + dark mode (auto + toggle)
-- 52 test unitari verdi
+- 53 test unitari verdi
 
 ### 🔜 Fase 2 — Il tool completo per il pizzaiolo
 - Persistenza ricette con versioning (ORM già pronto)

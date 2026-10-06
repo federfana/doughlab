@@ -148,6 +148,7 @@
           <input type="hidden" name="phase_label_{{ i }}" value="{{ p.label }}">
           <div class="phase-fields">
             <label class="field"><span class="lab">Durata (ore)</span><input type="number" name="phase_hours_{{ i }}" value="{{ p.hours }}" step="0.25" min="0" max="720"></label>
+            <label class="field"><span class="lab">Temperatura (°C)</span><input type="number" name="phase_ambient_{{ i }}" value="{{ p.ambient_c }}" step="0.5" min="-5" max="50"></label>
             <label class="field"><span class="lab">Condizione</span>
               <select name="phase_env_{{ i }}">
                 {% for v, label in environments %}
@@ -155,7 +156,6 @@
                 {% endfor %}
               </select>
             </label>
-            <label class="field"><span class="lab">Temperatura (°C)</span><input type="number" name="phase_ambient_{{ i }}" value="{{ p.ambient_c }}" step="0.5" min="-5" max="50"></label>
           </div>
           <details class="phase-advanced">
             <summary>Contenitore</summary>
@@ -296,12 +296,12 @@
     <input type="hidden" name="phase_label_IDX" value="Puntata">
     <div class="phase-fields">
       <label class="field"><span class="lab">Durata (ore)</span><input type="number" name="phase_hours_IDX" value="1" step="0.25" min="0" max="720"></label>
+      <label class="field"><span class="lab">Temperatura (°C)</span><input type="number" name="phase_ambient_IDX" value="22" step="0.5" min="-5" max="50"></label>
       <label class="field"><span class="lab">Condizione</span>
         <select name="phase_env_IDX">
           {% for v, label in environments %}<option value="{{ v }}">{% if v=='ambient' %}TA · {% else %}TC · {% endif %}{{ label }}</option>{% endfor %}
         </select>
       </label>
-      <label class="field"><span class="lab">Temperatura (°C)</span><input type="number" name="phase_ambient_IDX" value="22" step="0.5" min="-5" max="50"></label>
     </div>
     <details class="phase-advanced">
       <summary>Contenitore</summary>

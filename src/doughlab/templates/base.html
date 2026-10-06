@@ -28,7 +28,7 @@
   --border: #e4d6bf;
   --ink: #221811;
   --ink-2: #5c4a37;
-  --mut: #8a7659;
+  --mut: #79664c;
   --ac: #c2410c;        /* arancione terracotta */
   --ac-ink: #ffffff;
   --ac-soft: #fed7aa;
@@ -45,7 +45,7 @@ html.dark {
   --border: #3b2e23;
   --ink: #f5ede0;
   --ink-2: #c9b89a;
-  --mut: #938168;
+  --mut: #a8967c;
   --ac: #fb923c;
   --ac-ink: #1a0e05;
   --ac-soft: #4a2d12;
@@ -130,6 +130,9 @@ input[type=datetime-local] { width: auto; }
   cursor: pointer;
 }
 .number-stepper-controls button:hover { color: var(--ac); border-color: var(--ac); }
+@media (max-width: 560px), (pointer: coarse) {
+  .number-stepper-controls button { width: 2.1rem; min-height: 1.55rem; font-size: 13px; }
+}
 .number-stepper input::-webkit-inner-spin-button,
 .number-stepper input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
 .number-stepper input[type=number] { -moz-appearance: textfield; }
@@ -252,7 +255,7 @@ details.panel > .panel-body { padding: .9rem; border-top: 1px solid var(--border
 .icon-button:hover { border-color: var(--bad); color: var(--bad); }
 .icon-button:disabled { opacity: .35; cursor: default; }
 .phase-advanced { margin-top: .55rem; font-size: .78rem; color: var(--mut); }
-.phase-advanced summary { cursor: pointer; }
+.phase-advanced summary { cursor: pointer; padding: .35rem 0; }
 .phase-advanced select { width: 100%; margin-top: .4rem; }
 .phase-help { margin: .8rem 0 0; }
 .baking-section { padding: .65rem .85rem; }
@@ -266,10 +269,6 @@ details.panel > .panel-body { padding: .9rem; border-top: 1px solid var(--border
 .oven-profile-segments span { display: block; padding: .28rem .55rem; border-radius: 4px; color: var(--ink-2); font-size: .76rem; font-weight: 600; }
 .oven-profile-segments input:checked + span { background: var(--ac); color: var(--ac-ink); }
 .oven-profile-segments input:focus-visible + span { outline: 2px solid var(--ac); outline-offset: 2px; }
-.baking-profile-label { margin: -.35rem 0 .75rem; color: var(--ac); font-size: .9rem; font-weight: 650; }
-.baking-fields { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: .75rem; }
-.baking-fields input { width: 100%; }
-.baking-position { grid-column: span 2; }
 .baking-note { margin: .35rem 0 0; font-size: .76rem; line-height: 1.3; }
 .baking-suggestions { display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: .3rem .7rem; margin: 0; }
 .baking-suggestions > div { min-width: 0; }
@@ -298,13 +297,14 @@ details.panel > .panel-body { padding: .9rem; border-top: 1px solid var(--border
 .preferment-split strong { flex-basis: 100%; }
 .result-layout .space-y > * + * { margin-top: 1rem; }
 .bake-log-panel { padding: 1rem; }
-.bake-cooking-fields { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .75rem; margin: 0 0 .8rem; padding: .8rem; border: 1px solid var(--border); border-radius: 6px; }
+.chart-wrap { position: relative; height: clamp(240px, 36vw, 340px); }
+.bake-cooking-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: .75rem; margin: 0 0 .8rem; padding: .8rem; border: 1px solid var(--border); border-radius: 6px; }
 .bake-cooking-fields legend { padding: 0 .3rem; color: var(--ink-2); font-size: .85rem; font-weight: 650; }
 .bake-cooking-fields input, .bake-cooking-fields select { width: 100%; }
 .bake-profile-fields { display: contents; }
-.bake-observation-fields { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .75rem; margin-bottom: .8rem; }
+.bake-observation-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(11.5rem, 1fr)); gap: .75rem; margin-bottom: .8rem; }
 .bake-observation-fields input, .bake-observation-fields select, .bake-observation-fields textarea { width: 100%; }
-.bake-notes-field { grid-column: span 2; }
+.bake-notes-field { grid-column: 1 / -1; }
 .bake-status { margin: 0 0 .75rem; padding: .55rem .7rem; border-radius: 6px; background: var(--ac-soft); color: var(--ac); font-size: .85rem; }
 .bake-status.error { background: #fee2e2; color: #b91c1c; }
 .bake-history-list { margin-top: .9rem; border-top: 1px solid var(--border); padding-top: .7rem; }
@@ -322,23 +322,22 @@ details.panel > .panel-body { padding: .9rem; border-top: 1px solid var(--border
 }
 @media (max-width: 850px) {
   .dough-input-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .baking-fields { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .yeast-kind-control { grid-column: span 2; }
   .phase-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .summary-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .ingredient-list { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 @media (max-width: 560px) {
   .dough-input-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .65rem; }
-  .baking-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .baking-position { grid-column: 1 / -1; }
   .preset-layout { grid-template-columns: 1fr; gap: .5rem; }
   .section-heading { align-items: flex-start; flex-direction: column; }
   .phase-grid { grid-template-columns: 1fr; }
   .summary-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .85rem .5rem; }
   .ingredient-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .bake-observation-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .bake-cooking-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .bake-notes-field { grid-column: 1 / -1; }
+  .bake-cooking-fields > label.field:first-of-type { grid-column: 1 / -1; }
+  table { font-size: 12px; }
+  th, td { padding: .35rem .12rem; }
   .summary-metrics > div, .ingredient-list > div { padding-left: .55rem; }
 }
 .space-y > * + * { margin-top: 1rem; }

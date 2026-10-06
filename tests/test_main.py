@@ -152,6 +152,15 @@ def test_chart_x_axis_uses_elapsed_hours_not_sample_indexes() -> None:
     assert "max: d.t[d.t.length - 1]" in rendered
 
 
+def test_chart_has_fixed_responsive_height_and_follows_theme() -> None:
+    rendered = _render_plan_summary(_form(65))
+
+    assert 'class="chart-wrap"' in rendered
+    assert "maintainAspectRatio: false" in rendered
+    assert "window.__redrawChart" in rendered
+    assert "css('--ink-2'" in rendered
+
+
 def test_planner_shows_primary_inputs_and_hides_manual_yeast_dose() -> None:
     context = _common_ctx()
     context["recipe"] = _default_recipe_ctx()

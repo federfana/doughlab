@@ -52,7 +52,7 @@
     {# ───── Grafico ───── #}
     <section class="card" style="padding: 1rem">
       <div class="lab-row">Temperatura e maturità</div>
-      <canvas id="chart" height="140"></canvas>
+      <div class="chart-wrap"><canvas id="chart" role="img" aria-label="Temperatura dell'impasto e maturità nel tempo"></canvas></div>
     </section>
 
     {# ───── Timeline fasi ───── #}
@@ -61,7 +61,7 @@
       <div style="overflow-x: auto">
         <table>
           <thead>
-            <tr><th>Fase</th><th>Inizio</th><th>Fine</th><th>Ore</th><th>T° amb</th><th>Maturità</th></tr>
+            <tr><th>Fase</th><th>Inizio</th><th>Fine</th><th>Ore</th><th>T°C</th><th>Maturità</th></tr>
           </thead>
           <tbody>
             {% for pr in plan.phases %}
@@ -70,8 +70,8 @@
               <td>{{ weekdays_it[pr.start_at.weekday()] }} {{ pr.start_at.strftime('%H:%M') }}</td>
               <td>{{ weekdays_it[pr.end_at.weekday()] }} {{ pr.end_at.strftime('%H:%M') }}</td>
               <td>{{ '%.2f'|format(pr.phase.hours) }}</td>
-              <td>{{ '%.1f'|format(pr.phase.ambient_c) }} °C</td>
-              <td class="hint">{{ '%.0f'|format(pr.maturity_start_pct) }}% → {{ '%.0f'|format(pr.maturity_end_pct) }}%</td>
+              <td>{{ '%.1f'|format(pr.phase.ambient_c) }}°</td>
+              <td class="hint" style="white-space: nowrap">{{ '%.0f'|format(pr.maturity_start_pct) }}→{{ '%.0f'|format(pr.maturity_end_pct) }}%</td>
             </tr>
             {% endfor %}
           </tbody>
@@ -92,31 +92,53 @@
 <script>
 (function() {
   const d = JSON.parse(document.getElementById('chartData').textContent);
-  const styles = getComputedStyle(document.documentElement);
-  const acc = styles.getPropertyValue('--ac').trim() || '#c2410c';
-  const mut = styles.getPropertyValue('--mut').trim() || '#8a7659';
-  const ok = styles.getPropertyValue('--ok').trim() || '#15803d';
-  if (window.__chart) window.__chart.destroy();
-  window.__chart = new Chart(document.getElementById('chart'), {
-    type: 'line',
-    data: {
-      datasets: [
-        { label: 'T° impasto', data: d.t.map((x, i) => ({ x, y: d.dough[i] })), borderColor: acc, borderWidth: 2, pointRadius: 0, yAxisID: 'y' },
-        { label: 'T° ambiente', data: d.t.map((x, i) => ({ x, y: d.amb[i] })), borderColor: mut, borderWidth: 1, borderDash: [6,4], pointRadius: 0, yAxisID: 'y' },
-        { label: 'Maturità %', data: d.t.map((x, i) => ({ x, y: d.mat[i] })), borderColor: ok, borderWidth: 2, pointRadius: 0, yAxisID: 'y1' }
-      ]
-    },
-    options: {
-      responsive: true,
-      interaction: { mode: 'index', intersect: false },
-      scales: {
-        x: { type: 'linear', min: 0, max: d.t[d.t.length - 1], title: { display: true, text: "ore dall'inizio" }, ticks: { maxTicksLimit: 7, callback: v => `${Number(v).toFixed(1)} h` } },
-        y: { title: { display: true, text: '°C' }, suggestedMin: 0, suggestedMax: 30 },
-        y1: { position: 'right', title: { display: true, text: 'maturità %' }, suggestedMin: 0, suggestedMax: 120, grid: { drawOnChartArea: false } }
+  const css = (name, fallback) => getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
+  const isWide = () => window.innerWidth >= 560;
+
+  function build() {
+    const acc = css('--ac', '#c2410c');
+    const mut = css('--mut', '#79664c');
+    const ok = css('--ok', '#15803d');
+    const ink = css('--ink-2', '#5c4a37');
+    const grid = css('--border', '#e4d6bf');
+    if (window.__chart) window.__chart.destroy();
+    window.__chart = new Chart(document.getElementById('chart'), {
+      type: 'line',
+      data: {
+        datasets: [
+          { label: 'T° impasto', data: d.t.map((x, i) => ({ x, y: d.dough[i] })), borderColor: acc, borderWidth: 2, pointRadius: 0, yAxisID: 'y' },
+          { label: 'T° ambiente', data: d.t.map((x, i) => ({ x, y: d.amb[i] })), borderColor: mut, borderWidth: 1, borderDash: [6,4], pointRadius: 0, yAxisID: 'y' },
+          { label: 'Maturità %', data: d.t.map((x, i) => ({ x, y: d.mat[i] })), borderColor: ok, borderWidth: 2, pointRadius: 0, yAxisID: 'y1' }
+        ]
       },
-      plugins: { legend: { position: 'bottom' } }
-    }
-  });
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        color: ink,
+        interaction: { mode: 'index', intersect: false },
+        // Su schermi stretti i titoli degli assi tolgono spazio al grafico: la legenda basta.
+        onResize: chart => {
+          const wide = isWide();
+          ['x', 'y', 'y1'].forEach(id => { chart.options.scales[id].title.display = wide; });
+          chart.update('none');
+        },
+        scales: {
+          x: { type: 'linear', min: 0, max: d.t[d.t.length - 1], title: { display: isWide(), text: "ore dall'inizio", color: ink }, ticks: { color: ink, maxTicksLimit: 6, callback: v => `${Number(v).toFixed(1)} h` }, grid: { color: grid } },
+          y: { title: { display: isWide(), text: '°C', color: ink }, suggestedMin: 0, suggestedMax: 30, ticks: { color: ink, callback: v => `${v}°` }, grid: { color: grid } },
+          y1: { position: 'right', title: { display: isWide(), text: 'maturità %', color: ink }, suggestedMin: 0, suggestedMax: 120, ticks: { color: ink, callback: v => `${v}%` }, grid: { drawOnChartArea: false } }
+        },
+        plugins: { legend: { position: 'bottom', labels: { color: ink, usePointStyle: true, pointStyle: 'line', boxWidth: 24 } } }
+      }
+    });
+  }
+
+  // Il grafico legge i colori dalle variabili CSS: va ridisegnato quando cambia il tema.
+  window.__redrawChart = build;
+  if (!window.__chartThemeWatcher) {
+    window.__chartThemeWatcher = new MutationObserver(() => window.__redrawChart && window.__redrawChart());
+    window.__chartThemeWatcher.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+  }
+  build();
 })();
 </script>
 </section>
