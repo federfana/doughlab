@@ -42,7 +42,7 @@ def encode_data_url(mime: str, data: bytes) -> str:
 
 
 def normalize_photo_settings(raw: Any) -> dict[str, Any]:
-    """Impostazioni di inquadratura di Pizza Lab, ridotte ai soli valori usati dalla pagina."""
+    """Impostazioni di inquadratura del backup, ridotte ai soli valori usati dalla pagina."""
     settings = dict(DEFAULT_PHOTO_SETTINGS)
     if not isinstance(raw, dict):
         return settings

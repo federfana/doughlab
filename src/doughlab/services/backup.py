@@ -1,4 +1,4 @@
-"""Lettura e scrittura dei backup di Sibellutu Pizza Lab (stesso schema `entries`).
+"""Lettura e scrittura del backup JSON del Diario (schema `entries`, compatibile con Pizza Lab).
 
 Il formato ha tutti i valori come stringhe; qui diventano numeri e testo con limiti.
 Le chiavi sconosciute finiscono in `extra` e tornano nell'export, così non si perde nulla.
@@ -24,7 +24,7 @@ MAX_ENTRIES = 5000
 MAX_EXTRA_BYTES = 20_000
 MAX_PLAN_BYTES = 100_000
 
-# chiave Pizza Lab -> (colonna, lunghezza massima)
+# chiave del backup -> (colonna, lunghezza massima)
 TEXT_FIELDS: dict[str, tuple[str, int]] = {
     "name": ("name", 120),
     "pizzaType": ("pizza_type", 60),
@@ -40,7 +40,7 @@ TEXT_FIELDS: dict[str, tuple[str, int]] = {
     "nextChanges": ("next_changes", 5_000),
     "tags": ("tags", 200),
 }
-# chiave Pizza Lab -> (colonna, minimo, massimo)
+# chiave del backup -> (colonna, minimo, massimo)
 FLOAT_FIELDS: dict[str, tuple[str, float, float]] = {
     "flourW": ("flour_w", 0, 1_000),
     "protein": ("protein", 0, 100),

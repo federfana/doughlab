@@ -36,8 +36,8 @@ Laboratorio digitale per impasti pizza/pane. Prevede **quando** l'impasto è dav
 - **Ricette salvate**: formula, fasi, lievito e forno si salvano con un nome (*Le mie ricette*); salvare di nuovo con lo stesso nome crea una nuova versione, e ogni versione si può riaprire. Le prove del diario nate da una ricetta salvata restano collegate e si filtrano per ricetta.
 - **In corso (Live Bake)**: *Avvia in cucina* segue le fasi in tempo reale con timer, avanzamento manuale, ±15 min, controlli per fase, temperatura misurata, avviso a fine fase e schermo acceso. Lo stato resta nel browser (sopravvive a ricarica e chiusura) e a fine impasto precompila il diario con gli orari reali.
 - **Ricerca nel Diario** per nome, tipo, note, forno.
-- **Backup**: importa ed esporta il JSON di [Pizza Lab](https://pizzalab.sibellutu.com/) con le foto. L'importazione è ripetibile: le voci già presenti non si duplicano e non sovrascrivono modifiche locali più recenti.
-- **Export `.ics`** per il Calendario, **PWA** installabile e tema chiaro/scuro. Le librerie JS sono locali (`static/vendor/`): dopo la prima visita l'app si apre e funziona anche offline, tranne le operazioni che passano dal server.
+- **Backup**: importa ed esporta il Diario in JSON con le foto (formato compatibile con il backup di [Pizza Lab](https://pizzalab.sibellutu.com/)). L'importazione è ripetibile: le voci già presenti non si duplicano e non sovrascrivono modifiche locali più recenti.
+- **Export `.ics`** per il Calendario, **PWA** installabile e tema chiaro/scuro. Le librerie JS sono locali (`static/vendor/`): su `localhost` o in HTTPS, dopo la prima visita, l'app si apre e funziona anche offline, tranne le operazioni che passano dal server.
 
 ---
 
@@ -73,6 +73,10 @@ Safari → Condividi → **Aggiungi alla schermata Home**: diventa un'icona come
 
 > **PWA e iOS**: senza HTTPS iOS non registra il service worker e non invia push. Per uso casalingo l'icona-home e l'export `.ics` nel Calendario coprono il 90% dei bisogni. Il resto lo abiliteremo quando aggiungeremo HTTPS.
 
+> **Contesto sicuro**: service worker (uso offline), Wake Lock (schermo acceso nel tab *In corso*) e notifiche funzionano solo su `localhost` o in HTTPS, non su `http://<IP-del-Mac>:8000`. Dal telefono in LAN il timer del Live Bake funziona, ma lo schermo può spegnersi e non ci sono notifiche: vibrazione e avvisi a schermo restano.
+
+> **Sicurezza**: l'app non ha autenticazione né protezione CSRF, pensata per una rete domestica fidata. Non esporla su Internet senza metterle davanti un proxy con login e HTTPS.
+
 ---
 
 ## Struttura del progetto
@@ -99,7 +103,7 @@ doughlab/
 │   │   ├── presets.py             # ricette predefinite
 │   │   ├── fields.py              # lettura difensiva di numeri, testi, date
 │   │   ├── images.py              # controllo del tipo di immagine dai primi byte
-│   │   ├── pizzalab.py            # parsing/scrittura dei backup Pizza Lab
+│   │   ├── backup.py              # parsing/scrittura del backup JSON del Diario
 │   │   └── scheduler.py           # orchestra tutto in un PlanResult
 │   ├── templates/
 │   │   ├── base.html              # layout, CSS con variabili, tema chiaro/scuro
@@ -120,7 +124,7 @@ doughlab/
     ├── test_fermentation.py       # proprietà di Q10 e taratura della dose
     ├── test_ingredients.py        # baker's percentage e prefermento
     ├── test_scheduler.py          # end-to-end del piano
-    ├── test_pizzalab.py           # parsing/export dei backup, immagini
+    ├── test_backup.py             # parsing/export dei backup, immagini
     ├── test_diary.py              # rotte del Diario su SQLite temporaneo
     ├── test_recipes.py            # ricette salvate, versioni, collegamento al Diario
     └── test_main.py               # form, template, .ics
@@ -292,7 +296,7 @@ Quattro modelli ORM:
 
 - **`Recipe`**: metadati della ricetta (nome, stile, note).
 - **`RecipeVersion`**: ogni modifica è una nuova riga → **ricettario versionato**. Payload JSON contiene fasi/ingredienti/parametri, utile come MVP prima di normalizzare lo schema.
-- **`DiaryEntry`**: una prova del diario. Colonne per i campi di Pizza Lab (nome, data, tipo, forno, farina, idratazione, ore frigo/ambiente, panetti, temperature, voto 0.5-5, ingredienti, procedimento, note, "da cambiare", etichette), più `started_at`/`ready_at` reali, `plan` (snapshot JSON del piano di origine, se c'è) ed `extra` (chiavi di backup sconosciute, restituite nell'export). `external_id` (uuid o id del backup) rende l'importazione ripetibile.
+- **`DiaryEntry`**: una prova del diario. Colonne per i campi del backup (nome, data, tipo, forno, farina, idratazione, ore frigo/ambiente, panetti, temperature, voto 0.5-5, ingredienti, procedimento, note, "da cambiare", etichette), più `started_at`/`ready_at` reali, `plan` (snapshot JSON del piano di origine, se c'è) ed `extra` (chiavi di backup sconosciute, restituite nell'export). `external_id` (uuid o id del backup) rende l'importazione ripetibile.
 - **`DiaryPhoto`**: fino a 5 foto per voce (`main`, `extra1`..`extra4`), binario `deferred` (si legge solo quando serve una foto o l'export), con didascalia e inquadratura.
 
 > `Recipe` e `RecipeVersion` esistono ma non sono ancora usati: arriveranno con la persistenza ricette (fase 2). La vecchia tabella `bakes` non viene più usata (era vuota) e non viene eliminata dal database.
@@ -425,9 +429,9 @@ Router `/diario`. Tutte le rotte restituiscono il pannello `partials/diary_panel
 
 Sicurezza e robustezza: il tipo dell'immagine è deciso dai primi byte (solo JPEG/PNG/WebP, max 12 MB), i testi hanno lunghezza massima, i numeri vengono validati e limitati (nessun `inf`/`NaN`), tutto passa dall'autoescape di Jinja. Se `ready_at` precede `started_at` il modulo resta aperto con l'errore in evidenza e i valori digitati.
 
-### [services/pizzalab.py](src/doughlab/services/pizzalab.py)
+### [services/backup.py](src/doughlab/services/backup.py)
 
-`parse_backup(raw)` legge `{"entries": [...]}` (valori sempre stringa) in `DiaryData`; `build_backup(entries)` fa il percorso inverso. Le foto sono data URL base64 negli slot `photos.main/extra1..4`, con `photoLabels` e `photoSettings`. Le chiavi sconosciute vengono conservate in `extra`; DoughLab aggiunge un blocco `doughlab` (piano e orari reali) che Pizza Lab ignora. L'importazione abbina le voci per `id`: se la voce esiste viene aggiornata solo quando `updatedAt` del file è più recente.
+`parse_backup(raw)` legge `{"entries": [...]}` (valori sempre stringa) in `DiaryData`; `build_backup(entries)` fa il percorso inverso. Le foto sono data URL base64 negli slot `photos.main/extra1..4`, con `photoLabels` e `photoSettings`. Le chiavi sconosciute vengono conservate in `extra`; DoughLab aggiunge un blocco `doughlab` (piano e orari reali) che le altre app ignorano. L'importazione abbina le voci per `id`: se la voce esiste viene aggiornata solo quando `updatedAt` del file è più recente.
 
 ### [templates/](src/doughlab/templates/)
 
@@ -443,14 +447,14 @@ Nota UX: nel form le percentuali sono inserite in formato umano (`62`, `2.8`) e 
 ### [static/](src/doughlab/static/)
 
 - **`manifest.webmanifest`**: nome, colori, icone 192/512 → "installabile" come PWA.
-- **`sw.js`**: service worker minimale, cache-first per asset statici, network-first per il resto. Precarica pagina iniziale, manifest e le tre librerie di `static/vendor/` (versioni fissate nel nome del file; cambiando versione si aggiorna anche `CACHE` in `sw.js`) e salva l'ultima pagina vista. Offline l'app si apre ed è interattiva; calcolo del piano, diario e ricette richiedono comunque il server.
+- **`sw.js`**: service worker minimale, cache-first solo per `/static/*` (le richieste dinamiche di HTMX, foto ed export non passano mai dalla cache, altrimenti diario e ricette risulterebbero vecchi), network-first per le pagine HTML. Precarica pagina iniziale, manifest e le tre librerie di `static/vendor/` (versioni fissate nel nome del file; cambiando versione si aggiorna anche `CACHE` in `sw.js`) e salva l'ultima pagina vista. Offline l'app si apre ed è interattiva; calcolo del piano, diario e ricette richiedono comunque il server.
 - **`icons/*.png`**: placeholder generati con Python puro (zlib). Da sostituire con grafica vera.
 
 ---
 
 ## Testing
 
-81 test (al 2026-10-06). Lanciali con `uv run pytest`.
+83 test (al 2026-10-06). Lanciali con `uv run pytest`.
 
 ### [tests/test_thermal.py](tests/test_thermal.py)
 
@@ -519,7 +523,7 @@ Nota UX: nel form le percentuali sono inserite in formato umano (`62`, `2.8`) e 
 | `test_planner_numeric_inputs_accept_any_value_so_the_form_stays_valid` | nessun campo numerico del pianificatore ha uno `step` vincolante (un valore "non valido" per il browser blocca il ricalcolo HTMX) |
 | `test_panetto_weight_is_not_rounded_to_multiples_of_ten` | 265 g si calcola come 265 g |
 
-### [tests/test_pizzalab.py](tests/test_pizzalab.py)
+### [tests/test_backup.py](tests/test_backup.py)
 
 | Test | Proprietà verificata |
 |---|---|
@@ -546,6 +550,8 @@ Nota UX: nel form le percentuali sono inserite in formato umano (`62`, `2.8`) e 
 | `test_import_rejects_non_backup_files` | file non validi o assenti danno un messaggio |
 | `test_plan_prefills_new_diary_entry` | il piano precompila la voce e viene conservato |
 | `test_diary_shows_prediction_error_for_linked_plan` | confronto stima/reale nella scheda |
+| `test_out_of_range_ids_are_rejected_not_crashing` | id enormi danno 422, non 500 (overflow SQLite) |
+| `test_service_worker_never_caches_dynamic_responses` | il service worker mette in cache solo `/static/*` e pagine HTML |
 
 ### [tests/test_recipes.py](tests/test_recipes.py)
 
@@ -582,18 +588,18 @@ Nota UX: nel form le percentuali sono inserite in formato umano (`62`, `2.8`) e 
 - Pianificatore HTMX con grafico Chart.js
 - Suggerimenti di cottura per forno domestico o elettrico cielo/platea
 - Diario prove con foto, voto, note, orari reali e scarto dalla stima
-- Importazione/esportazione dei backup di Pizza Lab (foto incluse)
+- Importazione/esportazione del backup del Diario (foto incluse, compatibile con Pizza Lab)
 - Export `.ics` per Calendario iOS
 - PWA installabile
 - UI con palette rivista + dark mode (auto + toggle), verificata da 320 px a desktop
 - Input del form validati lato server
-- 81 test unitari verdi
+- 83 test unitari verdi
 
 ### ✅ Fase 2 (fatta)
 - Ricette salvate con versioning, riapribili e collegate alle prove del Diario
 - Live Bake: timer per fase, controlli, orari reali che precompilano il diario
 - Ricerca nel Diario e filtro per ricetta
-- Librerie JS in `static/vendor/`: l'app si apre e funziona anche offline
+- Librerie JS in `static/vendor/`: offline su `localhost`/HTTPS (su HTTP in LAN il browser non attiva il service worker)
 
 ### 🔜 Prossimi passi
 - Confrontare le prove di una ricetta (scarto medio stima/reale) e usarlo per tarare `target_work`

@@ -1,4 +1,4 @@
-"""Test della lettura/scrittura dei backup di Pizza Lab."""
+"""Test della lettura/scrittura del backup del Diario."""
 from __future__ import annotations
 
 import base64
@@ -8,8 +8,8 @@ from typing import Any
 
 import pytest
 
+from doughlab.services.backup import build_backup, parse_backup, parse_rating
 from doughlab.services.images import decode_data_url, sniff_image_mime
-from doughlab.services.pizzalab import build_backup, parse_backup, parse_rating
 
 JPEG = b"\xff\xd8\xff\xe0" + b"\x00" * 64
 

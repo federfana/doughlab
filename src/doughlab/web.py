@@ -2,8 +2,9 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any
 
+from fastapi import Path as PathParam
 from fastapi.templating import Jinja2Templates
 
 from .config import settings
@@ -27,6 +28,9 @@ YEAST_SHORT_LABELS = {
 }
 
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
+
+# Identificativi nei percorsi: oltre i 64 bit SQLite solleva OverflowError.
+RowId = Annotated[int, PathParam(ge=1, le=2_147_483_647)]
 
 
 def common_ctx() -> dict[str, Any]:

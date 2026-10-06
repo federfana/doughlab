@@ -1,5 +1,5 @@
 // Service worker minimale: shell cache per aprire l'app offline.
-const CACHE = 'doughlab-v3';
+const CACHE = 'doughlab-v4';
 const CORE = [
   '/',
   '/static/manifest.webmanifest',
@@ -23,20 +23,24 @@ self.addEventListener('fetch', (e) => {
   if (req.mode === 'navigate') {
     e.respondWith(
       fetch(req).then(resp => {
-        if (resp.ok) caches.open(CACHE).then(c => c.put(req, resp.clone())).catch(() => {});
+        if (resp.ok && (resp.headers.get('content-type') || '').includes('text/html')) {
+          caches.open(CACHE).then(c => c.put(req, resp.clone())).catch(() => {});
+        }
         return resp;
       }).catch(() => caches.match(req).then(hit => hit || caches.match('/')))
     );
     return;
   }
+  // Solo gli asset statici sono cache-first: diario, ricette e foto devono arrivare sempre dalla rete.
+  const url = new URL(req.url);
+  if (url.origin !== self.location.origin || !url.pathname.startsWith('/static/') || url.pathname === '/static/sw.js') return;
   e.respondWith(
     caches.match(req).then(hit => hit || fetch(req).then(resp => {
-      // Cache GET riusciti su stessa origine.
-      if (resp.ok && new URL(req.url).origin === self.location.origin) {
+      if (resp.ok) {
         const copy = resp.clone();
         caches.open(CACHE).then(c => c.put(req, copy)).catch(() => {});
       }
       return resp;
-    }).catch(() => caches.match('/')))
+    }))
   );
 });

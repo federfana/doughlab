@@ -15,7 +15,7 @@ from .planning import default_recipe_ctx, number, parse_ingredients, parse_phase
 from .services.fermentation import DEFAULT_TARGET_WORK, YeastKind
 from .services.ingredients import STYLE_LABELS, RecipeIngredients, RecipeStyle
 from .services.presets import PRESETS_BY_KEY
-from .web import common_ctx, templates
+from .web import RowId, common_ctx, templates
 
 router = APIRouter(prefix="/ricette")
 
@@ -179,7 +179,7 @@ async def save_recipe(request: Request) -> HTMLResponse:
 
 
 @router.post("/{recipe_id:int}/elimina", response_class=HTMLResponse)
-async def delete_recipe(request: Request, recipe_id: int) -> HTMLResponse:
+async def delete_recipe(request: Request, recipe_id: RowId) -> HTMLResponse:
     async with SessionLocal() as session:
         recipe = await session.get(Recipe, recipe_id, options=[selectinload(Recipe.versions)])
         if recipe is not None:

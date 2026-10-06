@@ -15,8 +15,8 @@ from doughlab.db import Base
 from doughlab.main import app
 from doughlab.models import DiaryEntry, DiaryPhoto
 
+from .test_backup import JPEG, data_url, sample_entry
 from .test_main import _form
-from .test_pizzalab import JPEG, data_url, sample_entry
 
 Check = Callable[[AsyncClient, async_sessionmaker], Awaitable[None]]
 
@@ -255,3 +255,28 @@ def test_diary_shows_prediction_error_for_linked_plan(tmp_path, monkeypatch) -> 
         assert "Stima DoughLab 04/10 10:00, reale 04/10 11:30 (+1.5 h)" in page.text
 
     run_with_db(tmp_path, monkeypatch, check)
+
+
+def test_out_of_range_ids_are_rejected_not_crashing(tmp_path, monkeypatch) -> None:
+    async def check(client: AsyncClient, sessions: async_sessionmaker) -> None:
+        huge = "9" * 25
+        for method, url in (
+            ("GET", f"/diario/foto/{huge}"),
+            ("POST", f"/diario/{huge}"),
+            ("POST", f"/diario/{huge}/elimina"),
+            ("GET", f"/diario?recipe={huge}"),
+            ("POST", f"/ricette/{huge}/elimina"),
+        ):
+            assert (await client.request(method, url)).status_code == 422
+        assert (await client.get("/diario/foto/5")).status_code == 404
+
+    run_with_db(tmp_path, monkeypatch, check)
+
+
+def test_service_worker_never_caches_dynamic_responses() -> None:
+    from pathlib import Path
+
+    source = (Path(__file__).parents[1] / "src/doughlab/static/sw.js").read_text()
+
+    assert "startsWith('/static/')" in source
+    assert "text/html" in source

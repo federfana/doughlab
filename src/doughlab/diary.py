@@ -3,10 +3,10 @@ from __future__ import annotations
 
 import json
 from datetime import date, datetime
-from typing import Any
+from typing import Annotated, Any
 from uuid import uuid4
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Query, Request
 from fastapi.responses import HTMLResponse, Response
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload, undefer
@@ -14,16 +14,7 @@ from starlette.datastructures import FormData, UploadFile
 
 from .db import SessionLocal
 from .models import DiaryEntry, DiaryPhoto, utcnow
-from .services.fields import (
-    clean_text,
-    format_number,
-    parse_date,
-    parse_datetime,
-    parse_float,
-    parse_int,
-)
-from .services.images import MAX_PHOTO_BYTES, SLOTS, sniff_image_mime
-from .services.pizzalab import (
+from .services.backup import (
     FLOAT_FIELDS,
     MAX_PLAN_BYTES,
     TEXT_FIELDS,
@@ -33,8 +24,17 @@ from .services.pizzalab import (
     parse_backup,
     parse_rating,
 )
+from .services.fields import (
+    clean_text,
+    format_number,
+    parse_date,
+    parse_datetime,
+    parse_float,
+    parse_int,
+)
+from .services.images import MAX_PHOTO_BYTES, SLOTS, sniff_image_mime
 from .services.presets import PRESETS_BY_KEY
-from .web import common_ctx, templates
+from .web import RowId, common_ctx, templates
 
 router = APIRouter(prefix="/diario")
 
@@ -377,7 +377,9 @@ async def _read_form(request: Request) -> tuple[FormData, dict[str, str]] | None
 
 
 @router.get("", response_class=HTMLResponse)
-async def diary_list(request: Request, q: str = "", recipe: int | None = None) -> HTMLResponse:
+async def diary_list(
+    request: Request, q: str = "", recipe: Annotated[int | None, Query(ge=1, le=2_147_483_647)] = None
+) -> HTMLResponse:
     return await _panel(request, query=q, recipe_id=recipe)
 
 
@@ -387,7 +389,7 @@ async def diary_new(request: Request) -> HTMLResponse:
 
 
 @router.get("/{entry_id:int}/modifica", response_class=HTMLResponse)
-async def diary_edit(request: Request, entry_id: int) -> HTMLResponse:
+async def diary_edit(request: Request, entry_id: RowId) -> HTMLResponse:
     async with SessionLocal() as session:
         entry = await session.get(DiaryEntry, entry_id)
         form = _form_from_entry(entry) if entry else None
@@ -420,7 +422,7 @@ async def diary_create(request: Request) -> HTMLResponse:
 
 
 @router.post("/{entry_id:int}", response_class=HTMLResponse)
-async def diary_update(request: Request, entry_id: int) -> HTMLResponse:
+async def diary_update(request: Request, entry_id: RowId) -> HTMLResponse:
     parsed = await _read_form(request)
     async with SessionLocal() as session:
         entry = await session.get(DiaryEntry, entry_id)
@@ -453,7 +455,7 @@ async def diary_update(request: Request, entry_id: int) -> HTMLResponse:
 
 
 @router.post("/{entry_id:int}/elimina", response_class=HTMLResponse)
-async def diary_delete(request: Request, entry_id: int) -> HTMLResponse:
+async def diary_delete(request: Request, entry_id: RowId) -> HTMLResponse:
     async with SessionLocal() as session:
         entry = await session.get(DiaryEntry, entry_id)
         if entry is not None:
@@ -463,7 +465,7 @@ async def diary_delete(request: Request, entry_id: int) -> HTMLResponse:
 
 
 @router.get("/foto/{photo_id:int}")
-async def diary_photo(photo_id: int) -> Response:
+async def diary_photo(photo_id: RowId) -> Response:
     async with SessionLocal() as session:
         photo = await session.scalar(
             select(DiaryPhoto).where(DiaryPhoto.id == photo_id).options(undefer(DiaryPhoto.data))
