@@ -22,7 +22,7 @@ from .services.scheduler import (
     build_plan,
     fermentation_activity_mask,
 )
-from .services.thermal import Container, Environment
+from .services.thermal import Container, Environment, parse_container, parse_environment
 
 # Gli stessi limiti degli input HTML: il server non si fida del client.
 MAX_PHASES = 30
@@ -49,8 +49,8 @@ def parse_phase_form(data: dict[str, str]) -> list[PlanPhase]:
                     label=(data[f"phase_label_{i}"] or data[f"phase_kind_{i}"])[:80],
                     hours=number(data, f"phase_hours_{i}", 0, 0, 720),
                     ambient_c=number(data, f"phase_ambient_{i}", 22, -5, 50),
-                    container=Container(data[f"phase_container_{i}"]),
-                    environment=Environment(data[f"phase_env_{i}"]),
+                    container=parse_container(data[f"phase_container_{i}"]),
+                    environment=parse_environment(data[f"phase_env_{i}"]),
                 )
             )
         i += 1

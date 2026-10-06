@@ -8,6 +8,7 @@
 <title>{{ app_name }}</title>
 <link rel="manifest" href="/static/manifest.webmanifest">
 <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
+<link rel="icon" type="image/png" href="/static/icons/icon-192.png">
 <script>
   // Previene flash: applica il tema prima del render.
   (function(){
@@ -242,21 +243,29 @@ details.panel > .panel-body { padding: .9rem; border-top: 1px solid var(--border
 .preset-description strong { color: var(--ink); }
 .preset-flour-hint { padding-top: .3rem; border-top: 1px solid var(--border); font-size: .82rem; }
 .preset-hint { margin: .65rem 0 0; }
+.tray-calc { margin-top: .8rem; padding-top: .7rem; border-top: 1px solid var(--border); }
+.tray-calc-row { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; }
+.tray-calc-row input { width: 4.2rem; min-height: 2rem; padding-block: .2rem; text-align: center; }
+.tray-calc-row strong { min-width: 3.6rem; font-variant-numeric: tabular-nums; }
+.tray-calc .hint { margin: .4rem 0 0; }
 .section-heading, .section-title-row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
 .phase-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .75rem; }
-.phase-card { min-width: 0; padding: .85rem; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2); }
-.phase-card-head { display: flex; align-items: center; gap: .5rem; margin-bottom: .75rem; }
-.phase-number { display: grid; place-items: center; flex: 0 0 1.7rem; height: 1.7rem; border-radius: 50%; background: var(--ac); color: var(--ac-ink); font-size: .78rem; font-weight: 700; }
+.phase-card { min-width: 0; padding: .6rem .7rem; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2); }
+.phase-card-head { display: flex; align-items: center; gap: .4rem; margin-bottom: .45rem; }
+.phase-number { display: grid; place-items: center; flex: 0 0 1.5rem; height: 1.5rem; border-radius: 50%; background: var(--ac); color: var(--ac-ink); font-size: .72rem; font-weight: 700; }
 .phase-kind { min-width: 0; flex: 1; font-weight: 600; }
-.phase-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .55rem; }
-.phase-fields .field:last-child { grid-column: 1 / -1; }
-.phase-fields input, .phase-fields select { width: 100%; }
-.icon-button { flex: 0 0 2rem; min-height: 2rem; border: 1px solid var(--border); border-radius: 5px; background: var(--surface); color: var(--mut); cursor: pointer; font-size: 1.2rem; line-height: 1; }
+.phase-fields { display: grid; grid-template-columns: minmax(0, 1fr) 6.2rem; gap: .35rem .5rem; }
+.phase-fields.phase-selects { grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); margin-top: .35rem; }
+.phase-selects select { text-overflow: ellipsis; padding-inline: .25rem; font-size: .78rem; }
+.phase-fields label.field { gap: .15rem; }
+.phase-fields input, .phase-fields select { width: 100%; min-height: 2rem; padding-block: .2rem; font-size: .9rem; }
+.duration-input { display: flex; align-items: center; gap: .3rem; }
+.phase-fields .duration-input input { flex: 1 1 0; width: auto; min-width: 0; padding-inline: .25rem; text-align: center; appearance: textfield; -moz-appearance: textfield; }
+.duration-input input::-webkit-inner-spin-button, .duration-input input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.duration-input span { color: var(--mut); font-size: .82rem; }
+.icon-button { flex: 0 0 1.8rem; min-height: 1.8rem; border: 1px solid var(--border); border-radius: 5px; background: var(--surface); color: var(--mut); cursor: pointer; font-size: 1.05rem; line-height: 1; }
 .icon-button:hover { border-color: var(--bad); color: var(--bad); }
 .icon-button:disabled { opacity: .35; cursor: default; }
-.phase-advanced { margin-top: .55rem; font-size: .78rem; color: var(--mut); }
-.phase-advanced summary { cursor: pointer; padding: .35rem 0; }
-.phase-advanced select { width: 100%; margin-top: .4rem; }
 .phase-help { margin: .8rem 0 0; }
 .baking-section { padding: .65rem .85rem; }
 .baking-section .section-heading { margin-bottom: .4rem; }

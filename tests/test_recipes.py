@@ -95,3 +95,26 @@ def test_plan_snapshot_carries_recipe_link() -> None:
     snapshot = compute_plan_and_ingredients(data)["plan_snapshot"]
     assert (snapshot["recipe_id"], snapshot["recipe_version"]) == (7, 3)
     assert compute_plan_and_ingredients(_form(65))["plan_snapshot"]["recipe_id"] is None
+
+
+def test_saved_recipe_with_retired_container_opens_with_the_closest_offered_one(tmp_path, monkeypatch) -> None:
+    async def check(client, sessions) -> None:
+        data = _save_data("Vecchia")
+        data.update(phase_container_1="mass_box", phase_env_1="fridge_box")
+        await client.post("/ricette", data=data)
+        async with sessions() as session:
+            version = await session.scalar(select(RecipeVersion))
+            version.payload = {
+                **version.payload,
+                "phases": [
+                    {**p, "container": "mass_box", "environment": "fridge_box"} for p in version.payload["phases"]
+                ],
+            }
+            await session.commit()
+
+        page = (await client.get("/?recipe=1")).text
+        assert 'value="mass_bowl" selected' in page
+        assert 'value="fridge_home" selected' in page
+        assert 'value="mass_box"' not in page
+
+    run_with_db(tmp_path, monkeypatch, check)

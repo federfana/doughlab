@@ -35,7 +35,7 @@
           <dd class="metric-primary">{% if ready %}{{ weekdays_it[ready.weekday()] }} {{ ready.day }} {{ months_it[ready.month - 1] }} · {{ ready.strftime('%H:%M') }}{% else %}<span class="metric-warning">target non raggiunto</span>{% endif %}</dd>
         </div>
         {% if not completion_matches %}<div><dt>Fine ultima fase</dt><dd>{{ weekdays_it[plan.end_at.weekday()] }} {{ plan.end_at.day }} {{ months_it[plan.end_at.month - 1] }} · {{ plan.end_at.strftime('%H:%M') }}</dd></div>{% endif %}
-        <div><dt>Durata totale</dt><dd>{{ '%.1f'|format(plan.total_hours) }} h</dd></div>
+        <div><dt>Durata totale</dt><dd>{{ plan.total_hours|hours }}</dd></div>
         <div><dt>Maturità finale</dt><dd><span class="maturity-value {{ final_class }}">{{ '%.0f'|format(final_pct) }}%</span></dd></div>
         <div><dt>Lievito consigliato</dt><dd>{{ '%.3f'|format(suggested_pct * 100) }}%</dd><small>Stimato da tempi e temperature impostati</small></div>
       </dl>
@@ -65,7 +65,7 @@
       <div style="overflow-x: auto">
         <table>
           <thead>
-            <tr><th>Fase</th><th>Inizio</th><th>Fine</th><th>Ore</th><th>T°C</th><th>Maturità</th></tr>
+            <tr><th>Fase</th><th>Inizio</th><th>Fine</th><th>Durata</th><th>T°C</th><th>Maturità</th></tr>
           </thead>
           <tbody>
             {% for pr in plan.phases %}
@@ -73,7 +73,7 @@
               <td style="text-align: left">{{ pr.phase.label }}</td>
               <td>{{ weekdays_it[pr.start_at.weekday()] }} {{ pr.start_at.strftime('%H:%M') }}</td>
               <td>{{ weekdays_it[pr.end_at.weekday()] }} {{ pr.end_at.strftime('%H:%M') }}</td>
-              <td>{{ '%.2f'|format(pr.phase.hours) }}</td>
+              <td style="white-space: nowrap">{{ pr.phase.hours|hours }}</td>
               <td>{{ '%.1f'|format(pr.phase.ambient_c) }}°</td>
               <td class="hint" style="white-space: nowrap">{{ '%.0f'|format(pr.maturity_start_pct) }}→{{ '%.0f'|format(pr.maturity_end_pct) }}%</td>
             </tr>

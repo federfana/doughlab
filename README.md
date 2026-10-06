@@ -30,7 +30,7 @@ Laboratorio digitale per impasti pizza/pane. Prevede **quando** l'impasto è dav
 
 - **Formula**: numero e peso dei panetti, idratazione, sale e tipo di lievito (fresco, secco attivo, madre) danno le grammature. Olio, zucchero e prefermento stanno nei parametri avanzati.
 - **Fasi e temperature**: la sequenza di fasi (TA/TC, contenitore) genera la curva termica e la maturità. La **dose di lievito non si inserisce**: è calcolata dal piano.
-- **Ricette base**: 5 preset caricabili con un click, con un orientamento sulla farina.
+- **Ricette base**: 5 preset caricabili con un click, con un orientamento sulla farina. Per la teglia c'è un piccolo calcolatore: *lato × lato ÷ 2* = grammi di impasto (30 × 40 cm ≈ 600 g) e un pulsante per usarlo come peso del panetto.
 - **Suggerimenti di cottura**: in sola lettura, per forno domestico o elettrico con cielo e platea indipendenti. Non influenzano la maturazione.
 - **Diario**: ogni prova ha nome, data, formula, forno, voto a mezzi punti, note, "da cambiare" e fino a 5 foto. Può nascere da un piano (pulsante *Salva questa prova nel diario*, che precompila ingredienti, fasi e forno) e, con gli orari reali, mostra lo scarto rispetto alla stima.
 - **Ricette salvate**: formula, fasi, lievito e forno si salvano con un nome (*Le mie ricette*); salvare di nuovo con lo stesso nome crea una nuova versione, e ogni versione si può riaprire. Le prove del diario nate da una ricetta salvata restano collegate e si filtrano per ricetta.
@@ -190,21 +190,23 @@ $$T(t + \Delta t) = T_{\text{amb}} + (T(t) - T_{\text{amb}}) \cdot e^{-\Delta t 
 
 **τ (costante di tempo)** = tempo per percorrere il 63% della strada verso l'ambiente. Dipende da massa, superficie, mezzo. Noi usiamo una tabella `(Container × Environment) → τ` con 16 combinazioni in [services/thermal.py](src/doughlab/services/thermal.py).
 
-I profili disponibili:
+I profili del modello, con ciò che offre l'interfaccia (colonna *UI*):
 
-| Container | Significato |
-|---|---|
-| `MASS_BOWL` | massa in ciotola/madia (puntata) |
-| `MASS_BOX` | massa in cassetta coperta |
-| `BALLS_BOX` | panetti stagliati in cassetta |
-| `BALLS_SINGLE` | panetto singolo esposto |
+| Container | Significato | UI |
+|---|---|---|
+| `MASS_BOWL` | massa in ciotola (puntata) | 🥣 Massa in ciotola |
+| `BALLS_BOX` | panetti stagliati in cassetta | 📦 Panetti in cassetta |
+| `MASS_BOX` | massa in cassetta coperta | ritirato: diventa `MASS_BOWL` |
+| `BALLS_SINGLE` | panetto singolo esposto | ritirato: diventa `BALLS_BOX` |
 
-| Environment | Significato |
-|---|---|
-| `AMBIENT` | ambiente di casa |
-| `FRIDGE_HOME` | frigo domestico (apre/chiude) |
-| `FRIDGE_BOX` | cassetta chiusa in frigo (isolamento) |
-| `CHAMBER` | cella di lievitazione |
+| Environment | Significato | UI |
+|---|---|---|
+| `AMBIENT` | casa | 🏠 TA · Casa |
+| `FRIDGE_HOME` | frigo domestico | ❄️ TC · Frigo |
+| `CHAMBER` | cella di lievitazione | 🌡️ TC · Cella |
+| `FRIDGE_BOX` | cassetta chiusa in frigo | ritirato: diventa `FRIDGE_HOME` |
+
+I valori ritirati restano nel modello e nella tabella τ (i test li usano), ma il form non li offre più: `parse_container`/`parse_environment` in `services/thermal.py` li convertono nel profilo più simile quando arrivano da un form o da una ricetta salvata. I preset usano solo i valori offerti: passando da `MASS_BOX` a `MASS_BOWL` la dose di lievito suggerita per i preset con maturazione in frigo è salita di circa il 2% (es. teglia 0.190% → 0.195%).
 
 **Rispetto all'HTML di riferimento** che usa 2 τ fisse (2.8 h frigo, 1.3 h fuori), DoughLab distingue i profili: panetti stagliati rispondono in ~0.9 h a casa, la massa unica in ~1.6 h.
 
@@ -442,7 +444,7 @@ Sicurezza e robustezza: il tipo dell'immagine è deciso dai primi byte (solo JPE
 - **`partials/recipes_panel.html`**: salvataggio con nome, elenco ricette con versioni, prove collegate; sta fuori da `#planForm` per non innescare ricalcoli.
 - **`partials/diary_panel.html`, `diary_form.html`, `diary_entry.html`**: barra (nuova prova, esporta), importazione, modulo a sezioni (prova, impasto, cottura, note, foto) ed elenco di schede con miniatura, voto, dati chiave e confronto stima/reale.
 
-Nota UX: nel form le percentuali sono inserite in formato umano (`62`, `2.8`) e convertite server-side in frazioni per i calcoli. I decimali si possono digitare liberamente: i campi numerici usano `step="any"` perché un valore non multiplo dello step rende il form non valido e HTMX non ricalcola. Le frecce di idratazione, sale, prefermento e peso panetto (±5 g) sono pulsanti custom (`adjustPercent`). Il lievito non è un input: la percentuale suggerita dall'app determina anche i grammi mostrati. Giorni e mesi nel risultato sono localizzati in italiano.
+Nota UX: nel form le percentuali sono inserite in formato umano (`62`, `2.8`) e convertite server-side in frazioni per i calcoli. I decimali si possono digitare liberamente: i campi numerici usano `step="any"` perché un valore non multiplo dello step rende il form non valido e HTMX non ricalcola. Le frecce di idratazione, sale, prefermento e peso panetto (±5 g) sono pulsanti custom (`adjustPercent`). La durata di ogni fase si digita in **ore e minuti** (due campi; il campo nascosto `phase_hours_N` porta al server ore decimali, quindi l'API non cambia) e ovunque viene mostrata come `1 h 30 min`, `45 min` o `1 min 15 s` con i filtri Jinja `hours` e `minutes` (`format_hours`/`format_minutes` in `services/fields.py`): niente più `0.5 h` o `1.25 min`. Il lievito non è un input: la percentuale suggerita dall'app determina anche i grammi mostrati. Giorni e mesi nel risultato sono localizzati in italiano.
 
 ### [static/](src/doughlab/static/)
 
@@ -454,7 +456,7 @@ Nota UX: nel form le percentuali sono inserite in formato umano (`62`, `2.8`) e 
 
 ## Testing
 
-83 test (al 2026-10-06). Lanciali con `uv run pytest`.
+98 test (al 2026-10-06). Lanciali con `uv run pytest`.
 
 ### [tests/test_thermal.py](tests/test_thermal.py)
 
@@ -520,6 +522,13 @@ Nota UX: nel form le percentuali sono inserite in formato umano (`62`, `2.8`) e 
 | `test_hostile_form_values_never_hang_or_produce_non_finite_plans` | inf/NaN, ore enormi o negative, date ed enum non validi non bloccano né producono piani non finiti |
 | `test_phase_count_is_capped` | il server accetta al massimo 30 fasi |
 | `test_ics_export_uses_local_time_not_utc` | l'export `.ics` non sposta gli orari di fuso |
+| `test_durations_are_shown_in_hours_and_minutes_never_decimals` | `format_minutes`/`format_hours` danno `30 s`, `1 min 15 s`, `1 h 30 min`... |
+| `test_phase_duration_is_typed_as_hours_and_minutes_but_posted_as_decimal_hours` | i campi ore/minuti convivono con il campo nascosto in ore decimali |
+| `test_form_offers_only_casa_frigo_cella_and_ciotola_cassetta_with_icons` | il form offre solo Casa/Frigo/Cella e Ciotola/Cassetta, con icone |
+| `test_presets_only_use_offered_containers_and_environments` | i preset non usano valori ritirati |
+| `test_teglia_preset_suggests_tray_formula_and_other_presets_do_not` | il calcolatore della teglia compare solo per la teglia |
+| `test_stesura_phases_use_the_dough_ball_profile_not_the_bowl` | la Stesura di teglia e pinsa usa il profilo dei panetti in cassetta (superficie alta, risposta rapida) |
+| `test_retired_container_and_environment_values_map_to_the_closest_offered_one` | `mass_box`/`fridge_box` da un form diventano `mass_bowl`/`fridge_home` |
 | `test_planner_numeric_inputs_accept_any_value_so_the_form_stays_valid` | nessun campo numerico del pianificatore ha uno `step` vincolante (un valore "non valido" per il browser blocca il ricalcolo HTMX) |
 | `test_panetto_weight_is_not_rounded_to_multiples_of_ten` | 265 g si calcola come 265 g |
 
@@ -562,6 +571,7 @@ Nota UX: nel form le percentuali sono inserite in formato umano (`62`, `2.8`) e 
 | `test_recipe_name_is_escaped_and_delete_removes_versions` | nomi ostili escapati; l'eliminazione rimuove anche le versioni |
 | `test_diary_entry_keeps_recipe_link_and_can_be_filtered` | collegamento ricetta-prova, filtro per ricetta e ricerca testuale |
 | `test_plan_snapshot_carries_recipe_link` | lo snapshot del piano porta `recipe_id`/`recipe_version` |
+| `test_saved_recipe_with_retired_container_opens_with_the_closest_offered_one` | una ricetta salvata con valori ritirati si riapre con quelli più simili |
 
 ---
 
@@ -593,7 +603,7 @@ Nota UX: nel form le percentuali sono inserite in formato umano (`62`, `2.8`) e 
 - PWA installabile
 - UI con palette rivista + dark mode (auto + toggle), verificata da 320 px a desktop
 - Input del form validati lato server
-- 83 test unitari verdi
+- 98 test unitari verdi
 
 ### ✅ Fase 2 (fatta)
 - Ricette salvate con versioning, riapribili e collegate alle prove del Diario

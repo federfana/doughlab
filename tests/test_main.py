@@ -328,3 +328,85 @@ def test_panetto_weight_is_not_rounded_to_multiples_of_ten() -> None:
     data["panetto_g"] = "265"
 
     assert compute_plan_and_ingredients(data)["weights"].total_g == pytest.approx(1060.0)
+
+
+@pytest.mark.parametrize(
+    ("minutes", "expected"),
+    [(0, "0 min"), (0.5, "30 s"), (1.25, "1 min 15 s"), (8, "8 min"), (45, "45 min"),
+     (60, "1 h"), (90, "1 h 30 min"), (24 * 60, "24 h")],
+)
+def test_durations_are_shown_in_hours_and_minutes_never_decimals(minutes: float, expected: str) -> None:
+    from doughlab.services.fields import format_hours, format_minutes
+
+    assert format_minutes(minutes) == expected
+    assert format_hours(minutes / 60) == expected
+
+
+def test_phase_duration_is_typed_as_hours_and_minutes_but_posted_as_decimal_hours() -> None:
+    context = _common_ctx()
+    recipe = default_recipe_ctx()
+    recipe["phases"][1]["hours"] = 1.75
+    context["recipe"] = recipe
+    rendered = templates.get_template("planner.html").render(**context)
+
+    assert 'class="dur-h" value="1"' in rendered
+    assert 'class="dur-m" value="45"' in rendered
+    assert 'name="phase_hours_1" value="1.75"' in rendered
+    assert "Durata (ore)" not in rendered
+    assert "1.25 min" not in rendered
+
+
+def test_form_offers_only_casa_frigo_cella_and_ciotola_cassetta_with_icons() -> None:
+    context = _common_ctx()
+    context["recipe"] = default_recipe_ctx()
+    rendered = templates.get_template("planner.html").render(**context)
+
+    for option in ("🏠 TA · Casa", "❄️ TC · Frigo", "🌡️ TC · Cella", "🥣 Massa in ciotola", "📦 Panetti in cassetta"):
+        assert option in rendered
+    for retired in ("mass_box", "balls_single", "fridge_box", "Cassetta chiusa", "Panetto singolo"):
+        assert f'value="{retired}"' not in rendered
+
+
+def test_presets_only_use_offered_containers_and_environments() -> None:
+    from doughlab.services.presets import PRESETS
+    from doughlab.services.thermal import UI_CONTAINERS, UI_ENVIRONMENTS
+
+    for preset in PRESETS:
+        for phase in preset.phases:
+            assert phase.container in UI_CONTAINERS
+            assert phase.environment in UI_ENVIRONMENTS
+
+
+def test_retired_container_and_environment_values_map_to_the_closest_offered_one() -> None:
+    data = _form(65)
+    data.update(
+        phase_container_1="mass_box", phase_env_1="fridge_box",
+        phase_container_2="balls_single", phase_env_2="chamber",
+    )
+    phases = compute_plan_and_ingredients(data)["plan_snapshot"]["phases"]
+
+    assert phases[1]["environment"] == "fridge_home"
+    assert phases[2]["environment"] == "chamber"
+
+
+def test_teglia_preset_suggests_tray_formula_and_other_presets_do_not() -> None:
+    context = _common_ctx()
+    context["recipe"] = preset_ctx("teglia")
+    teglia = templates.get_template("planner.html").render(**context)
+    context["recipe"] = preset_ctx("napoletana")
+    napoletana = templates.get_template("planner.html").render(**context)
+
+    assert "lato × lato ÷ 2" in teglia
+    assert 'class="tray-calc"' in teglia
+    assert "tray-calc\"" not in napoletana
+
+
+def test_stesura_phases_use_the_dough_ball_profile_not_the_bowl() -> None:
+    from doughlab.services.presets import PRESETS_BY_KEY
+    from doughlab.services.scheduler import PhaseKind
+    from doughlab.services.thermal import Container
+
+    for key in ("teglia", "pinsa"):
+        stesure = [p for p in PRESETS_BY_KEY[key].phases if p.kind == PhaseKind.OPEN]
+        assert stesure
+        assert all(p.container == Container.BALLS_BOX for p in stesure)

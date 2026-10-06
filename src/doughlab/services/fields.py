@@ -60,3 +60,21 @@ def format_number(value: float | int | None) -> str:
     if value is None:
         return ""
     return f"{value:g}"
+
+
+def format_minutes(minutes: float) -> str:
+    """Durata leggibile: `45 s`, `1 min 15 s`, `30 min`, `2 h 30 min` (mai minuti decimali)."""
+    seconds = round(max(0.0, minutes) * 60)
+    if seconds == 0:
+        return "0 min"
+    if seconds < 60:
+        return f"{seconds} s"
+    if seconds < 3600:
+        mins, secs = divmod(seconds, 60)
+        return f"{mins} min" + (f" {secs} s" if secs else "")
+    hours, mins = divmod(round(seconds / 60), 60)
+    return f"{hours} h" + (f" {mins} min" if mins else "")
+
+
+def format_hours(hours: float) -> str:
+    return format_minutes(hours * 60)

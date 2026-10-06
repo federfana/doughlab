@@ -12,9 +12,9 @@
     </p>
     {% if item.chips %}<ul class="diary-chips">{% for chip in item.chips %}<li>{{ chip }}</li>{% endfor %}</ul>{% endif %}
     {% if item.predicted_ready_at and item.ready_at %}
-    <p class="diary-compare">Stima DoughLab {{ item.predicted_ready_at.strftime('%d/%m %H:%M') }}, reale {{ item.ready_at.strftime('%d/%m %H:%M') }} ({{ '%+.1f'|format(item.delta_hours) }} h)</p>
+    <p class="diary-compare">Stima DoughLab {{ item.predicted_ready_at.strftime('%d/%m %H:%M') }}, reale {{ item.ready_at.strftime('%d/%m %H:%M') }} ({{ '+' if item.delta_hours >= 0 else '−' }}{{ item.delta_hours|abs|hours }})</p>
     {% elif item.duration_hours is not none %}
-    <p class="diary-compare">Pronto dopo {{ '%.1f'|format(item.duration_hours) }} h dall'impasto</p>
+    <p class="diary-compare">Pronto dopo {{ item.duration_hours|hours }} dall'impasto</p>
     {% endif %}
 
     <details class="diary-more">

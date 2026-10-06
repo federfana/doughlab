@@ -15,6 +15,7 @@ from .planning import default_recipe_ctx, number, parse_ingredients, parse_phase
 from .services.fermentation import DEFAULT_TARGET_WORK, YeastKind
 from .services.ingredients import STYLE_LABELS, RecipeIngredients, RecipeStyle
 from .services.presets import PRESETS_BY_KEY
+from .services.thermal import parse_container, parse_environment
 from .web import RowId, common_ctx, templates
 
 router = APIRouter(prefix="/ricette")
@@ -69,7 +70,11 @@ def _recipe_ctx(recipe: Recipe, version: RecipeVersion) -> dict[str, Any] | None
         base = preset_ctx(str(payload.get("preset_key", ""))) or default_recipe_ctx()
         ingredients = RecipeIngredients(yeast_pct=0.0, **payload["ingredients"])
         phases = [
-            {key: phase[key] for key in ("kind", "label", "hours", "ambient_c", "container", "environment")}
+            {
+                **{key: phase[key] for key in ("kind", "label", "hours", "ambient_c")},
+                "container": parse_container(phase["container"]).value,
+                "environment": parse_environment(phase["environment"]).value,
+            }
             for phase in payload["phases"]
         ]
         base.update(

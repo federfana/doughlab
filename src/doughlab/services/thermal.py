@@ -38,18 +38,35 @@ class Environment(StrEnum):
 
 
 CONTAINER_LABELS: dict[Container, str] = {
-    Container.MASS_BOWL: "Massa in ciotola/madia",
+    Container.MASS_BOWL: "Massa in ciotola",
     Container.MASS_BOX: "Massa in cassetta coperta",
     Container.BALLS_BOX: "Panetti in cassetta",
     Container.BALLS_SINGLE: "Panetto singolo esposto",
 }
 
 ENVIRONMENT_LABELS: dict[Environment, str] = {
-    Environment.AMBIENT: "Ambiente di casa",
-    Environment.FRIDGE_HOME: "Frigorifero domestico",
-    Environment.FRIDGE_BOX: "Cassetta chiusa in frigo",
-    Environment.CHAMBER: "Cella di lievitazione",
+    Environment.AMBIENT: "Casa",
+    Environment.FRIDGE_HOME: "Frigo",
+    Environment.FRIDGE_BOX: "Frigo, cassetta chiusa",
+    Environment.CHAMBER: "Cella",
 }
+
+# Scelte offerte nell'interfaccia; gli altri valori restano nel modello per i dati già salvati.
+UI_CONTAINERS = (Container.MASS_BOWL, Container.BALLS_BOX)
+UI_ENVIRONMENTS = (Environment.AMBIENT, Environment.FRIDGE_HOME, Environment.CHAMBER)
+_LEGACY_CONTAINERS = {Container.MASS_BOX: Container.MASS_BOWL, Container.BALLS_SINGLE: Container.BALLS_BOX}
+_LEGACY_ENVIRONMENTS = {Environment.FRIDGE_BOX: Environment.FRIDGE_HOME}
+
+
+def parse_container(value: str) -> Container:
+    """Contenitore ammesso dall'interfaccia; i valori ritirati diventano il più simile. `ValueError` se ignoto."""
+    container = Container(value)
+    return _LEGACY_CONTAINERS.get(container, container)
+
+
+def parse_environment(value: str) -> Environment:
+    environment = Environment(value)
+    return _LEGACY_ENVIRONMENTS.get(environment, environment)
 
 
 # τ in ore. Valori empirici di partenza da panificazione casalinga.

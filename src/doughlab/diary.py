@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import json
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from datetime import date, datetime
 from typing import Annotated, Any
 from uuid import uuid4
@@ -26,6 +28,8 @@ from .services.backup import (
 )
 from .services.fields import (
     clean_text,
+    format_hours,
+    format_minutes,
     format_number,
     parse_date,
     parse_datetime,
@@ -163,7 +167,7 @@ def form_from_plan(snapshot: dict[str, Any]) -> dict[str, Any]:
         values["bake_temp"] = format_number(baking.get("bake_c"))
         values["bake_setup"] = clean_text(baking.get("position"), 200)
     if baking.get("bake_minutes") is not None:
-        values["bake_time"] = f"{format_number(baking.get('bake_minutes'))} min"
+        values["bake_time"] = format_minutes(float(baking["bake_minutes"]))
 
     lines = [
         f"Farina {_hours(weights.get('flour_g')):.0f} g",
@@ -186,7 +190,7 @@ def form_from_plan(snapshot: dict[str, Any]) -> dict[str, Any]:
     for phase in phases:
         begin, end = parse_datetime(phase.get("start_at")), parse_datetime(phase.get("end_at"))
         when = f" ({begin:%d/%m %H:%M} - {end:%H:%M})" if begin and end else ""
-        steps.append(f"{phase.get('label', '')}: {format_number(_hours(phase.get('hours')))} h{when}")
+        steps.append(f"{phase.get('label', '')}: {format_hours(_hours(phase.get('hours')))}{when}")
     values["process"] = "\n".join(steps)
     return _new_form(values, snapshot)
 
@@ -282,9 +286,9 @@ def _entry_view(entry: DiaryEntry) -> dict[str, Any]:
     if entry.hydration is not None:
         chips.append(f"idratazione {format_number(entry.hydration)}%")
     if entry.cold_hours:
-        chips.append(f"{format_number(entry.cold_hours)} h frigo")
+        chips.append(f"{format_hours(entry.cold_hours)} in frigo")
     if entry.room_hours:
-        chips.append(f"{format_number(entry.room_hours)} h ambiente")
+        chips.append(f"{format_hours(entry.room_hours)} a temp. ambiente")
     if entry.dough_ball_count and entry.dough_ball_weight:
         chips.append(f"{entry.dough_ball_count} × {format_number(entry.dough_ball_weight)} g")
     if entry.bake_temp is not None:
@@ -365,12 +369,16 @@ async def _panel(request: Request, **kwargs: Any) -> HTMLResponse:
     return templates.TemplateResponse(request, "partials/diary_panel.html", ctx)
 
 
-async def _read_form(request: Request) -> tuple[FormData, dict[str, str]] | None:
-    if _too_large(request, MAX_FORM_BYTES):
-        return None
-    form = await request.form()
-    data = {k: v for k, v in form.items() if isinstance(v, str)}
-    return form, data
+@asynccontextmanager
+async def _open_form(
+    request: Request, limit: int
+) -> AsyncIterator[tuple[FormData, dict[str, str]] | None]:
+    """Form multipart con i file temporanei chiusi a fine richiesta; None se il corpo è troppo grande."""
+    if _too_large(request, limit):
+        yield None
+        return
+    async with request.form() as form:
+        yield form, {k: v for k, v in form.items() if isinstance(v, str)}
 
 
 # --- Rotte ------------------------------------------------------------------------------------
@@ -400,21 +408,21 @@ async def diary_edit(request: Request, entry_id: RowId) -> HTMLResponse:
 
 @router.post("", response_class=HTMLResponse)
 async def diary_create(request: Request) -> HTMLResponse:
-    parsed = await _read_form(request)
-    if parsed is None:
-        return await _panel(request, form=_new_form(), message="Le foto sono troppo grandi.")
-    form, data = parsed
-    fields, error = _parse_fields(data)
-    plan = _plan_from_form(data)
-    entry = DiaryEntry(external_id=str(uuid4()), extra={}, plan=plan)
-    if error is None:
-        for column, value in fields.items():
-            setattr(entry, column, value)
-        error = await _apply_photos(entry, form, data)
-    if error is not None:
-        failed = _new_form({k: data.get(k, "") for k in _blank_values()}, plan)
-        failed["error"] = error
-        return await _panel(request, form=failed)
+    async with _open_form(request, MAX_FORM_BYTES) as parsed:
+        if parsed is None:
+            return await _panel(request, form=_new_form(), message="Le foto sono troppo grandi.")
+        form, data = parsed
+        fields, error = _parse_fields(data)
+        plan = _plan_from_form(data)
+        entry = DiaryEntry(external_id=str(uuid4()), extra={}, plan=plan)
+        if error is None:
+            for column, value in fields.items():
+                setattr(entry, column, value)
+            error = await _apply_photos(entry, form, data)
+        if error is not None:
+            failed = _new_form({k: data.get(k, "") for k in _blank_values()}, plan)
+            failed["error"] = error
+            return await _panel(request, form=failed)
     async with SessionLocal() as session:
         session.add(entry)
         await session.commit()
@@ -423,8 +431,7 @@ async def diary_create(request: Request) -> HTMLResponse:
 
 @router.post("/{entry_id:int}", response_class=HTMLResponse)
 async def diary_update(request: Request, entry_id: RowId) -> HTMLResponse:
-    parsed = await _read_form(request)
-    async with SessionLocal() as session:
+    async with _open_form(request, MAX_FORM_BYTES) as parsed, SessionLocal() as session:
         entry = await session.get(DiaryEntry, entry_id)
         if entry is None:
             return await _panel(request, message="Voce non trovata.")
@@ -510,13 +517,13 @@ def _fill_from_data(entry: DiaryEntry, data: DiaryData) -> None:
 
 @router.post("/importa", response_class=HTMLResponse)
 async def diary_import(request: Request) -> HTMLResponse:
-    if _too_large(request, MAX_IMPORT_BYTES):
-        return await _panel(request, message="Il file è troppo grande (massimo 100 MB).")
-    form = await request.form()
-    upload = form.get("file")
-    if not isinstance(upload, UploadFile) or not upload.filename:
-        return await _panel(request, message="Scegli un file di backup da importare.")
-    raw = await upload.read(MAX_IMPORT_BYTES + 1)
+    async with _open_form(request, MAX_IMPORT_BYTES) as parsed:
+        if parsed is None:
+            return await _panel(request, message="Il file è troppo grande (massimo 100 MB).")
+        upload = parsed[0].get("file")
+        if not isinstance(upload, UploadFile) or not upload.filename:
+            return await _panel(request, message="Scegli un file di backup da importare.")
+        raw = await upload.read(MAX_IMPORT_BYTES + 1)
     if len(raw) > MAX_IMPORT_BYTES:
         return await _panel(request, message="Il file è troppo grande (massimo 100 MB).")
     try:

@@ -118,6 +118,20 @@
         </div>
       </div>
       <p class="hint preset-hint">Scegliere una base sostituisce quantità, percentuali e fasi. Dopo puoi modificare ogni valore.</p>
+      {% if recipe.style == 'teglia' %}
+      <div class="tray-calc" x-data="{ a: 40, b: 40, get grams() { return Math.round((Number(this.a) || 0) * (Number(this.b) || 0) / 2); } }" @input.stop @change.stop>
+        <div class="lab-row">Dimensione della teglia</div>
+        <div class="tray-calc-row">
+          <input type="number" x-model="a" min="10" max="60" step="any" inputmode="decimal" aria-label="Primo lato della teglia in centimetri">
+          <span>×</span>
+          <input type="number" x-model="b" min="10" max="60" step="any" inputmode="decimal" aria-label="Secondo lato della teglia in centimetri">
+          <span>cm =</span>
+          <strong x-text="grams + ' g'"></strong>
+          <button type="button" class="btn-ghost" @click="useTray(grams)">Usa come peso panetto</button>
+        </div>
+        <p class="hint">Regola pratica: lato × lato ÷ 2 = grammi di impasto per la teglia (30 × 40 cm ≈ 600 g, 40 × 40 cm ≈ 800 g).</p>
+      </div>
+      {% endif %}
     </section>
 
     {# Partenza #}
@@ -168,22 +182,30 @@
           </div>
           <input type="hidden" name="phase_label_{{ i }}" value="{{ p.label }}">
           <div class="phase-fields">
-            <label class="field"><span class="lab">Durata (ore)</span><input type="number" name="phase_hours_{{ i }}" value="{{ p.hours }}" step="any" min="0" max="720"></label>
-            <label class="field"><span class="lab">Temperatura (°C)</span><input type="number" name="phase_ambient_{{ i }}" value="{{ p.ambient_c }}" step="any" min="-5" max="50"></label>
+            <label class="field"><span class="lab">Durata</span>
+              {% set total_min = (p.hours * 60)|round|int %}
+              <span class="duration-input" role="group" aria-label="Durata fase {{ loop.index }}">
+                <input type="number" class="dur-h" value="{{ total_min // 60 }}" min="0" max="720" step="any" inputmode="numeric" aria-label="Ore" oninput="syncDuration(this)" onchange="normalizeDuration(this)"><span>h</span>
+                <input type="number" class="dur-m" value="{{ total_min % 60 }}" min="0" step="any" inputmode="numeric" aria-label="Minuti" oninput="syncDuration(this)" onchange="normalizeDuration(this)"><span>min</span>
+              </span>
+              <input type="hidden" name="phase_hours_{{ i }}" value="{{ p.hours }}">
+            </label>
+            <label class="field"><span class="lab">Temp. (°C)</span><input type="number" name="phase_ambient_{{ i }}" value="{{ p.ambient_c }}" step="any" min="-5" max="50"></label>
+          </div>
+          <div class="phase-fields phase-selects">
             <label class="field"><span class="lab">Condizione</span>
               <select name="phase_env_{{ i }}">
-                {% for v, label in environments %}
-                  <option value="{{ v }}" {% if p.environment==v %}selected{% endif %}>{% if v=='ambient' %}TA · {% else %}TC · {% endif %}{{ label }}</option>
+                {% for v, label, icon in environments %}
+                  <option value="{{ v }}" {% if p.environment==v %}selected{% endif %}>{{ icon }} {% if v=='ambient' %}TA{% else %}TC{% endif %} · {{ label }}</option>
                 {% endfor %}
               </select>
             </label>
+            <label class="field"><span class="lab">Contenitore</span>
+              <select name="phase_container_{{ i }}">
+                {% for v, label, icon in containers %}<option value="{{ v }}" {% if p.container==v %}selected{% endif %}>{{ icon }} {{ label }}</option>{% endfor %}
+              </select>
+            </label>
           </div>
-          <details class="phase-advanced">
-            <summary>Contenitore</summary>
-            <select name="phase_container_{{ i }}" aria-label="Contenitore fase {{ loop.index }}">
-              {% for v, label in containers %}<option value="{{ v }}" {% if p.container==v %}selected{% endif %}>{{ label }}</option>{% endfor %}
-            </select>
-          </details>
         </article>
         {% endfor %}
       </div>
@@ -208,20 +230,20 @@
         <dl class="baking-suggestions">
           <div><dt>Platea</dt><dd>{% if recipe.baking.split_plate_c is not none %}{{ recipe.baking.split_plate_c }} °C{% else %}Da calibrare{% endif %}</dd></div>
           <div><dt>Cielo</dt><dd>{% if recipe.baking.split_ceiling_c is not none %}{{ recipe.baking.split_ceiling_c }} °C{% else %}Da calibrare{% endif %}</dd></div>
-          <div><dt>Durata</dt><dd>{% if recipe.baking.split_minutes is not none %}{{ recipe.baking.split_minutes }} min{% else %}Da calibrare{% endif %}</dd></div>
-          <div><dt>Preriscaldamento</dt><dd>{{ recipe.baking.preheat_minutes }} min</dd></div>
+          <div><dt>Durata</dt><dd>{% if recipe.baking.split_minutes is not none %}{{ recipe.baking.split_minutes|minutes }}{% else %}Da calibrare{% endif %}</dd></div>
+          <div><dt>Preriscaldamento</dt><dd>{{ recipe.baking.preheat_minutes|minutes }}</dd></div>
           <div><dt>Posizione</dt><dd>Pietra</dd></div>
         </dl>
-        <p class="hint baking-note">{{ recipe.baking.split_hint }} Verifica i limiti del tuo forno e registra i parametri effettivi nel registro delle prove.</p>
+        <p class="hint baking-note">{{ recipe.baking.split_hint }} Verifica i limiti del tuo forno e registra i parametri effettivi nel Diario.</p>
       </div>
       <div class="home-bake-fields" x-show="ovenProfile === 'home'" x-cloak>
         <dl class="baking-suggestions">
           <div><dt>Temperatura forno</dt><dd>{{ recipe.baking.bake_c }} °C</dd></div>
-          <div><dt>Durata</dt><dd>{{ recipe.baking.bake_minutes }} min</dd></div>
-          <div><dt>Preriscaldamento</dt><dd>{{ recipe.baking.preheat_c }} °C · {{ recipe.baking.preheat_minutes }} min</dd></div>
+          <div><dt>Durata</dt><dd>{{ recipe.baking.bake_minutes|minutes }}</dd></div>
+          <div><dt>Preriscaldamento</dt><dd>{{ recipe.baking.preheat_c }} °C · {{ recipe.baking.preheat_minutes|minutes }}</dd></div>
           <div><dt>Posizione</dt><dd>{{ recipe.baking.position }}</dd></div>
         </dl>
-        <p class="hint baking-note">{{ recipe.baking.note }} Registra i parametri effettivi nel registro delle prove.</p>
+        <p class="hint baking-note">{{ recipe.baking.note }} Registra i parametri effettivi nel Diario.</p>
       </div>
     </section>
 
@@ -361,20 +383,27 @@
     </div>
     <input type="hidden" name="phase_label_IDX" value="Puntata">
     <div class="phase-fields">
-      <label class="field"><span class="lab">Durata (ore)</span><input type="number" name="phase_hours_IDX" value="1" step="any" min="0" max="720"></label>
-      <label class="field"><span class="lab">Temperatura (°C)</span><input type="number" name="phase_ambient_IDX" value="22" step="any" min="-5" max="50"></label>
+      <label class="field"><span class="lab">Durata</span>
+        <span class="duration-input" role="group" aria-label="Durata fase">
+          <input type="number" class="dur-h" value="1" min="0" max="720" step="any" inputmode="numeric" aria-label="Ore" oninput="syncDuration(this)" onchange="normalizeDuration(this)"><span>h</span>
+          <input type="number" class="dur-m" value="0" min="0" step="any" inputmode="numeric" aria-label="Minuti" oninput="syncDuration(this)" onchange="normalizeDuration(this)"><span>min</span>
+        </span>
+        <input type="hidden" name="phase_hours_IDX" value="1">
+      </label>
+      <label class="field"><span class="lab">Temp. (°C)</span><input type="number" name="phase_ambient_IDX" value="22" step="any" min="-5" max="50"></label>
+    </div>
+    <div class="phase-fields phase-selects">
       <label class="field"><span class="lab">Condizione</span>
         <select name="phase_env_IDX">
-          {% for v, label in environments %}<option value="{{ v }}">{% if v=='ambient' %}TA · {% else %}TC · {% endif %}{{ label }}</option>{% endfor %}
+          {% for v, label, icon in environments %}<option value="{{ v }}">{{ icon }} {% if v=='ambient' %}TA{% else %}TC{% endif %} · {{ label }}</option>{% endfor %}
+        </select>
+      </label>
+      <label class="field"><span class="lab">Contenitore</span>
+        <select name="phase_container_IDX">
+          {% for v, label, icon in containers %}<option value="{{ v }}">{{ icon }} {{ label }}</option>{% endfor %}
         </select>
       </label>
     </div>
-    <details class="phase-advanced">
-      <summary>Contenitore</summary>
-      <select name="phase_container_IDX" aria-label="Contenitore fase">
-        {% for v, label in containers %}<option value="{{ v }}">{{ label }}</option>{% endfor %}
-      </select>
-    </details>
   </article>
 </template>
 
@@ -387,6 +416,26 @@ function adjustPercent(button, delta) {
   const next = Math.min(max, Math.max(min, current + delta));
   input.value = String(Number(next.toFixed(3)));
   input.dispatchEvent(new Event('input', { bubbles: true }));
+}
+
+function phaseDuration(input) {
+  const box = input.closest('.duration-input');
+  return [box.querySelector('.dur-h'), box.querySelector('.dur-m'), input.closest('label').querySelector('input[type=hidden]')];
+}
+
+// La durata si digita in ore e minuti; il server riceve ore decimali nel campo nascosto.
+function syncDuration(input) {
+  const [hours, minutes, hidden] = phaseDuration(input);
+  const total = Math.max(0, (Number(hours.value) || 0) * 60 + (Number(minutes.value) || 0));
+  hidden.value = String(Number((total / 60).toFixed(4)));
+}
+
+function normalizeDuration(input) {
+  const [hours, minutes] = phaseDuration(input);
+  const total = Math.min(720 * 60, Math.max(0, Math.round((Number(hours.value) || 0) * 60 + (Number(minutes.value) || 0))));
+  hours.value = String(Math.floor(total / 60));
+  minutes.value = String(total % 60);
+  syncDuration(input);
 }
 
 function syncPhaseLabel(select) {
@@ -463,7 +512,7 @@ function plannerUI(initialOvenProfile) {
       else localStorage.removeItem(LIVE_KEY);
     },
     liveStart() {
-      if (this.live && !this.liveDone() && !confirm('Sostituire l\'impasto già in corso?')) return;
+      if (this.live && !confirm('Sostituire l\'impasto già in corso o concluso e non ancora salvato?')) return;
       let snapshot;
       try { snapshot = JSON.parse(document.getElementById('liveData').textContent); } catch (error) { return; }
       const phases = (snapshot.phases || []).map(p => ({ kind: p.kind, label: p.label, hours: Number(p.hours) || 0 }));
@@ -591,7 +640,7 @@ function plannerUI(initialOvenProfile) {
     },
     duration(ms) {
       const minutes = Math.round(Math.abs(ms) / 60000);
-      return minutes >= 60 ? Math.floor(minutes / 60) + ' h ' + pad2(minutes % 60) + ' min' : minutes + ' min';
+      return minutes >= 60 ? Math.floor(minutes / 60) + ' h' + (minutes % 60 ? ' ' + pad2(minutes % 60) + ' min' : '') : minutes + ' min';
     },
     reindex() {
       const cards = document.querySelectorAll('#phases [data-row]');
@@ -615,8 +664,8 @@ function plannerUI(initialOvenProfile) {
       kind.value = type;
       card.querySelector('[name^="phase_label_"]').value = kind.selectedOptions[0].textContent.trim();
       const phaseDefaults = {
-        preferment: { environment: 'ambient', temperature: 18, container: 'mass_box' },
-        maturation: { environment: 'fridge_home', temperature: 4, container: 'mass_box' },
+        preferment: { environment: 'ambient', temperature: 18, container: 'mass_bowl' },
+        maturation: { environment: 'fridge_home', temperature: 4, container: 'mass_bowl' },
         shape: { environment: 'ambient', temperature: 22, container: 'balls_box' },
         proof: { environment: 'ambient', temperature: 22, container: 'balls_box' },
       };
@@ -648,6 +697,11 @@ function plannerUI(initialOvenProfile) {
       if (yeast) params.set('yeast', yeast);
       if (oven) params.set('oven', oven);
       window.location.href = '/?' + params.toString();
+    },
+    useTray(grams) {
+      const input = document.querySelector('#planForm [name="panetto_g"]');
+      input.value = String(Math.min(2000, Math.max(30, grams)));
+      input.dispatchEvent(new Event('input', { bubbles: true }));
     },
     exportIcs() {
       const form = document.getElementById('planForm');

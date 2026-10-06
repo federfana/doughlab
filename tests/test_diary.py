@@ -252,7 +252,7 @@ def test_diary_shows_prediction_error_for_linked_plan(tmp_path, monkeypatch) -> 
             },
         )
         page = await client.get("/")
-        assert "Stima DoughLab 04/10 10:00, reale 04/10 11:30 (+1.5 h)" in page.text
+        assert "Stima DoughLab 04/10 10:00, reale 04/10 11:30 (+1 h 30 min)" in page.text
 
     run_with_db(tmp_path, monkeypatch, check)
 
