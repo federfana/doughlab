@@ -1,6 +1,12 @@
 // Service worker minimale: shell cache per aprire l'app offline.
-const CACHE = 'doughlab-v2';
-const CORE = ['/', '/static/manifest.webmanifest'];
+const CACHE = 'doughlab-v3';
+const CORE = [
+  '/',
+  '/static/manifest.webmanifest',
+  '/static/vendor/alpine-3.14.3.min.js',
+  '/static/vendor/htmx-1.9.12.min.js',
+  '/static/vendor/chart-4.4.4.umd.min.js',
+];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(CORE)).then(() => self.skipWaiting()));

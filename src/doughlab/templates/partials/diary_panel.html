@@ -1,0 +1,48 @@
+{# Pannello del Diario: barra, messaggi, modulo (se aperto) ed elenco. Sostituito da HTMX come blocco unico. #}
+{% set diary_total = diary_total|default(0) %}
+<div id="diaryPanel" class="space-y" hx-target="#diaryPanel" hx-swap="outerHTML show:#diaryPanel:top">
+  <section class="card diary-toolbar">
+    <button type="button" class="btn" hx-get="/diario/nuova">Nuova prova</button>
+    <a class="btn-ghost" href="/diario/export.json" download>Esporta backup</a>
+    <span class="hint count">{{ diary_items|length }}{% if diary_items|length != diary_total %} di {{ diary_total }}{% endif %} {{ 'prova' if diary_total == 1 else 'prove' }}</span>
+  </section>
+
+  {% if diary_total > 0 or diary_query or diary_recipe %}
+  <section class="card diary-filter">
+    {% if diary_recipe %}<input type="hidden" name="recipe" value="{{ diary_recipe }}">{% endif %}
+    <input type="search" name="q" value="{{ diary_query }}" placeholder="Cerca per nome, tipo, note, forno..." aria-label="Cerca nel diario" hx-get="/diario" hx-trigger="input changed delay:300ms, search" hx-include="[name='recipe']" hx-target="#diaryList" hx-select="#diaryList" hx-swap="outerHTML">
+    {% if diary_recipe %}<button type="button" class="btn-ghost" hx-get="/diario">Ricetta: {{ diary_recipe_label or 'filtrata' }} ×</button>{% endif %}
+  </section>
+  {% endif %}
+
+  {% if diary_message %}<p class="diary-status" role="status">{{ diary_message }}</p>{% endif %}
+  {% if diary_report %}
+  <div class="diary-status" role="status">
+    Importazione completata: {{ diary_report.created }} nuove, {{ diary_report.updated }} aggiornate, {{ diary_report.skipped }} già presenti.
+    {% if diary_report.warnings %}<ul>{% for warning in diary_report.warnings %}<li>{{ warning }}</li>{% endfor %}</ul>{% endif %}
+  </div>
+  {% endif %}
+
+  {% if diary_form %}{% include "partials/diary_form.html" %}{% endif %}
+
+  <details class="card diary-import">
+    <summary>Importa un backup di Pizza Lab (o di DoughLab)</summary>
+    <form hx-post="/diario/importa" hx-encoding="multipart/form-data" class="space-y" style="margin-top:.7rem">
+      <p class="hint">Scegli il file JSON esportato dall'app. Le prove già presenti non vengono duplicate: si aggiornano solo se nel file sono più recenti.</p>
+      <input type="file" name="file" accept=".json,application/json" required>
+      <div class="diary-actions"><button type="submit" class="btn">Importa</button></div>
+    </form>
+  </details>
+
+  <div id="diaryList">
+  {% if diary_items %}
+  <div class="diary-list">
+    {% for item in diary_items %}{% include "partials/diary_entry.html" %}{% endfor %}
+  </div>
+  {% elif diary_total and not diary_form %}
+  <p class="card diary-empty">Nessuna prova corrisponde alla ricerca.</p>
+  {% elif not diary_form %}
+  <p class="card diary-empty">Nessuna prova nel diario. Crea la prima, salva un piano dal pianificatore o importa un backup.</p>
+  {% endif %}
+  </div>
+</div>

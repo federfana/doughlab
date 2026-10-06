@@ -1,0 +1,38 @@
+{% set e = item.entry %}
+<article class="card diary-card {{ '' if item.cover_id else 'no-cover' }}" id="entry-{{ item.id }}">
+  {% if item.cover_id %}<img class="diary-cover" src="/diario/foto/{{ item.cover_id }}?v={{ item.version }}" alt="{{ item.name }}" loading="lazy" decoding="async">{% endif %}
+  <div>
+    <h3>{{ item.name }}</h3>
+    <p class="diary-meta">
+      {{ item.date.day }} {{ months_it[item.date.month - 1] }} {{ item.date.year }}
+      {% if item.pizza_type %} · {{ item.pizza_type }}{% endif %}
+      {% if item.oven %} · {{ item.oven }}{% endif %}
+      {% if item.recipe_label %} · Ricetta {{ item.recipe_label }}{% endif %}
+      {% if item.rating %} · <span class="diary-rating" aria-label="Voto {{ item.rating }} su 5">★ {{ item.rating }}</span>{% endif %}
+    </p>
+    {% if item.chips %}<ul class="diary-chips">{% for chip in item.chips %}<li>{{ chip }}</li>{% endfor %}</ul>{% endif %}
+    {% if item.predicted_ready_at and item.ready_at %}
+    <p class="diary-compare">Stima DoughLab {{ item.predicted_ready_at.strftime('%d/%m %H:%M') }}, reale {{ item.ready_at.strftime('%d/%m %H:%M') }} ({{ '%+.1f'|format(item.delta_hours) }} h)</p>
+    {% elif item.duration_hours is not none %}
+    <p class="diary-compare">Pronto dopo {{ '%.1f'|format(item.duration_hours) }} h dall'impasto</p>
+    {% endif %}
+
+    <details class="diary-more">
+      <summary>Dettagli e foto</summary>
+      {% for title, text in [('Ingredienti', e.ingredients), ('Procedimento', e.process), ('Cottura', e.bake), ('Impostazioni forno', e.bake_setup), ('Com\'è andata', e.notes), ('Da cambiare', e.next_changes), ('Etichette', e.tags), ('Farina', e.flour)] %}
+      {% if text %}<h4>{{ title }}</h4><p class="diary-text">{{ text }}</p>{% endif %}
+      {% endfor %}
+      {% if item.photos %}
+      <div class="diary-photos">
+        {% for photo in item.photos %}
+        <figure><a href="/diario/foto/{{ photo.id }}?v={{ item.version }}" target="_blank" rel="noopener"><img src="/diario/foto/{{ photo.id }}?v={{ item.version }}" alt="{{ photo.label or item.name }}" loading="lazy" decoding="async"></a>{% if photo.label %}<figcaption>{{ photo.label }}</figcaption>{% endif %}</figure>
+        {% endfor %}
+      </div>
+      {% endif %}
+      <div class="diary-actions" style="margin-top:.8rem">
+        <button type="button" class="btn-ghost" hx-get="/diario/{{ item.id }}/modifica">Modifica</button>
+        <button type="button" class="btn-ghost" hx-post="/diario/{{ item.id }}/elimina" hx-confirm="Eliminare «{{ item.name }}» dal diario?">Elimina</button>
+      </div>
+    </details>
+  </div>
+</article>

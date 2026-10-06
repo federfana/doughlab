@@ -32,8 +32,12 @@ Laboratorio digitale per impasti pizza/pane. Prevede **quando** l'impasto è dav
 - **Fasi e temperature**: la sequenza di fasi (TA/TC, contenitore) genera la curva termica e la maturità. La **dose di lievito non si inserisce**: è calcolata dal piano.
 - **Ricette base**: 5 preset caricabili con un click, con un orientamento sulla farina.
 - **Suggerimenti di cottura**: in sola lettura, per forno domestico o elettrico con cielo e platea indipendenti. Non influenzano la maturazione.
-- **Registro prove**: ogni prova salva lo snapshot del piano, l'orario in cui l'impasto era davvero pronto, temperatura, voto, note e i parametri di cottura realmente usati; mostra lo scarto rispetto alla stima.
-- **Export `.ics`** per il Calendario, **PWA** installabile e tema chiaro/scuro.
+- **Diario**: ogni prova ha nome, data, formula, forno, voto a mezzi punti, note, "da cambiare" e fino a 5 foto. Può nascere da un piano (pulsante *Salva questa prova nel diario*, che precompila ingredienti, fasi e forno) e, con gli orari reali, mostra lo scarto rispetto alla stima.
+- **Ricette salvate**: formula, fasi, lievito e forno si salvano con un nome (*Le mie ricette*); salvare di nuovo con lo stesso nome crea una nuova versione, e ogni versione si può riaprire. Le prove del diario nate da una ricetta salvata restano collegate e si filtrano per ricetta.
+- **In corso (Live Bake)**: *Avvia in cucina* segue le fasi in tempo reale con timer, avanzamento manuale, ±15 min, controlli per fase, temperatura misurata, avviso a fine fase e schermo acceso. Lo stato resta nel browser (sopravvive a ricarica e chiusura) e a fine impasto precompila il diario con gli orari reali.
+- **Ricerca nel Diario** per nome, tipo, note, forno.
+- **Backup**: importa ed esporta il JSON di [Pizza Lab](https://pizzalab.sibellutu.com/) con le foto. L'importazione è ripetibile: le voci già presenti non si duplicano e non sovrascrivono modifiche locali più recenti.
+- **Export `.ics`** per il Calendario, **PWA** installabile e tema chiaro/scuro. Le librerie JS sono locali (`static/vendor/`): dopo la prima visita l'app si apre e funziona anche offline, tranne le operazioni che passano dal server.
 
 ---
 
@@ -82,30 +86,44 @@ doughlab/
 │   ├── __init__.py                # entry point `doughlab` (uvicorn)
 │   ├── config.py                  # Settings (env + .env)
 │   ├── db.py                      # engine async + session + init_db()
-│   ├── models.py                  # ORM: Recipe, RecipeVersion, Bake
-│   ├── main.py                    # FastAPI app + route
+│   ├── models.py                  # ORM: Recipe, RecipeVersion, DiaryEntry, DiaryPhoto
+│   ├── web.py                     # template Jinja e contesto comune
+│   ├── main.py                    # FastAPI app: pianificatore, /plan, /plan.ics
+│   ├── planning.py                # dal form al piano: parsing, preset, calcolo
+│   ├── recipes.py                 # router ricette salvate con versioning
+│   ├── diary.py                   # router del Diario: CRUD, foto, ricerca, import/export
 │   ├── services/
 │   │   ├── thermal.py             # modello di Newton (τ per profilo)
 │   │   ├── fermentation.py        # modello Q10 del lievito
 │   │   ├── ingredients.py         # calcolo baker's percentage
 │   │   ├── presets.py             # ricette predefinite
+│   │   ├── fields.py              # lettura difensiva di numeri, testi, date
+│   │   ├── images.py              # controllo del tipo di immagine dai primi byte
+│   │   ├── pizzalab.py            # parsing/scrittura dei backup Pizza Lab
 │   │   └── scheduler.py           # orchestra tutto in un PlanResult
 │   ├── templates/
 │   │   ├── base.html              # layout, CSS con variabili, tema chiaro/scuro
-│   │   ├── planner.html           # tab Pianifica + Registro prove (HTMX live, Alpine)
+│   │   ├── planner.html           # tab Pianifica + In corso + Diario (HTMX, Alpine)
 │   │   └── partials/
 │   │       ├── plan_result.html   # fragment di /plan: ingredienti, riepilogo, grafico, timeline
-│   │       └── bake_history.html  # form del registro prove + cronologia
+│   │       ├── recipes_panel.html # Le mie ricette: salvataggio, elenco, versioni
+│   │       ├── diary_panel.html   # Diario: barra, messaggi, import, elenco
+│   │       ├── diary_form.html    # modulo di una prova (con foto)
+│   │       └── diary_entry.html   # scheda di una prova
 │   └── static/
 │       ├── manifest.webmanifest   # PWA
-│       ├── sw.js                  # service worker (shell cache)
+│       ├── sw.js                  # service worker (precache shell + librerie)
+│       ├── vendor/                # Alpine, HTMX, Chart.js (versioni fissate)
 │       └── icons/                 # icone PWA
 └── tests/
     ├── test_thermal.py            # proprietà di Newton
     ├── test_fermentation.py       # proprietà di Q10 e taratura della dose
     ├── test_ingredients.py        # baker's percentage e prefermento
     ├── test_scheduler.py          # end-to-end del piano
-    └── test_main.py               # form, template, registro prove, .ics
+    ├── test_pizzalab.py           # parsing/export dei backup, immagini
+    ├── test_diary.py              # rotte del Diario su SQLite temporaneo
+    ├── test_recipes.py            # ricette salvate, versioni, collegamento al Diario
+    └── test_main.py               # form, template, .ics
 ```
 
 ---
@@ -134,7 +152,7 @@ doughlab/
       │
       ▼
 ┌─────────────┐
-│ db.py       │  (registro prove; ricette: futuro)
+│ db.py       │  (diario prove; ricette: futuro)
 │ SQLAlchemy  │
 │  async      │
 └─────────────┘
@@ -148,7 +166,7 @@ Flusso di una richiesta `POST /plan`:
 4. `fermentation.suggest_yeast_pct(...)` calcola la dose che porta la maturità al 100% a fine piano, contando solo le fasi fermentanti (`fermentation_activity_mask`).
 5. Con quella dose `build_plan` produce il `PlanResult` definitivo: `fermentation.simulate(...)` → `FermentationResult` (lavoro cumulato W(t) e maturità %) e, per ogni fase, l'intervallo `maturity_start_pct` → `maturity_end_pct`.
 6. `ingredients.compute(...)` ricava le grammature con lo stesso lievito suggerito.
-7. Rende `partials/plan_result.html` (ingredienti, riepilogo, grafico, timeline) e aggiorna con `hx-swap-oob` il pannello del registro prove con lo snapshot del piano.
+7. Rende `partials/plan_result.html` (ingredienti, riepilogo, grafico, timeline) con il pulsante che apre il Diario precompilato (`POST /diario/da-piano`).
 
 Il frontend invia la richiesta via **HTMX** `hx-post` quando modifichi un campo (`input` dopo 450 ms, `change` dopo 200 ms), quindi la UI è "live". Il cambio del profilo forno non ricalcola: aggiorna solo i suggerimenti di cottura.
 
@@ -270,13 +288,14 @@ Setup SQLAlchemy 2.0 **async** (richiede l'extra `[asyncio]` per installare `gre
 
 ### [models.py](src/doughlab/models.py)
 
-Tre modelli ORM:
+Quattro modelli ORM:
 
 - **`Recipe`**: metadati della ricetta (nome, stile, note).
 - **`RecipeVersion`**: ogni modifica è una nuova riga → **ricettario versionato**. Payload JSON contiene fasi/ingredienti/parametri, utile come MVP prima di normalizzare lo schema.
-- **`Bake`**: una prova reale, usata dal registro prove (`POST /bakes`). Ha `notes` e `rating` 1-5; `log` è una lista JSON con una voce `plan` (snapshot del piano, inclusi i suggerimenti di cottura) e una voce `observation` (orario di maturità reale, T° impasto, parametri di cottura effettivi).
+- **`DiaryEntry`**: una prova del diario. Colonne per i campi di Pizza Lab (nome, data, tipo, forno, farina, idratazione, ore frigo/ambiente, panetti, temperature, voto 0.5-5, ingredienti, procedimento, note, "da cambiare", etichette), più `started_at`/`ready_at` reali, `plan` (snapshot JSON del piano di origine, se c'è) ed `extra` (chiavi di backup sconosciute, restituite nell'export). `external_id` (uuid o id del backup) rende l'importazione ripetibile.
+- **`DiaryPhoto`**: fino a 5 foto per voce (`main`, `extra1`..`extra4`), binario `deferred` (si legge solo quando serve una foto o l'export), con didascalia e inquadratura.
 
-> Solo `Bake` è esposto, tramite il registro prove. `Recipe` e `RecipeVersion` esistono ma non sono ancora usati: arriveranno con la persistenza ricette (fase 2).
+> `Recipe` e `RecipeVersion` esistono ma non sono ancora usati: arriveranno con la persistenza ricette (fase 2). La vecchia tabella `bakes` non viene più usata (era vuota) e non viene eliminata dal database.
 
 ### [services/thermal.py](src/doughlab/services/thermal.py)
 
@@ -337,7 +356,7 @@ Preset inclusi (ogni base comprende anche un orientamento sulla farina; percentu
 - `pinsa` — pinsa 48h ad alta idratazione
 - `pane_biga` — pane con biga al 30%
 
-I suggerimenti per napoletana e teglia sono orientativi e non modificabili nel pianificatore; nel registro delle prove si annotano i parametri effettivamente usati. Gli intervalli riportati seguono la [guida Macte sulle temperature](https://macteovens.com/blogs/ricette-consigli/temperatura-forno-pizza-quanti-gradi-per-ogni-tipo-da-napoletana-a-teglia). Il profilo a resistenze separate mostra setpoint distinti per cielo e platea fino a 510 °C; verifica sempre i limiti del tuo forno. Per pinsa e pane, senza un riferimento univoco, i setpoint restano da calibrare.
+I suggerimenti per napoletana e teglia sono orientativi e non modificabili nel pianificatore; nel Diario si annotano i parametri effettivamente usati. Gli intervalli riportati seguono la [guida Macte sulle temperature](https://macteovens.com/blogs/ricette-consigli/temperatura-forno-pizza-quanti-gradi-per-ogni-tipo-da-napoletana-a-teglia). Il profilo a resistenze separate mostra setpoint distinti per cielo e platea fino a 510 °C; verifica sempre i limiti del tuo forno. Per pinsa e pane, senza un riferimento univoco, i setpoint restano da calibrare.
 
 ### [services/scheduler.py](src/doughlab/services/scheduler.py)
 
@@ -361,43 +380,77 @@ L'app FastAPI. Route attuali:
 
 | Metodo | Path | Scopo |
 |---|---|---|
-| `GET` | `/` | pagina `planner.html` con tab Piano/Registro, primo preset e storico recente |
+| `GET` | `/` | pagina `planner.html` con tab Pianifica/In corso/Diario e primo preset |
 | `GET` | `/?preset=<key>&yeast=<kind>&oven=<profile>` | carica preset mantenendo lievito e profilo forno |
+| `GET` | `/?recipe=<id>&version=<n>` | carica una ricetta salvata (ultima versione se `version` manca) |
 | `POST` | `/plan` | ritorna il **fragment HTML** `plan_result.html` (HTMX swap) |
-| `POST` | `/bakes` | salva nel database una prova reale e restituisce lo scarto dalla maturità prevista |
+| `POST` | `/diario/da-piano` | apre il modulo del Diario precompilato con il piano corrente |
 | `POST` | `/plan.ics` | ritorna il piano come file `.ics` da aprire in Calendario (orari in ora locale del server) |
 | `GET` | `/static/*` | asset statici (PWA, icone, SW) |
 
-Helper interni:
-- `_common_ctx()` → dropdown e metadati sempre serviti al template
-- `_number(data, key, default, low, high)` → numero finito dentro i limiti, altrimenti il default (nessun `inf`/`NaN` arriva ai servizi)
-- `_parse_phase_form(data)` → legge campi index-based `phase_kind_0`, `phase_hours_0`, ... (max 30 fasi, durata ≤ 720 h)
-- `_parse_ingredients(data)` → estrae grammature e percentuali dal form, con gli stessi limiti degli input HTML
-- `_baking_advice(preset, oven_profile)` → suggerimento di cottura per il profilo `home` o `split`
-- `_default_recipe_ctx()` / `_preset_ctx(key)` → struttura dati per il template
-- `_compute_plan_and_ingredients(data)` → pacchetto unificato per `/plan` e `/plan.ics`; lo snapshot contiene i suggerimenti di entrambi i profili forno (`baking_options`)
-- `_make_bake_record(data)` / `_bake_history_item(record)` / `_recent_bakes()` → salvataggio e lettura del registro prove
+`main.py` contiene solo le rotte; i calcoli del form vivono in `planning.py`.
+
+### [planning.py](src/doughlab/planning.py)
+
+- `number(data, key, default, low, high)` → numero finito dentro i limiti, altrimenti il default (nessun `inf`/`NaN` arriva ai servizi)
+- `parse_phase_form(data)` → legge campi index-based `phase_kind_0`, `phase_hours_0`, ... (max 30 fasi, durata ≤ 720 h)
+- `parse_ingredients(data)` → estrae grammature e percentuali dal form, con gli stessi limiti degli input HTML
+- `baking_advice(preset, oven_profile)` → suggerimento di cottura per il profilo `home` o `split`
+- `default_recipe_ctx()` / `preset_ctx(key)` → struttura dati per il template
+- `compute_plan_and_ingredients(data)` → pacchetto unificato per `/plan`, `/plan.ics` e `/diario/da-piano`; `plan_snapshot` riassume piano, grammature, fasi, cottura e ricetta di origine (`recipe_id`, `recipe_version`)
+
+### [recipes.py](src/doughlab/recipes.py)
+
+Router `/ricette` (risposte HTML di `partials/recipes_panel.html`).
+
+| Metodo | Path | Scopo |
+|---|---|---|
+| `POST` | `/ricette` | salva la ricetta del form con `save_name` (e `save_message` facoltativo): nome nuovo = v1, nome esistente = nuova versione |
+| `POST` | `/ricette/{id}/elimina` | elimina ricetta e versioni (le prove del diario restano) |
+
+`payload_from_form` salva ciò che definisce la ricetta (formula, fasi, lievito, `target_work`, forno, T° iniziale) e non l'orario di partenza. `load_recipe(id, version)` ricostruisce il contesto del pianificatore a partire dal preset di origine; un payload illeggibile viene ignorato. Dopo un salvataggio, il pannello aggiorna i campi nascosti `recipe_id`/`recipe_version` del piano con `hx-swap-oob`.
+
+### [diary.py](src/doughlab/diary.py)
+
+Router `/diario`. Tutte le rotte restituiscono il pannello `partials/diary_panel.html` (HTMX lo sostituisce intero), tranne foto ed export.
+
+| Metodo | Path | Scopo |
+|---|---|---|
+| `GET` | `/diario?q=<testo>&recipe=<id>`, `/diario/nuova`, `/diario/{id}/modifica` | elenco con ricerca e filtro per ricetta, modulo vuoto, modulo di modifica |
+| `POST` | `/diario`, `/diario/{id}` | crea o modifica (multipart: campi + `photo_<slot>`, `label_<slot>`, `remove_<slot>`) |
+| `POST` | `/diario/{id}/elimina` | elimina voce e foto |
+| `GET` | `/diario/foto/{id}` | serve la foto (`nosniff`, cache privata; l'URL include una versione) |
+| `POST` | `/diario/importa` | importa un backup JSON (max 100 MB) e mostra il resoconto |
+| `GET` | `/diario/export.json` | scarica il backup completo con le foto |
+
+Sicurezza e robustezza: il tipo dell'immagine è deciso dai primi byte (solo JPEG/PNG/WebP, max 12 MB), i testi hanno lunghezza massima, i numeri vengono validati e limitati (nessun `inf`/`NaN`), tutto passa dall'autoescape di Jinja. Se `ready_at` precede `started_at` il modulo resta aperto con l'errore in evidenza e i valori digitati.
+
+### [services/pizzalab.py](src/doughlab/services/pizzalab.py)
+
+`parse_backup(raw)` legge `{"entries": [...]}` (valori sempre stringa) in `DiaryData`; `build_backup(entries)` fa il percorso inverso. Le foto sono data URL base64 negli slot `photos.main/extra1..4`, con `photoLabels` e `photoSettings`. Le chiavi sconosciute vengono conservate in `extra`; DoughLab aggiunge un blocco `doughlab` (piano e orari reali) che Pizza Lab ignora. L'importazione abbina le voci per `id`: se la voce esiste viene aggiornata solo quando `updatedAt` del file è più recente.
 
 ### [templates/](src/doughlab/templates/)
 
-- **`base.html`**: layout minimale con variabili CSS semantiche (`--bg`, `--surface`, `--ac`…), dark mode automatica (preferenza di sistema) + toggle manuale persistente in `localStorage`. Alpine.js + HTMX + Chart.js caricati da CDN. Niente Node, niente build step. Il testo secondario (`--mut`) rispetta il contrasto AA in entrambi i temi.
-- **`planner.html`**: una tab bar nella stessa pagina separa **Pianifica** da **Registro prove**. La scheda Piano contiene input base, ricetta, fasi e suggerimenti di cottura in sola lettura, selezionabili per forno domestico o elettrico con cielo e platea. I parametri reali si annotano nel Registro e non influenzano la maturazione.
-- **`partials/plan_result.html`**: HTMX aggiorna ingredienti e riepilogo in `#result`, grafico e timeline in `#detailsResult`, e lo snapshot nel tab nascosto `#bakeHistory` con `hx-swap-oob`. Il tab Registro può quindi essere aperto senza ricalcolare o perdere il piano. Il grafico ha altezza responsive fissa (`.chart-wrap`), nasconde i titoli degli assi sotto i 560 px, legge i colori dalle variabili CSS e si ridisegna al cambio tema; l'asse X è il tempo trascorso in ore.
-- **`partials/bake_history.html`**: form del registro prove (orario reale di maturità, T° impasto, voto, note, parametri di cottura usati) e cronologia con lo scarto dalla stima. Il tipo di forno segue la scelta del planner e i valori consigliati compaiono come placeholder; le prove sono salvate in `Bake.log`.
+- **`base.html`**: layout minimale con variabili CSS semantiche (`--bg`, `--surface`, `--ac`…), dark mode automatica (preferenza di sistema) + toggle manuale persistente in `localStorage`. Alpine.js, HTMX e Chart.js sono serviti da `static/vendor/`. Niente Node, niente build step. Il testo secondario (`--mut`) rispetta il contrasto AA in entrambi i temi.
+- **`planner.html`**: una tab bar nella stessa pagina separa **Pianifica**, **In corso** e **Diario**. La scheda Piano contiene input base, ricetta, fasi e suggerimenti di cottura in sola lettura, selezionabili per forno domestico o elettrico con cielo e platea. I parametri reali si annotano nel Diario e non influenzano la maturazione. `compressPhotoInput` riduce le foto a 1600 px (JPEG) nel browser prima del caricamento.
+  **Live Bake** (tab *In corso*, tutto lato client in `plannerUI`): *Avvia in cucina* legge il piano da `#liveData` e salva lo stato in `localStorage['dl-live']` (orari reali di inizio fase, minuti aggiunti/tolti, controlli spuntati, T° misurata). La fase corrente è l'ultima con un orario reale; il timer conta alla scadenza prevista e, se superata, va in negativo. Alla scadenza scattano vibrazione e notifica (solo se la pagina è aperta), e la Wake Lock API tiene acceso lo schermo. Il "pronto" reale è l'inizio della prima fase di cottura (o la fine dell'ultima fase). *Salva nel diario* chiama `/diario/da-piano` con l'orario di partenza reale, quindi compila `started_at`, `ready_at` e `dough_temp`.
+- **`partials/plan_result.html`**: HTMX aggiorna ingredienti e riepilogo in `#result`, grafico e timeline in `#detailsResult`, e offre il pulsante per salvare la prova nel Diario. Il grafico ha altezza responsive fissa (`.chart-wrap`), nasconde i titoli degli assi sotto i 560 px, legge i colori dalle variabili CSS e si ridisegna al cambio tema; l'asse X è il tempo trascorso in ore.
+- **`partials/recipes_panel.html`**: salvataggio con nome, elenco ricette con versioni, prove collegate; sta fuori da `#planForm` per non innescare ricalcoli.
+- **`partials/diary_panel.html`, `diary_form.html`, `diary_entry.html`**: barra (nuova prova, esporta), importazione, modulo a sezioni (prova, impasto, cottura, note, foto) ed elenco di schede con miniatura, voto, dati chiave e confronto stima/reale.
 
-Nota UX: nel form le percentuali sono inserite in formato umano (`62`, `2.8`) e convertite server-side in frazioni per i calcoli. I decimali si possono digitare liberamente. Il lievito non è un input: la percentuale suggerita dall'app determina anche i grammi mostrati. Giorni e mesi nel risultato sono localizzati in italiano.
+Nota UX: nel form le percentuali sono inserite in formato umano (`62`, `2.8`) e convertite server-side in frazioni per i calcoli. I decimali si possono digitare liberamente: i campi numerici usano `step="any"` perché un valore non multiplo dello step rende il form non valido e HTMX non ricalcola. Le frecce di idratazione, sale, prefermento e peso panetto (±5 g) sono pulsanti custom (`adjustPercent`). Il lievito non è un input: la percentuale suggerita dall'app determina anche i grammi mostrati. Giorni e mesi nel risultato sono localizzati in italiano.
 
 ### [static/](src/doughlab/static/)
 
 - **`manifest.webmanifest`**: nome, colori, icone 192/512 → "installabile" come PWA.
-- **`sw.js`**: service worker minimale, cache-first per asset statici, network-first per il resto. Salva l'ultima pagina vista, ma Alpine.js, HTMX e Chart.js arrivano da CDN e non sono nella cache: **offline la pagina si apre ma non è interattiva** finché non verranno serviti da `static/`.
+- **`sw.js`**: service worker minimale, cache-first per asset statici, network-first per il resto. Precarica pagina iniziale, manifest e le tre librerie di `static/vendor/` (versioni fissate nel nome del file; cambiando versione si aggiorna anche `CACHE` in `sw.js`) e salva l'ultima pagina vista. Offline l'app si apre ed è interattiva; calcolo del piano, diario e ricette richiedono comunque il server.
 - **`icons/*.png`**: placeholder generati con Python puro (zlib). Da sostituire con grafica vera.
 
 ---
 
 ## Testing
 
-53 test (al 2026-10-06). Lanciali con `uv run pytest`.
+81 test (al 2026-10-06). Lanciali con `uv run pytest`.
 
 ### [tests/test_thermal.py](tests/test_thermal.py)
 
@@ -457,15 +510,52 @@ Nota UX: nel form le percentuali sono inserite in formato umano (`62`, `2.8`) e 
 | `test_summary_separates_ready_from_later_bake_phase` | distingue la maturità dalla fine del piano se segue la cottura |
 | `test_chart_x_axis_uses_elapsed_hours_not_sample_indexes` | asse X in ore reali, non in indici dei campioni |
 | `test_chart_has_fixed_responsive_height_and_follows_theme` | il grafico ha altezza responsive fissa e si ridisegna al cambio tema |
-| `test_bake_observation_saves_snapshot_and_prediction_delta` | conserva lo snapshot e calcola lo scarto temporale |
-| `test_bake_route_persists_observation_in_sqlite` | `/bakes` conserva snapshot e risultato nel DB |
 | `test_cooking_advice_is_not_overridden_by_planner_form` | il planner mantiene i suggerimenti del preset |
 | `test_split_oven_profile_keeps_preset_platea_and_ceiling_advice` | i suggerimenti cielo/platea restano quelli del preset |
 | `test_teglia_preset_shows_split_oven_cielo_and_platea_advice` | il preset teglia mostra setpoint separati e hint di cottura |
 | `test_hostile_form_values_never_hang_or_produce_non_finite_plans` | inf/NaN, ore enormi o negative, date ed enum non validi non bloccano né producono piani non finiti |
 | `test_phase_count_is_capped` | il server accetta al massimo 30 fasi |
 | `test_ics_export_uses_local_time_not_utc` | l'export `.ics` non sposta gli orari di fuso |
-| `test_bake_form_never_embeds_snapshot_text_in_javascript` | uno snapshot ostile o non-oggetto non genera JS iniettato né errori 500 |
+| `test_planner_numeric_inputs_accept_any_value_so_the_form_stays_valid` | nessun campo numerico del pianificatore ha uno `step` vincolante (un valore "non valido" per il browser blocca il ricalcolo HTMX) |
+| `test_panetto_weight_is_not_rounded_to_multiples_of_ten` | 265 g si calcola come 265 g |
+
+### [tests/test_pizzalab.py](tests/test_pizzalab.py)
+
+| Test | Proprietà verificata |
+|---|---|
+| `test_strings_become_numbers_and_text` | le stringhe del backup diventano numeri, date, testi e foto |
+| `test_hostile_or_empty_values_are_neutralised` | NaN, infiniti, date e foto non valide non rompono l'importazione |
+| `test_invalid_photos_produce_warnings` | le foto illeggibili vengono segnalate |
+| `test_non_backup_files_are_rejected` | file che non sono backup danno un errore chiaro |
+| `test_round_trip_keeps_everything` | export + reimport non perdono campi, chiavi sconosciute, foto |
+| `test_entries_without_id_get_unique_ids` | le voci senza id ne ricevono uno univoco |
+| `test_rating_is_rounded_to_half_points` | il voto è a mezzi punti, 0 significa nessun voto |
+| `test_image_type_is_decided_by_content_not_by_declared_type` | SVG/HTML travestiti da JPEG vengono rifiutati |
+
+### [tests/test_diary.py](tests/test_diary.py)
+
+| Test | Proprietà verificata |
+|---|---|
+| `test_entry_with_photo_is_saved_and_photo_is_served` | salvataggio con foto, escape dell'HTML, header della foto |
+| `test_ready_before_start_shows_visible_error_and_keeps_values` | l'errore sugli orari è in evidenza e il modulo conserva i valori |
+| `test_only_start_without_ready_time_is_accepted` | un piano futuro senza orario reale si salva |
+| `test_non_image_upload_is_rejected` | un file non immagine non viene salvato |
+| `test_update_replaces_and_removes_photos_then_delete` | modifica, sostituzione/rimozione foto, eliminazione a cascata |
+| `test_import_is_idempotent_and_never_overwrites_newer_local_edits` | reimportare non duplica né sovrascrive modifiche locali più recenti |
+| `test_export_then_import_into_empty_diary_is_lossless` | export e reimport in un diario vuoto non perdono nulla |
+| `test_import_rejects_non_backup_files` | file non validi o assenti danno un messaggio |
+| `test_plan_prefills_new_diary_entry` | il piano precompila la voce e viene conservato |
+| `test_diary_shows_prediction_error_for_linked_plan` | confronto stima/reale nella scheda |
+
+### [tests/test_recipes.py](tests/test_recipes.py)
+
+| Test | Proprietà verificata |
+|---|---|
+| `test_saving_same_name_creates_new_version_and_old_one_can_be_opened` | stesso nome = nuova versione; `?recipe=` apre l'ultima, `&version=` una precedente |
+| `test_save_requires_name_and_ignores_missing_recipe` | nome vuoto rifiutato; id inesistenti o non numerici non rompono la pagina |
+| `test_recipe_name_is_escaped_and_delete_removes_versions` | nomi ostili escapati; l'eliminazione rimuove anche le versioni |
+| `test_diary_entry_keeps_recipe_link_and_can_be_filtered` | collegamento ricetta-prova, filtro per ricetta e ricerca testuale |
+| `test_plan_snapshot_carries_recipe_link` | lo snapshot del piano porta `recipe_id`/`recipe_version` |
 
 ---
 
@@ -476,7 +566,7 @@ Nota UX: nel form le percentuali sono inserite in formato umano (`62`, `2.8`) e 
 - **Import style**: ordinati da ruff (regola `I`); si importa SEMPRE con nomi relativi dentro `doughlab/`.
 - **Dataclass vs Pydantic**: Pydantic solo ai confini (settings, schema API). Dentro i servizi, `dataclass` semplici per minimo overhead.
 - **Numpy ovunque**: le curve termiche/fermentazione viaggiano come `np.ndarray`. Nel template, `.tolist()` per Chart.js.
-- **Nessun bundler**: HTMX, Alpine.js e Chart.js da CDN, CSS scritto a mano con variabili. Niente Node, niente webpack, niente step di build.
+- **Nessun bundler**: HTMX, Alpine.js e Chart.js copiati in `static/vendor/`, CSS scritto a mano con variabili. Niente Node, niente webpack, niente step di build.
 - **Niente lazy-load SQLAlchemy in async**: `expire_on_commit=False`.
 - **Documentazione**: questo README va tenuto aggiornato ad ogni cambio di API o aggiunta di modulo. Niente file `.md` paralleli per feature singole.
 
@@ -491,19 +581,24 @@ Nota UX: nel form le percentuali sono inserite in formato umano (`62`, `2.8`) e 
 - 5 preset ricette (napoletana / napoletana frigo / teglia / pinsa / pane biga)
 - Pianificatore HTMX con grafico Chart.js
 - Suggerimenti di cottura per forno domestico o elettrico cielo/platea
-- Registro prove: esito reale, voto, note e parametri di cottura, con scarto dalla stima
+- Diario prove con foto, voto, note, orari reali e scarto dalla stima
+- Importazione/esportazione dei backup di Pizza Lab (foto incluse)
 - Export `.ics` per Calendario iOS
 - PWA installabile
 - UI con palette rivista + dark mode (auto + toggle), verificata da 320 px a desktop
 - Input del form validati lato server
-- 53 test unitari verdi
+- 81 test unitari verdi
 
-### 🔜 Fase 2 — Il tool completo per il pizzaiolo
-- Persistenza ricette con versioning (ORM già pronto)
-- UI load/save/elenco ricette (unificare con preset bar)
-- **Live Bake mode**: timer mobile per fase corrente + checkpoint
-- Diario infornate: upload foto e storico per ricetta (il registro prove base è già disponibile)
-- Librerie JS in `static/` per far funzionare davvero l'app offline
+### ✅ Fase 2 (fatta)
+- Ricette salvate con versioning, riapribili e collegate alle prove del Diario
+- Live Bake: timer per fase, controlli, orari reali che precompilano il diario
+- Ricerca nel Diario e filtro per ricetta
+- Librerie JS in `static/vendor/`: l'app si apre e funziona anche offline
+
+### 🔜 Prossimi passi
+- Confrontare le prove di una ricetta (scarto medio stima/reale) e usarlo per tarare `target_work`
+- Migrazioni dello schema (oggi `create_all` non modifica le tabelle esistenti)
+- Notifiche di fine fase anche a pagina chiusa (richiede Web Push/server)
 
 ### 🔮 Fase 3 — Analisi
 - Analisi alveolatura via OpenCV (contorni bolle, uniformità, densità)

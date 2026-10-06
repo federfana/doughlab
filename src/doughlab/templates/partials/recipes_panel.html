@@ -1,0 +1,47 @@
+{# Pannello "Le mie ricette": fuori dal form del piano, sostituito da HTMX come blocco unico. #}
+<div id="recipesPanel" class="space-y" hx-target="#recipesPanel" hx-swap="outerHTML">
+  {% if recipes_saved %}
+  {# Aggiorna i campi nascosti del piano: i prossimi calcoli e salvataggi nel diario puntano a questa versione. #}
+  <input type="hidden" id="recipeIdField" name="recipe_id" value="{{ recipes_saved.id }}" hx-swap-oob="true">
+  <input type="hidden" id="recipeVersionField" name="recipe_version" value="{{ recipes_saved.version }}" hx-swap-oob="true">
+  {% endif %}
+  {% if recipes_message %}<p class="diary-status" role="status">{{ recipes_message }}</p>{% endif %}
+  {% if recipes_error %}<p class="diary-status error" role="alert">{{ recipes_error }}</p>{% endif %}
+
+  <div id="saveRecipeFields" class="recipe-save">
+    <label class="field"><span class="lab">Nome della ricetta</span><input type="text" name="save_name" value="{{ saved_recipe.name if saved_recipe else '' }}" maxlength="80" placeholder="Es. Teglia 24h"></label>
+    <label class="field"><span class="lab">Cosa cambia (facoltativo)</span><input type="text" name="save_message" maxlength="200" placeholder="Es. idratazione 72%"></label>
+    <button type="button" class="btn" hx-post="/ricette" hx-include="#planForm, #saveRecipeFields">Salva ricetta</button>
+  </div>
+  <p class="hint">Salva formula, fasi, lievito e forno. Con lo stesso nome si crea una nuova versione, così puoi tornare alle precedenti.</p>
+
+  {% if recipes_items %}
+  <ul class="recipe-list">
+    {% for item in recipes_items %}
+    <li class="recipe-item">
+      <div class="recipe-head">
+        <strong>{{ item.name }}</strong>
+        <span class="hint">{% if item.style %}{{ item.style }} · {% endif %}{{ item.versions|length }} {{ 'versione' if item.versions|length == 1 else 'versioni' }}{% if item.trials %} · {{ item.trials }} {{ 'prova' if item.trials == 1 else 'prove' }}{% endif %}</span>
+      </div>
+      <div class="diary-actions">
+        <a class="btn-ghost" href="/?recipe={{ item.id }}">Apri</a>
+        {% if item.trials %}<button type="button" class="btn-ghost" hx-get="/diario?recipe={{ item.id }}" hx-target="#diaryPanel" @click="activeTab = 'diary'">Prove</button>{% endif %}
+        <button type="button" class="btn-ghost" hx-post="/ricette/{{ item.id }}/elimina" hx-confirm="Eliminare la ricetta «{{ item.name }}» con tutte le sue versioni? Le prove del diario restano.">Elimina</button>
+      </div>
+      {% if item.versions|length > 1 %}
+      <details class="recipe-versions">
+        <summary>Versioni</summary>
+        <ul>
+          {% for v in item.versions %}
+          <li><a href="/?recipe={{ item.id }}&version={{ v.version }}">v{{ v.version }}</a> <span class="hint">{{ v.created_at.strftime('%d/%m/%Y') }}{% if v.message %} · {{ v.message }}{% endif %}</span></li>
+          {% endfor %}
+        </ul>
+      </details>
+      {% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="hint">Nessuna ricetta salvata.</p>
+  {% endif %}
+</div>

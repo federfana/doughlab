@@ -296,22 +296,72 @@ details.panel > .panel-body { padding: .9rem; border-top: 1px solid var(--border
 .preferment-split { display: flex; flex-wrap: wrap; gap: .4rem 1.2rem; margin-top: .75rem; padding-top: .75rem; border-top: 1px solid var(--border); font-size: .85rem; }
 .preferment-split strong { flex-basis: 100%; }
 .result-layout .space-y > * + * { margin-top: 1rem; }
-.bake-log-panel { padding: 1rem; }
 .chart-wrap { position: relative; height: clamp(240px, 36vw, 340px); }
-.bake-cooking-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: .75rem; margin: 0 0 .8rem; padding: .8rem; border: 1px solid var(--border); border-radius: 6px; }
-.bake-cooking-fields legend { padding: 0 .3rem; color: var(--ink-2); font-size: .85rem; font-weight: 650; }
-.bake-cooking-fields input, .bake-cooking-fields select { width: 100%; }
-.bake-profile-fields { display: contents; }
-.bake-observation-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(11.5rem, 1fr)); gap: .75rem; margin-bottom: .8rem; }
-.bake-observation-fields input, .bake-observation-fields select, .bake-observation-fields textarea { width: 100%; }
-.bake-notes-field { grid-column: 1 / -1; }
-.bake-status { margin: 0 0 .75rem; padding: .55rem .7rem; border-radius: 6px; background: var(--ac-soft); color: var(--ac); font-size: .85rem; }
-.bake-status.error { background: #fee2e2; color: #b91c1c; }
-.bake-history-list { margin-top: .9rem; border-top: 1px solid var(--border); padding-top: .7rem; }
-.bake-history-list summary { cursor: pointer; color: var(--ink-2); font-size: .85rem; font-weight: 600; }
-.bake-history-scroll { overflow-x: auto; margin-top: .5rem; }
-.bake-history-scroll table { min-width: 620px; }
-.bake-note-row td { padding-top: 0; color: var(--mut); text-align: left; font-size: .8rem; }
+.diary-toolbar { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; padding: .8rem 1rem; }
+.diary-toolbar .count { margin-left: auto; }
+.diary-status { margin: 0; padding: .55rem .7rem; border-radius: 6px; background: var(--ac-soft); color: var(--ink); font-size: .85rem; }
+.diary-status.error { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; font-weight: 600; }
+html.dark .diary-status.error { background: #450a0a; color: #fecaca; border-color: #7f1d1d; }
+.diary-status ul { margin: .3rem 0 0; padding-left: 1.1rem; font-weight: 400; }
+.diary-import, .diary-form { padding: 1rem; }
+.diary-import summary { cursor: pointer; font-weight: 600; font-size: .9rem; }
+.diary-form fieldset { margin: 0 0 .9rem; padding: .8rem; border: 1px solid var(--border); border-radius: 6px; min-width: 0; }
+.diary-form legend { padding: 0 .3rem; color: var(--ink-2); font-size: .85rem; font-weight: 650; }
+.diary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr)); gap: .75rem; }
+.diary-grid input, .diary-grid select, .diary-grid textarea, .diary-form textarea { width: 100%; }
+.diary-wide { grid-column: 1 / -1; }
+.diary-form textarea { min-height: 5.5rem; resize: vertical; }
+.photo-slot { display: flex; flex-direction: column; gap: .35rem; padding: .6rem; border: 1px dashed var(--border); border-radius: 6px; min-width: 0; }
+.photo-slot img { width: 100%; max-height: 9rem; object-fit: cover; border-radius: 4px; }
+.photo-slot input[type="file"] { width: 100%; font-size: .8rem; }
+.photo-remove { display: flex; gap: .35rem; align-items: center; font-size: .8rem; color: var(--mut); }
+.diary-actions { display: flex; flex-wrap: wrap; gap: .5rem; }
+.diary-list { display: grid; gap: .8rem; }
+.diary-card { display: grid; grid-template-columns: 7.5rem minmax(0, 1fr); gap: .9rem; padding: .8rem; }
+.diary-card.no-cover { grid-template-columns: minmax(0, 1fr); }
+.diary-cover { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 6px; background: var(--ac-soft); }
+.diary-card h3 { margin: 0; font-size: 1.05rem; overflow-wrap: anywhere; }
+.diary-meta { margin: .15rem 0 .45rem; color: var(--mut); font-size: .82rem; }
+.diary-rating { color: var(--warn); font-weight: 700; }
+.diary-chips { display: flex; flex-wrap: wrap; gap: .3rem; margin: 0 0 .45rem; padding: 0; list-style: none; }
+.diary-chips li { padding: .12rem .5rem; border: 1px solid var(--border); border-radius: 999px; font-size: .75rem; color: var(--ink-2); }
+.diary-compare { margin: 0 0 .45rem; font-size: .82rem; color: var(--ink-2); }
+.diary-more summary { cursor: pointer; color: var(--ink-2); font-size: .85rem; font-weight: 600; }
+.diary-more h4 { margin: .7rem 0 .2rem; font-size: .75rem; letter-spacing: .04em; text-transform: uppercase; color: var(--mut); }
+.diary-text { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: .88rem; }
+.diary-photos { display: grid; grid-template-columns: repeat(auto-fill, minmax(6.5rem, 1fr)); gap: .5rem; margin-top: .6rem; }
+.diary-photos img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 6px; }
+.diary-photos figcaption { font-size: .7rem; color: var(--mut); overflow-wrap: anywhere; }
+.diary-photos figure { margin: 0; }
+.diary-cta { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
+.diary-empty { padding: 1.2rem; text-align: center; color: var(--mut); }
+.diary-filter { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; padding: .6rem 1rem; }
+.diary-filter input[type="search"] { flex: 1 1 14rem; min-width: 0; }
+.recipes-card { padding: .8rem 1rem; }
+.recipes-card > summary { cursor: pointer; font-weight: 600; font-size: .9rem; }
+.recipes-card > div { margin-top: .8rem; }
+.recipe-save { display: grid; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); gap: .6rem; align-items: end; }
+.recipe-save input { width: 100%; }
+.recipe-list { list-style: none; margin: 0; padding: 0; display: grid; gap: .6rem; }
+.recipe-item { padding: .6rem .7rem; border: 1px solid var(--border); border-radius: 6px; }
+.recipe-head { display: flex; flex-wrap: wrap; gap: .2rem .8rem; align-items: baseline; margin-bottom: .4rem; }
+.recipe-versions summary { cursor: pointer; font-size: .82rem; color: var(--ink-2); margin-top: .4rem; }
+.recipe-versions ul { margin: .3rem 0 0; padding-left: 1.1rem; font-size: .85rem; }
+.live-dot { display: inline-block; width: .55rem; height: .55rem; margin-left: .4rem; border-radius: 50%; background: var(--ac); vertical-align: middle; }
+.live-now { padding: 1.1rem; text-align: center; }
+.live-now h2 { margin: .2rem 0 0; font-size: 1.4rem; }
+.live-now .diary-actions { justify-content: center; }
+.live-timer { margin: .3rem 0 0; font-size: clamp(2.6rem, 14vw, 4rem); font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.live-timer.late { color: var(--bad); }
+.live-bar { height: .45rem; margin: .7rem auto .6rem; max-width: 26rem; border-radius: 999px; background: var(--ac-soft); overflow: hidden; }
+.live-bar span { display: block; height: 100%; background: var(--ac); transition: width 1s linear; }
+.live-check { display: flex; gap: .55rem; align-items: flex-start; padding: .4rem 0; font-size: .95rem; }
+.live-check input { margin-top: .2rem; }
+.live-steps { margin: 0; padding-left: 1.3rem; display: grid; gap: .35rem; }
+.live-steps li { color: var(--mut); }
+.live-steps li.done { text-decoration: line-through; }
+.live-steps li.current { color: var(--ink); font-weight: 700; text-decoration: none; }
+.live-steps .hint { margin-left: .4rem; font-weight: 400; }
 
 /* Grid helpers */
 .grid { display: grid; gap: 1rem; }
@@ -334,8 +384,8 @@ details.panel > .panel-body { padding: .9rem; border-top: 1px solid var(--border
   .phase-grid { grid-template-columns: 1fr; }
   .summary-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .85rem .5rem; }
   .ingredient-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .bake-cooking-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .bake-cooking-fields > label.field:first-of-type { grid-column: 1 / -1; }
+  .diary-card { grid-template-columns: 5.5rem minmax(0, 1fr); gap: .65rem; }
+  .diary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   table { font-size: 12px; }
   th, td { padding: .35rem .12rem; }
   .summary-metrics > div, .ingredient-list > div { padding-left: .55rem; }
@@ -343,9 +393,9 @@ details.panel > .panel-body { padding: .9rem; border-top: 1px solid var(--border
 .space-y > * + * { margin-top: 1rem; }
 .flex-wrap-row { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
 </style>
-<script src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js" defer></script>
-<script src="https://unpkg.com/htmx.org@1.9.12"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="/static/vendor/alpine-3.14.3.min.js" defer></script>
+<script src="/static/vendor/htmx-1.9.12.min.js"></script>
+<script src="/static/vendor/chart-4.4.4.umd.min.js"></script>
 </head>
 <body>
 <header class="topbar">

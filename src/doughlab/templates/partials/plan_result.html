@@ -40,11 +40,15 @@
         <div><dt>Lievito consigliato</dt><dd>{{ '%.3f'|format(suggested_pct * 100) }}%</dd><small>Stimato da tempi e temperature impostati</small></div>
       </dl>
     </section>
+
+    <div class="diary-cta">
+      <button type="button" class="btn" @click="liveStart()">Avvia in cucina</button>
+      <button type="button" class="btn-ghost" hx-post="/diario/da-piano" hx-include="#planForm" hx-target="#diaryPanel" hx-swap="outerHTML" @click="activeTab = 'diary'">Salva questa prova nel diario</button>
+      <span class="hint">«Avvia» parte adesso e segue le fasi con timer e controlli; il diario viene precompilato con questo piano.</span>
+      <script type="application/json" id="liveData">{{ plan_snapshot | tojson }}</script>
+    </div>
   </div>
 </div>
-
-{% set bake_oob = true %}
-{% include "partials/bake_history.html" %}
 
 <section id="detailsResult" hx-swap-oob="innerHTML">
   <div class="space-y">

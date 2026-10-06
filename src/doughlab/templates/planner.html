@@ -6,18 +6,27 @@
       <h1>Pianifica un impasto</h1>
       <p>La formula definisce le grammature; tempi e temperature definiscono il piano e la stima del lievito.</p>
     </div>
-    <div x-show="activeTab === 'registry'" x-cloak>
-      <h1>Registro prove</h1>
-      <p>Confronta l'orario in cui l'impasto era pronto con la stima salvata dal piano.</p>
+    <div x-show="activeTab === 'live'" x-cloak>
+      <h1>In corso</h1>
+      <p>Il timer della fase attuale e i controlli da fare, anche con lo schermo del telefono acceso in cucina.</p>
+    </div>
+    <div x-show="activeTab === 'diary'" x-cloak>
+      <h1>Diario</h1>
+      <p>Le tue prove con foto, note e orari reali. Importa il backup di Pizza Lab o esporta tutto in JSON.</p>
     </div>
   </header>
 
   <div class="workspace-tabs" role="tablist" aria-label="Aree DoughLab">
-    <button id="tab-planner" class="workspace-tab" type="button" role="tab" aria-controls="panel-planner" :aria-selected="activeTab === 'planner'" :tabindex="activeTab === 'planner' ? 0 : -1" x-ref="plannerTab" @click="focusTab('planner')" @keydown.right.prevent="focusTab('registry')">Pianifica</button>
-    <button id="tab-registry" class="workspace-tab" type="button" role="tab" aria-controls="panel-registry" :aria-selected="activeTab === 'registry'" :tabindex="activeTab === 'registry' ? 0 : -1" x-ref="registryTab" @click="focusTab('registry')" @keydown.left.prevent="focusTab('planner')">Registro prove</button>
+    <button id="tab-planner" class="workspace-tab" type="button" role="tab" aria-controls="panel-planner" :aria-selected="activeTab === 'planner'" :tabindex="activeTab === 'planner' ? 0 : -1" x-ref="plannerTab" @click="focusTab('planner')" @keydown.right.prevent="focusTab('live')">Pianifica</button>
+    <button id="tab-live" class="workspace-tab" type="button" role="tab" aria-controls="panel-live" :aria-selected="activeTab === 'live'" :tabindex="activeTab === 'live' ? 0 : -1" x-ref="liveTab" @click="focusTab('live')" @keydown.left.prevent="focusTab('planner')" @keydown.right.prevent="focusTab('diary')">In corso<span class="live-dot" x-show="live && !liveDone()" x-cloak role="img" aria-label="impasto in corso"></span></button>
+    <button id="tab-diary" class="workspace-tab" type="button" role="tab" aria-controls="panel-diary" :aria-selected="activeTab === 'diary'" :tabindex="activeTab === 'diary' ? 0 : -1" x-ref="diaryTab" @click="focusTab('diary')" @keydown.left.prevent="focusTab('live')">Diario</button>
   </div>
 
   <section id="panel-planner" class="workspace-panel space-y" role="tabpanel" aria-labelledby="tab-planner" x-show="activeTab === 'planner'" x-cloak>
+  <details class="card recipes-card" {% if saved_recipe %}open{% endif %}>
+    <summary>Le mie ricette{% if saved_recipe %} · aperta: {{ saved_recipe.name }} v{{ saved_recipe.version }}{% elif recipes_items %} ({{ recipes_items|length }}){% endif %}</summary>
+    {% include "partials/recipes_panel.html" %}
+  </details>
   <form id="planForm"
         hx-post="/plan"
         hx-trigger="input delay:450ms, change delay:200ms, submit"
@@ -26,6 +35,8 @@
         class="space-y">
       <input type="hidden" name="recipe_name" value="{{ recipe.recipe_name }}">
       <input type="hidden" name="preset_key" value="{{ recipe.active_preset }}">
+      <input type="hidden" id="recipeIdField" name="recipe_id" value="{{ saved_recipe.id if saved_recipe else '' }}">
+      <input type="hidden" id="recipeVersionField" name="recipe_version" value="{{ saved_recipe.version if saved_recipe else '' }}">
 
     {# Dati essenziali dell'impasto #}
     <section class="card-2" style="padding: 1rem; border-color: var(--ac)">
@@ -38,7 +49,13 @@
         </label>
         <label class="field">
           <span class="lab">Peso panetto (g)</span>
-          <input type="number" name="panetto_g" value="{{ '%.0f'|format(recipe.ingredients.panetto_g) }}" min="30" max="2000" step="10">
+          <span class="number-stepper">
+            <input type="number" name="panetto_g" value="{{ '%.0f'|format(recipe.ingredients.panetto_g) }}" min="30" max="2000" step="any" onkeydown="if (event.key === 'ArrowUp' || event.key === 'ArrowDown') { event.preventDefault(); adjustPercent(this, event.key === 'ArrowUp' ? 5 : -5); }">
+            <span class="number-stepper-controls">
+              <button type="button" aria-label="Aumenta peso panetto di 5 grammi" title="Aumenta di 5 g" onclick="adjustPercent(this, 5)">↑</button>
+              <button type="button" aria-label="Riduci peso panetto di 5 grammi" title="Riduci di 5 g" onclick="adjustPercent(this, -5)">↓</button>
+            </span>
+          </span>
         </label>
         <label class="field">
           <span class="lab">Idratazione %</span>
@@ -113,7 +130,7 @@
         </label>
         <label class="field">
           <span class="lab">T° impasto iniziale</span>
-          <input type="number" name="initial_dough_c" value="{{ recipe.initial_dough_c }}" step="0.5" min="0" max="40">
+          <input type="number" name="initial_dough_c" value="{{ recipe.initial_dough_c }}" step="any" min="0" max="40">
         </label>
       </div>
     </section>
@@ -151,8 +168,8 @@
           </div>
           <input type="hidden" name="phase_label_{{ i }}" value="{{ p.label }}">
           <div class="phase-fields">
-            <label class="field"><span class="lab">Durata (ore)</span><input type="number" name="phase_hours_{{ i }}" value="{{ p.hours }}" step="0.25" min="0" max="720"></label>
-            <label class="field"><span class="lab">Temperatura (°C)</span><input type="number" name="phase_ambient_{{ i }}" value="{{ p.ambient_c }}" step="0.5" min="-5" max="50"></label>
+            <label class="field"><span class="lab">Durata (ore)</span><input type="number" name="phase_hours_{{ i }}" value="{{ p.hours }}" step="any" min="0" max="720"></label>
+            <label class="field"><span class="lab">Temperatura (°C)</span><input type="number" name="phase_ambient_{{ i }}" value="{{ p.ambient_c }}" step="any" min="-5" max="50"></label>
             <label class="field"><span class="lab">Condizione</span>
               <select name="phase_env_{{ i }}">
                 {% for v, label in environments %}
@@ -268,13 +285,64 @@
   </form>
   </section>
 
-  <section id="panel-registry" class="workspace-panel space-y" role="tabpanel" aria-labelledby="tab-registry" x-show="activeTab === 'registry'" x-cloak>
-    {% set bake_history = bake_history|default([]) %}
-    {% set bake_snapshot = none %}
-    {% set bake_saved = false %}
-    {% set bake_error = none %}
-    {% set bake_oob = false %}
-    {% include "partials/bake_history.html" %}
+  <section id="panel-live" class="workspace-panel space-y" role="tabpanel" aria-labelledby="tab-live" x-show="activeTab === 'live'" x-cloak>
+    <template x-if="!live">
+      <p class="card diary-empty">Nessun impasto in corso. Imposta un piano e premi «Avvia in cucina»: qui trovi il timer della fase attuale e i controlli da fare.</p>
+    </template>
+    <template x-if="live">
+      <div class="space-y">
+        <section class="card live-now" x-show="!liveDone()">
+          <p class="hint"><span x-text="live.name"></span> · fase <span x-text="liveIndex() + 1"></span> di <span x-text="live.phases.length"></span></p>
+          <h2 x-text="live.phases[liveIndex()].label"></h2>
+          <p class="live-timer" :class="{ late: liveRemaining() < 0 }" x-text="(liveRemaining() < 0 ? '+' : '') + countdown(liveRemaining())" aria-live="off"></p>
+          <p class="hint" x-text="liveRemaining() < 0 ? 'oltre il tempo previsto: passa alla prossima fase quando sei pronto' : 'alla fine prevista, alle ' + clock(liveEnd(liveIndex()))"></p>
+          <div class="live-bar"><span :style="`width:${liveProgress() * 100}%`"></span></div>
+          <p class="hint" x-show="liveEta() !== null">Pronto stimato: <strong x-text="clockDay(liveEta())"></strong></p>
+          <p class="hint" x-show="live.phases[liveIndex() + 1]">Dopo: <span x-text="live.phases[liveIndex() + 1]?.label"></span> (<span x-text="live.phases[liveIndex() + 1] ? duration(liveDuration(liveIndex() + 1)) : ''"></span>)</p>
+          <div class="diary-actions" style="margin-top:.8rem">
+            <button type="button" class="btn" @click="liveAdvance()" x-text="liveIndex() === live.phases.length - 1 ? 'Concludi' : 'Fase completata: avanti'"></button>
+            <button type="button" class="btn-ghost" @click="liveShift(-15)">−15 min</button>
+            <button type="button" class="btn-ghost" @click="liveShift(15)">+15 min</button>
+            <button type="button" class="btn-ghost" @click="liveBack()" :disabled="live.actual.length <= 1">Indietro</button>
+          </div>
+        </section>
+
+        <section class="card" style="padding:1rem" x-show="!liveDone()">
+          <div class="lab-row">Da controllare</div>
+          <template x-for="(text, j) in liveChecks(live.phases[liveIndex()].kind)" :key="liveIndex() + ':' + j">
+            <label class="live-check"><input type="checkbox" :checked="!!live.checks[liveIndex() + ':' + j]" @change="liveCheck(j, $event.target.checked)"><span x-text="text"></span></label>
+          </template>
+          <label class="field" style="max-width:14rem;margin-top:.6rem"><span class="lab">Temp. impasto misurata (°C)</span><input type="number" step="any" min="0" max="40" x-model="live.doughTemp" @change="persist()"></label>
+        </section>
+
+        <section class="card" style="padding:1rem" x-show="liveDone()">
+          <h2 style="margin-top:0">Impasto pronto</h2>
+          <p>Iniziato alle <strong x-text="clockDay(live.startedAt)"></strong>, pronto alle <strong x-text="clockDay(liveReadyAt())"></strong> (durata reale <span x-text="duration(liveReadyAt() - live.startedAt)"></span>; previsto dal piano <span x-text="duration(livePlannedTotal())"></span>).</p>
+          <div class="diary-actions">
+            <button type="button" class="btn" @click="liveToDiary()">Salva nel diario</button>
+            <button type="button" class="btn-ghost" @click="liveBack()">Indietro</button>
+            <button type="button" class="btn-ghost" @click="liveClear(true)">Chiudi senza salvare</button>
+          </div>
+        </section>
+
+        <section class="card" style="padding:1rem">
+          <div class="lab-row">Fasi</div>
+          <ol class="live-steps">
+            <template x-for="(phase, j) in live.phases" :key="j">
+              <li :class="{ done: live.actual.length > j + 1, current: !liveDone() && liveIndex() === j }">
+                <span x-text="phase.label"></span>
+                <span class="hint" x-text="duration(liveDuration(j)) + (live.actual[j] ? ' · dalle ' + clock(live.actual[j]) : '')"></span>
+              </li>
+            </template>
+          </ol>
+          <div class="diary-actions" x-show="!liveDone()"><button type="button" class="btn-ghost" @click="liveClear(true)">Annulla impasto in corso</button></div>
+        </section>
+      </div>
+    </template>
+  </section>
+
+  <section id="panel-diary" class="workspace-panel space-y" role="tabpanel" aria-labelledby="tab-diary" x-show="activeTab === 'diary'" x-cloak>
+    {% include "partials/diary_panel.html" %}
   </section>
 </div>
 
@@ -293,8 +361,8 @@
     </div>
     <input type="hidden" name="phase_label_IDX" value="Puntata">
     <div class="phase-fields">
-      <label class="field"><span class="lab">Durata (ore)</span><input type="number" name="phase_hours_IDX" value="1" step="0.25" min="0" max="720"></label>
-      <label class="field"><span class="lab">Temperatura (°C)</span><input type="number" name="phase_ambient_IDX" value="22" step="0.5" min="-5" max="50"></label>
+      <label class="field"><span class="lab">Durata (ore)</span><input type="number" name="phase_hours_IDX" value="1" step="any" min="0" max="720"></label>
+      <label class="field"><span class="lab">Temperatura (°C)</span><input type="number" name="phase_ambient_IDX" value="22" step="any" min="-5" max="50"></label>
       <label class="field"><span class="lab">Condizione</span>
         <select name="phase_env_IDX">
           {% for v, label in environments %}<option value="{{ v }}">{% if v=='ambient' %}TA · {% else %}TC · {% endif %}{{ label }}</option>{% endfor %}
@@ -326,13 +394,204 @@ function syncPhaseLabel(select) {
   card.querySelector('[name^="phase_label_"]').value = select.selectedOptions[0].textContent.trim();
 }
 
+// Riduce le foto a max 1600 px (JPEG) prima del caricamento: sul telefono sono molti MB.
+async function compressPhotoInput(input) {
+  const slot = input.closest('.photo-slot');
+  const preview = slot.querySelector('.photo-preview');
+  const file = input.files[0];
+  if (!file) { preview.hidden = true; return; }
+  try {
+    const bitmap = await createImageBitmap(file);
+    const scale = Math.min(1, 1600 / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(bitmap.width * scale);
+    canvas.height = Math.round(bitmap.height * scale);
+    canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.82));
+    if (blob && (blob.size < file.size || !/^image\/(jpeg|png|webp)$/.test(file.type))) {
+      const transfer = new DataTransfer();
+      transfer.items.add(new File([blob], 'foto.jpg', { type: 'image/jpeg' }));
+      input.files = transfer.files;
+    }
+  } catch (error) { /* formato non decodificabile dal browser: si invia l'originale */ }
+  preview.src = URL.createObjectURL(input.files[0]);
+  preview.hidden = false;
+}
+
+const LIVE_KEY = 'dl-live';
+const LIVE_CHECKS = {
+  preferment: ['Bolle in superficie', 'Volume quasi raddoppiato, con la cupola ancora tesa'],
+  autolyse: ['Nessun grumo di farina asciutta'],
+  mix: ['Impasto liscio ed elastico', 'Temperatura dell\'impasto vicina a quella prevista'],
+  bulk: ['Impasto cresciuto del 30-50% circa', 'Bolle visibili sui bordi del contenitore'],
+  maturation: ['Contenitore chiuso', 'Volume raddoppiato prima di usarlo'],
+  temper: ['Impasto tornato morbido e senza zone fredde'],
+  shape: ['Panetti pesati e uniformi', 'Chiusura sotto, superficie tesa'],
+  proof: ['Prova del dito: l\'impronta risale lentamente', 'Panetti rilassati e ben gonfi'],
+  open: ['Piano infarinato', 'Bordo conservato'],
+  bake: ['Forno alla temperatura giusta', 'Cielo e platea come da piano'],
+};
+const pad2 = n => String(n).padStart(2, '0');
+function localInput(ms) {
+  const d = new Date(ms);
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+}
+
 function plannerUI(initialOvenProfile) {
   return {
     activeTab: 'planner',
     ovenProfile: initialOvenProfile,
+    live: null,
+    now: Date.now(),
+    init() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(LIVE_KEY));
+        if (saved && Array.isArray(saved.phases) && saved.phases.length && Array.isArray(saved.actual) && saved.actual.length) {
+          this.live = saved;
+          this.wakeLock();
+        }
+      } catch (error) { /* stato locale illeggibile: si riparte da zero */ }
+      setInterval(() => { this.now = Date.now(); this.liveTick(); }, 1000);
+      document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') this.wakeLock(); });
+    },
     focusTab(tab) {
       this.activeTab = tab;
-      this.$nextTick(() => this.$refs[tab === 'planner' ? 'plannerTab' : 'registryTab'].focus());
+      this.$nextTick(() => this.$refs[tab + 'Tab'].focus());
+    },
+    persist() {
+      if (this.live) localStorage.setItem(LIVE_KEY, JSON.stringify(this.live));
+      else localStorage.removeItem(LIVE_KEY);
+    },
+    liveStart() {
+      if (this.live && !this.liveDone() && !confirm('Sostituire l\'impasto già in corso?')) return;
+      let snapshot;
+      try { snapshot = JSON.parse(document.getElementById('liveData').textContent); } catch (error) { return; }
+      const phases = (snapshot.phases || []).map(p => ({ kind: p.kind, label: p.label, hours: Number(p.hours) || 0 }));
+      if (!phases.length) return;
+      const started = Date.now();
+      this.live = {
+        name: snapshot.recipe_name || 'Impasto', startedAt: started, phases,
+        actual: [started], extra: phases.map(() => 0), checks: {}, notified: {}, doughTemp: '',
+        plannedReady: snapshot.predicted_ready_at || null,
+      };
+      this.persist();
+      this.activeTab = 'live';
+      if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission().catch(() => {});
+      this.wakeLock();
+    },
+    liveClear(ask) {
+      if (ask && !confirm('Eliminare l\'impasto in corso? I tempi registrati andranno persi.')) return;
+      this.live = null;
+      this.persist();
+    },
+    liveDone() { return !!this.live && this.live.actual.length > this.live.phases.length; },
+    liveIndex() { return Math.min(this.live.actual.length - 1, this.live.phases.length - 1); },
+    liveDuration(j) { const l = this.live; return (l.phases[j].hours * 60 + (l.extra[j] || 0)) * 60000; },
+    liveEnd(j) { return this.live.actual[j] + this.liveDuration(j); },
+    liveRemaining() { return this.liveEnd(this.liveIndex()) - this.now; },
+    liveProgress() {
+      const i = this.liveIndex();
+      const total = this.liveDuration(i);
+      return total <= 0 ? 1 : Math.min(1, Math.max(0, (this.now - this.live.actual[i]) / total));
+    },
+    liveReadyIndex() {
+      const bake = this.live.phases.findIndex(p => p.kind === 'bake');
+      return bake === -1 ? this.live.phases.length : bake;
+    },
+    liveReadyAt() {
+      const l = this.live;
+      const ready = this.liveReadyIndex();
+      return l.actual[Math.min(ready, l.actual.length - 1)];
+    },
+    liveEta() {
+      const i = this.liveIndex();
+      const ready = this.liveReadyIndex();
+      if (i >= ready) return null;
+      let eta = Math.max(this.liveEnd(i), this.now);
+      for (let j = i + 1; j < ready; j++) eta += this.liveDuration(j);
+      return eta;
+    },
+    livePlannedTotal() {
+      let total = 0;
+      for (let j = 0; j < this.liveReadyIndex(); j++) total += this.live.phases[j].hours * 3600000;
+      return total;
+    },
+    liveAdvance() {
+      if (!this.live || this.liveDone()) return;
+      this.live.actual.push(Date.now());
+      this.persist();
+      if (this.liveDone()) this.releaseLock();
+    },
+    liveBack() {
+      if (!this.live || this.live.actual.length <= 1) return;
+      this.live.actual.pop();
+      delete this.live.notified[this.liveIndex()];
+      this.persist();
+      this.wakeLock();
+    },
+    liveShift(minutes) {
+      const i = this.liveIndex();
+      this.live.extra[i] = Math.max(-this.live.phases[i].hours * 60, (this.live.extra[i] || 0) + minutes);
+      delete this.live.notified[i];
+      this.persist();
+    },
+    liveChecks(kind) { return LIVE_CHECKS[kind] || []; },
+    liveCheck(j, value) {
+      this.live.checks[this.liveIndex() + ':' + j] = value;
+      this.persist();
+    },
+    liveTick() {
+      const l = this.live;
+      if (!l || this.liveDone()) return;
+      const i = this.liveIndex();
+      if (this.now < this.liveEnd(i) || l.notified[i]) return;
+      l.notified[i] = true;
+      this.persist();
+      const next = l.phases[i + 1];
+      const body = l.phases[i].label + ' finita' + (next ? ': ora ' + next.label : '');
+      if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+      if ('Notification' in window && Notification.permission === 'granted') {
+        try { new Notification('DoughLab', { body }); } catch (error) { /* notifiche non disponibili */ }
+      }
+    },
+    async wakeLock() {
+      try {
+        if (this.live && !this.liveDone() && navigator.wakeLock && document.visibilityState === 'visible') {
+          this._lock = await navigator.wakeLock.request('screen');
+        }
+      } catch (error) { /* schermo acceso non concesso */ }
+    },
+    releaseLock() { try { this._lock?.release(); } catch (error) { /* già rilasciato */ } },
+    liveToDiary() {
+      const l = this.live;
+      const values = Object.fromEntries(new FormData(document.getElementById('planForm')));
+      values.start_at = localInput(l.startedAt);
+      htmx.ajax('POST', '/diario/da-piano', { target: '#diaryPanel', swap: 'outerHTML', values }).then(() => {
+        const set = (name, value) => { const el = document.querySelector(`#diaryForm [name="${name}"]`); if (el && value) el.value = value; };
+        set('started_at', localInput(l.startedAt));
+        set('ready_at', localInput(this.liveReadyAt()));
+        set('dough_temp', l.doughTemp);
+        this.releaseLock();
+        this.live = null;
+        this.persist();
+        this.activeTab = 'diary';
+      });
+    },
+    clock(ms) { return new Date(ms).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }); },
+    clockDay(ms) {
+      const date = new Date(ms);
+      if (date.toDateString() === new Date().toDateString()) return this.clock(ms);
+      return date.toLocaleString('it-IT', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+    },
+    countdown(ms) {
+      const total = Math.floor(Math.abs(ms) / 1000);
+      const hours = Math.floor(total / 3600);
+      const minutes = Math.floor((total % 3600) / 60);
+      return (hours ? hours + ':' + pad2(minutes) : minutes) + ':' + pad2(total % 60);
+    },
+    duration(ms) {
+      const minutes = Math.round(Math.abs(ms) / 60000);
+      return minutes >= 60 ? Math.floor(minutes / 60) + ' h ' + pad2(minutes % 60) + ' min' : minutes + ' min';
     },
     reindex() {
       const cards = document.querySelectorAll('#phases [data-row]');

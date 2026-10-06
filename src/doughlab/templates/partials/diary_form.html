@@ -1,0 +1,87 @@
+{% set f = diary_form.data %}
+<form class="card diary-form" id="diaryForm" hx-post="{{ '/diario/' ~ diary_form.entry_id if diary_form.entry_id else '/diario' }}" hx-encoding="multipart/form-data">
+  <h2 style="margin-top:0">{{ 'Modifica prova' if diary_form.entry_id else 'Nuova prova' }}</h2>
+  {% if diary_form.error %}<p class="diary-status error" role="alert">{{ diary_form.error }}{% if not diary_form.entry_id %} Se avevi scelto delle foto, selezionale di nuovo.{% endif %}</p>{% endif %}
+  {% if diary_form.plan and diary_form.plan.predicted_ready_at is string %}
+  <p class="hint" style="margin:0 0 .8rem">Collegata a un piano DoughLab: pronto stimato {{ diary_form.plan.predicted_ready_at[:16]|replace('T', ' ') }}. Inserisci gli orari reali per confrontarli con la stima.</p>
+  {% endif %}
+  {% if not diary_form.entry_id and diary_form.plan %}<input type="hidden" name="plan_json" value="{{ diary_form.plan | tojson | forceescape }}">{% endif %}
+
+  <fieldset>
+    <legend>La prova</legend>
+    <div class="diary-grid">
+      <label class="field diary-wide"><span class="lab">Nome *</span><input type="text" name="name" value="{{ f.name }}" maxlength="120" required></label>
+      <label class="field"><span class="lab">Data</span><input type="date" name="date" value="{{ f.date }}" required></label>
+      <label class="field"><span class="lab">Tipo di pizza</span><input type="text" name="pizza_type" value="{{ f.pizza_type }}" maxlength="60"></label>
+      <label class="field"><span class="lab">Voto</span>
+        <select name="rating">
+          <option value="">Nessun voto</option>
+          {% for v in ['0.5', '1', '1.5', '2', '2.5', '3', '3.5', '4', '4.5', '5'] %}<option value="{{ v }}" {% if f.rating == v %}selected{% endif %}>{{ v|replace('.', ',') }} / 5</option>{% endfor %}
+        </select>
+      </label>
+      <label class="field"><span class="lab">Etichette</span><input type="text" name="tags" value="{{ f.tags }}" maxlength="200"></label>
+      <label class="field"><span class="lab">Inizio impasto</span><input type="datetime-local" name="started_at" value="{{ f.started_at }}"></label>
+      <label class="field"><span class="lab">Pronto alle</span><input type="datetime-local" name="ready_at" value="{{ f.ready_at }}"></label>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Impasto</legend>
+    <div class="diary-grid">
+      <label class="field diary-wide"><span class="lab">Farina</span><input type="text" name="flour" value="{{ f.flour }}" maxlength="200"></label>
+      <label class="field"><span class="lab">Forza (W)</span><input type="number" name="flour_w" value="{{ f.flour_w }}" min="0" max="1000" step="any" inputmode="decimal"></label>
+      <label class="field"><span class="lab">Proteine %</span><input type="number" name="protein" value="{{ f.protein }}" min="0" max="100" step="any" inputmode="decimal"></label>
+      <label class="field"><span class="lab">Idratazione %</span><input type="number" name="hydration" value="{{ f.hydration }}" min="0" max="200" step="any" inputmode="decimal"></label>
+      <label class="field"><span class="lab">Prefermento</span><input type="text" name="preferment" value="{{ f.preferment }}" maxlength="60"></label>
+      <label class="field"><span class="lab">N° panetti</span><input type="number" name="dough_ball_count" value="{{ f.dough_ball_count }}" min="0" max="1000" step="1" inputmode="numeric"></label>
+      <label class="field"><span class="lab">Peso panetto (g)</span><input type="number" name="dough_ball_weight" value="{{ f.dough_ball_weight }}" min="0" max="5000" step="any" inputmode="decimal"></label>
+      <label class="field"><span class="lab">Ore in frigo</span><input type="number" name="cold_hours" value="{{ f.cold_hours }}" min="0" max="2000" step="any" inputmode="decimal"></label>
+      <label class="field"><span class="lab">Ore a temp. ambiente</span><input type="number" name="room_hours" value="{{ f.room_hours }}" min="0" max="2000" step="any" inputmode="decimal"></label>
+      <label class="field"><span class="lab">Temp. impasto (°C)</span><input type="number" name="dough_temp" value="{{ f.dough_temp }}" min="-20" max="100" step="any" inputmode="decimal"></label>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Cottura</legend>
+    <div class="diary-grid">
+      <label class="field"><span class="lab">Forno</span><input type="text" name="oven" value="{{ f.oven }}" maxlength="80"></label>
+      <label class="field"><span class="lab">Temperatura (°C)</span><input type="number" name="bake_temp" value="{{ f.bake_temp }}" min="0" max="1000" step="any" inputmode="decimal"></label>
+      <label class="field"><span class="lab">Durata</span><input type="text" name="bake_time" value="{{ f.bake_time }}" maxlength="40"></label>
+      <label class="field diary-wide"><span class="lab">Impostazioni forno</span><input type="text" name="bake_setup" value="{{ f.bake_setup }}" maxlength="200"></label>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Note</legend>
+    <div class="diary-grid">
+      <label class="field diary-wide"><span class="lab">Ingredienti</span><textarea name="ingredients" maxlength="20000">{{ f.ingredients }}</textarea></label>
+      <label class="field diary-wide"><span class="lab">Procedimento</span><textarea name="process" maxlength="20000">{{ f.process }}</textarea></label>
+      <label class="field diary-wide"><span class="lab">Cottura</span><textarea name="bake" maxlength="5000">{{ f.bake }}</textarea></label>
+      <label class="field diary-wide"><span class="lab">Com'è andata</span><textarea name="notes" maxlength="20000">{{ f.notes }}</textarea></label>
+      <label class="field diary-wide"><span class="lab">Da cambiare la prossima volta</span><textarea name="next_changes" maxlength="5000">{{ f.next_changes }}</textarea></label>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Foto</legend>
+    {% set current = {} %}
+    {% for photo in diary_form.photos %}{% set _ = current.update({photo.slot: photo}) %}{% endfor %}
+    <div class="diary-grid">
+      {% for slot, slot_label in diary_slots %}
+      {% set photo = current.get(slot) %}
+      <div class="photo-slot">
+        <span class="lab">{{ slot_label }}</span>
+        <img class="photo-preview" alt="" {% if photo %}src="/diario/foto/{{ photo.id }}?v={{ photo.version }}"{% else %}hidden{% endif %}>
+        <input type="file" name="photo_{{ slot }}" accept="image/jpeg,image/png,image/webp" @change="compressPhotoInput($event.target)" aria-label="Foto {{ slot_label|lower }}">
+        <input type="text" name="label_{{ slot }}" value="{{ photo.label if photo else '' }}" maxlength="120" placeholder="Didascalia" aria-label="Didascalia foto {{ slot_label|lower }}">
+        {% if photo %}<label class="photo-remove"><input type="checkbox" name="remove_{{ slot }}" value="1"> Rimuovi la foto</label>{% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </fieldset>
+
+  <div class="diary-actions">
+    <button type="submit" class="btn">Salva</button>
+    <button type="button" class="btn-ghost" hx-get="/diario">Annulla</button>
+  </div>
+</form>
