@@ -41,7 +41,7 @@ class RecipeVersion(Base):
 
 
 class Bake(Base):
-    """Un'infornata reale, con log timestamp fase per fase."""
+    """Una prova reale: snapshot del piano più l'esito osservato."""
 
     __tablename__ = "bakes"
 
@@ -50,5 +50,5 @@ class Bake(Base):
     started_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     notes: Mapped[str] = mapped_column(Text, default="")
     rating: Mapped[int | None] = mapped_column(default=None)
-    # log fase per fase (nome fase, start, end, temp_amb, temp_impasto, nota, photo_path)
+    # [{"kind": "plan", "snapshot": ...}, {"kind": "observation", "actual_ready_at": ..., "baking": ...}]
     log: Mapped[list[Any]] = mapped_column(JSON, default=list)

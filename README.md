@@ -13,15 +13,27 @@ Laboratorio digitale per impasti pizza/pane. Prevede **quando** l'impasto è dav
 
 ## Indice
 
-1. [Avvio rapido](#avvio-rapido)
-2. [Accesso dal cellulare in LAN](#accesso-dal-cellulare-in-lan)
-3. [Struttura del progetto](#struttura-del-progetto)
-4. [Architettura](#architettura)
-5. [I modelli scientifici](#i-modelli-scientifici)
-6. [Documentazione del codice](#documentazione-del-codice)
-7. [Testing](#testing)
-8. [Convenzioni di sviluppo](#convenzioni-di-sviluppo)
-9. [Roadmap](#roadmap)
+1. [Funzionalità](#funzionalità)
+2. [Avvio rapido](#avvio-rapido)
+3. [Accesso dal cellulare in LAN](#accesso-dal-cellulare-in-lan)
+4. [Struttura del progetto](#struttura-del-progetto)
+5. [Architettura](#architettura)
+6. [I modelli scientifici](#i-modelli-scientifici)
+7. [Documentazione del codice](#documentazione-del-codice)
+8. [Testing](#testing)
+9. [Convenzioni di sviluppo](#convenzioni-di-sviluppo)
+10. [Roadmap](#roadmap)
+
+---
+
+## Funzionalità
+
+- **Formula**: numero e peso dei panetti, idratazione, sale e tipo di lievito (fresco, secco attivo, madre) danno le grammature. Olio, zucchero e prefermento stanno nei parametri avanzati.
+- **Fasi e temperature**: la sequenza di fasi (TA/TC, contenitore) genera la curva termica e la maturità. La **dose di lievito non si inserisce**: è calcolata dal piano.
+- **Ricette base**: 5 preset caricabili con un click, con un orientamento sulla farina.
+- **Suggerimenti di cottura**: in sola lettura, per forno domestico o elettrico con cielo e platea indipendenti. Non influenzano la maturazione.
+- **Registro prove**: ogni prova salva lo snapshot del piano, l'orario in cui l'impasto era davvero pronto, temperatura, voto, note e i parametri di cottura realmente usati; mostra lo scarto rispetto alla stima.
+- **Export `.ics`** per il Calendario, **PWA** installabile e tema chiaro/scuro.
 
 ---
 
@@ -33,6 +45,8 @@ uv run doughlab         # avvia uvicorn con reload su 0.0.0.0:8000
 ```
 
 Poi apri <http://localhost:8000>.
+
+Se compare `Address already in use`, c'è già un'istanza in ascolto sulla porta 8000: riusala oppure fermala (`lsof -i :8000`). Il reload osserva solo `src/doughlab`, non `tests/`.
 
 Comandi utili:
 
@@ -77,18 +91,21 @@ doughlab/
 │   │   ├── presets.py             # ricette predefinite
 │   │   └── scheduler.py           # orchestra tutto in un PlanResult
 │   ├── templates/
-│   │   ├── base.html              # layout Tailwind + HTMX + Chart.js
-│   │   ├── planner.html           # form del pianificatore (HTMX live)
+│   │   ├── base.html              # layout, CSS con variabili, tema chiaro/scuro
+│   │   ├── planner.html           # tab Pianifica + Registro prove (HTMX live, Alpine)
 │   │   └── partials/
-│   │       └── plan_result.html   # fragment ritornato da /plan
+│   │       ├── plan_result.html   # fragment di /plan: ingredienti, riepilogo, grafico, timeline
+│   │       └── bake_history.html  # form del registro prove + cronologia
 │   └── static/
 │       ├── manifest.webmanifest   # PWA
 │       ├── sw.js                  # service worker (shell cache)
 │       └── icons/                 # icone PWA
 └── tests/
     ├── test_thermal.py            # proprietà di Newton
-    ├── test_fermentation.py       # proprietà di Q10
-    └── test_scheduler.py          # end-to-end del piano
+    ├── test_fermentation.py       # proprietà di Q10 e taratura della dose
+    ├── test_ingredients.py        # baker's percentage e prefermento
+    ├── test_scheduler.py          # end-to-end del piano
+    └── test_main.py               # form, template, registro prove, .ics
 ```
 
 ---
@@ -117,7 +134,7 @@ doughlab/
       │
       ▼
 ┌─────────────┐
-│ db.py       │  (futuro: persistenza ricette/bake)
+│ db.py       │  (registro prove; ricette: futuro)
 │ SQLAlchemy  │
 │  async      │
 └─────────────┘
@@ -125,14 +142,15 @@ doughlab/
 
 Flusso di una richiesta `POST /plan`:
 
-1. **main.py** riceve il form, parsa fasi + lievito + T° iniziale.
-2. Costruisce un `PlanInput` e chiama `scheduler.build_plan(...)`.
+1. **main.py** riceve il form e lo normalizza: numeri non finiti o fuori intervallo tornano al default o ai limiti degli input HTML, al massimo 30 fasi.
+2. Costruisce un `PlanInput` con lievito a 0 e chiama `scheduler.build_plan(...)` solo per ottenere la curva termica.
 3. **scheduler.py** converte le fasi in `ThermalSegment` e chiama `thermal.simulate(...)` → `ThermalCurve`.
-4. Passa la curva a `fermentation.simulate(...)` → `FermentationResult` (lavoro cumulato W(t) e maturità %).
-5. Calcola per ogni fase l'intervallo di maturità (`maturity_start_pct` → `maturity_end_pct`).
-6. Rende il template `partials/plan_result.html` con tabella + canvas Chart.js.
+4. `fermentation.suggest_yeast_pct(...)` calcola la dose che porta la maturità al 100% a fine piano, contando solo le fasi fermentanti (`fermentation_activity_mask`).
+5. Con quella dose `build_plan` produce il `PlanResult` definitivo: `fermentation.simulate(...)` → `FermentationResult` (lavoro cumulato W(t) e maturità %) e, per ogni fase, l'intervallo `maturity_start_pct` → `maturity_end_pct`.
+6. `ingredients.compute(...)` ricava le grammature con lo stesso lievito suggerito.
+7. Rende `partials/plan_result.html` (ingredienti, riepilogo, grafico, timeline) e aggiorna con `hx-swap-oob` il pannello del registro prove con lo snapshot del piano.
 
-Il frontend fa partire la richiesta via **HTMX** `hx-post` ad ogni `change` del form (debounce 300 ms), quindi la UI è "live": muovi un valore e il grafico si ricalcola.
+Il frontend invia la richiesta via **HTMX** `hx-post` quando modifichi un campo (`input` dopo 450 ms, `change` dopo 200 ms), quindi la UI è "live". Il cambio del profilo forno non ricalcola: aggiorna solo i suggerimenti di cottura.
 
 ---
 
@@ -186,6 +204,22 @@ Parametri in [services/fermentation.py](src/doughlab/services/fermentation.py):
 
 Fresco e secco attivo sono tarati con un fit su 9 dosi pubblicate da PizzApp, Dough School e when.pizza (room temperature da 2 a 12 h, 16 e 28 °C, programmi con frigo): errore logaritmico medio 0.13 contro 0.68 con i parametri precedenti. Un caso di verifica: 9 h a 22 °C danno 0.115% di secco attivo (PizzApp 0.119%, Dough School 0.096%).
 
+Ancore usate nel fit (dose di riferimento in lievito istantaneo, IDY; il fresco vale 3 × IDY, il secco attivo 1.25 × IDY):
+
+| Scenario | IDY di riferimento | Fonte |
+|---|---|---|
+| 22 °C, 2 h | 0.45% | when.pizza |
+| 22 °C, 8 h | 0.10% | when.pizza |
+| 22 °C, 9 h | 0.095% (0.119% di secco attivo ÷ 1.25) | PizzApp |
+| 22 °C, 12 h | 0.07% | when.pizza |
+| 16 °C, 8 h | 0.20% | when.pizza |
+| 28 °C, 8 h | 0.05% | when.pizza |
+| 2 h a 22 °C + 22 h in frigo (4 °C) | 0.15% | Dough School |
+| 2 h a 22 °C + 46 h in frigo | 0.08% | Dough School |
+| 2 h a 22 °C + 70 h in frigo | 0.05% | Dough School |
+
+Non usati nel fit e controllati dopo: frigo puro 24-72 h (when.pizza) e le dosi a temperatura ambiente di PizzaPlan.
+
 Dalla velocità al **lavoro cumulato** (= maturità):
 
 $$W(t) = \int_0^t k(T(\tau)) \cdot 100 \cdot p_{\text{lievito}} \, d\tau$$
@@ -217,10 +251,10 @@ Carica configurazione da variabili d'ambiente e `.env` tramite `pydantic-setting
 | Setting | Default | Note |
 |---|---|---|
 | `app_name` | `"DoughLab"` | mostrato nei template |
-| `debug` | `True` | flag generico |
+| `debug` | `True` | flag generico (non ancora usato) |
 | `db_url` | `sqlite+aiosqlite:///data/doughlab.db` | async |
-| `default_ambient_c` | `22.0` | fallback form |
-| `default_fridge_c` | `4.0` | fallback form |
+| `default_ambient_c` | `22.0` | previsto come fallback del form (non ancora usato) |
+| `default_fridge_c` | `4.0` | previsto come fallback del form (non ancora usato) |
 
 Crea `data/` automaticamente al primo import.
 
@@ -240,9 +274,9 @@ Tre modelli ORM:
 
 - **`Recipe`**: metadati della ricetta (nome, stile, note).
 - **`RecipeVersion`**: ogni modifica è una nuova riga → **ricettario versionato**. Payload JSON contiene fasi/ingredienti/parametri, utile come MVP prima di normalizzare lo schema.
-- **`Bake`**: una infornata reale, con `log` JSON di eventi (fase, start, end, T° ambiente, foto, nota) + rating 1-5.
+- **`Bake`**: una prova reale, usata dal registro prove (`POST /bakes`). Ha `notes` e `rating` 1-5; `log` è una lista JSON con una voce `plan` (snapshot del piano, inclusi i suggerimenti di cottura) e una voce `observation` (orario di maturità reale, T° impasto, parametri di cottura effettivi).
 
-> I modelli esistono ma non sono ancora esposti via API. Lo faremo nella fase 2 (persistenza ricette).
+> Solo `Bake` è esposto, tramite il registro prove. `Recipe` e `RecipeVersion` esistono ma non sono ancora usati: arriveranno con la persistenza ricette (fase 2).
 
 ### [services/thermal.py](src/doughlab/services/thermal.py)
 
@@ -252,7 +286,7 @@ Tre modelli ORM:
 | `Environment` | `StrEnum` | profili di ambiente |
 | `CONTAINER_LABELS`, `ENVIRONMENT_LABELS` | `dict[Enum, str]` | etichette italiane per la UI |
 | `TAU_TABLE` | `dict[(Container, Environment), float]` | τ (ore) per ogni combinazione |
-| `tau_for(container, env)` | funzione | lookup di τ con fallback |
+| `tau_for(container, env)` | funzione | lookup di τ in `TAU_TABLE` |
 | `ThermalSegment` | `dataclass` | `(hours, ambient_c, container, environment, tau_override)` |
 | `ThermalCurve` | `dataclass` | `(time_h, temp_c, ambient_c, segment_index)` tutti `np.ndarray` |
 | `simulate(segments, initial_c, step_h=0.1)` | funzione | integra Newton segmento per segmento, step temporale configurabile |
@@ -268,8 +302,8 @@ Tre modelli ORM:
 | `YEAST_PARAMS` | `dict[YeastKind, YeastParams]` | parametri default (tabella sopra) |
 | `rate(temp_c, kind)` | funzione | $k(T)$ pointwise (anche su `np.ndarray`) |
 | `FermentationResult` | `dataclass` | `(time_h, rate, cumulative, maturity_pct, ready_at_h, final_pct)` |
-| `simulate(curve, kind, yeast_pct, target_work)` | funzione | integra W(t), interpola `ready_at_h` quando W=target |
-| `suggest_yeast_pct(curve, kind, target_work)` | funzione | % di lievito che fa W_final = target |
+| `simulate(curve, kind, yeast_pct, target_work, active_mask=None)` | funzione | integra W(t), interpola `ready_at_h` quando W=target; `active_mask` esclude gli intervalli non fermentanti |
+| `suggest_yeast_pct(curve, kind, target_work, active_mask=None)` | funzione | % di lievito che fa W_final = target |
 
 ### [services/ingredients.py](src/doughlab/services/ingredients.py)
 
@@ -280,8 +314,8 @@ Calcolo grammature con il sistema **baker's percentage**: tutto è relativo al 1
 | `RecipeStyle` | `StrEnum` | 7 stili (napoletana, teglia, pala, pinsa, romana, pane, panettone) |
 | `STYLE_LABELS` | `dict[RecipeStyle, str]` | etichette italiane |
 | `RecipeIngredients` | `dataclass` | input: `panetto_g`, `n_panetti`, %idratazione, %sale, %lievito, %olio, %zucchero, %prefermento, %idratazione prefermento |
-| `IngredientWeights` | `dataclass` | output: grammi di farina/acqua/sale/lievito/olio/zucchero + quota prefermento vs rinfresco |
-| `compute(ri)` | funzione | risolve `farina * (1 + idratazione + sale + ...) = peso_totale` e distribuisce |
+| `IngredientWeights` | `dataclass` | output: grammi di farina/acqua/sale/lievito/olio/zucchero + ripartizione tra prefermento e impasto finale |
+| `compute(ri)` | funzione | risolve `farina * (1 + idratazione + sale + ...) = peso_totale` e distribuisce; l'acqua del prefermento non supera quella totale |
 
 La logica: dato peso_panetto×n_panetti = peso_totale, si imposta `denominatore = 1 + sum(percentuali)` e si ricava `farina = peso_totale / denominatore`. Da lì tutte le grammature sono `farina × percentuale`.
 
@@ -314,6 +348,7 @@ Il "direttore d'orchestra". Converte una lista di fasi in un `PlanResult` comple
 | `PhaseKind` | `StrEnum` | 10 fasi (preferment, autolyse, mix, bulk, maturation, temper, shape, proof, open, bake) |
 | `PHASE_LABELS` | `dict[PhaseKind, str]` | etichette italiane |
 | `FERMENTING_PHASES` | `set[PhaseKind]` | fasi la cui durata contribuisce all'attività del lievito; esclude autolisi e cottura |
+| `fermentation_activity_mask(thermal, phases)` | funzione | maschera booleana per intervallo di tempo: `True` dove la fase è fermentante |
 | `PlanPhase` | `dataclass` | input: `(kind, label, hours, ambient_c, container, environment)` |
 | `PlanInput` | `dataclass` | wrapper: `(start_at, initial_dough_c, phases, yeast_kind, yeast_pct, target_work)` |
 | `PhaseResult` | `dataclass` | output per fase: `(phase, start_at, end_at, maturity_start_pct, maturity_end_pct)` |
@@ -330,28 +365,32 @@ L'app FastAPI. Route attuali:
 | `GET` | `/?preset=<key>&yeast=<kind>&oven=<profile>` | carica preset mantenendo lievito e profilo forno |
 | `POST` | `/plan` | ritorna il **fragment HTML** `plan_result.html` (HTMX swap) |
 | `POST` | `/bakes` | salva nel database una prova reale e restituisce lo scarto dalla maturità prevista |
-| `POST` | `/plan.ics` | ritorna il piano come file `.ics` da aprire in Calendario |
+| `POST` | `/plan.ics` | ritorna il piano come file `.ics` da aprire in Calendario (orari in ora locale del server) |
 | `GET` | `/static/*` | asset statici (PWA, icone, SW) |
 
 Helper interni:
 - `_common_ctx()` → dropdown e metadati sempre serviti al template
-- `_parse_phase_form(data)` → legge campi index-based `phase_kind_0`, `phase_hours_0`, ...
-- `_parse_ingredients(data)` → estrae grammature e percentuali dal form
+- `_number(data, key, default, low, high)` → numero finito dentro i limiti, altrimenti il default (nessun `inf`/`NaN` arriva ai servizi)
+- `_parse_phase_form(data)` → legge campi index-based `phase_kind_0`, `phase_hours_0`, ... (max 30 fasi, durata ≤ 720 h)
+- `_parse_ingredients(data)` → estrae grammature e percentuali dal form, con gli stessi limiti degli input HTML
+- `_baking_advice(preset, oven_profile)` → suggerimento di cottura per il profilo `home` o `split`
 - `_default_recipe_ctx()` / `_preset_ctx(key)` → struttura dati per il template
-- `_compute_plan_and_ingredients(data)` → pacchetto unificato per `/plan` e `/plan.ics`
+- `_compute_plan_and_ingredients(data)` → pacchetto unificato per `/plan` e `/plan.ics`; lo snapshot contiene i suggerimenti di entrambi i profili forno (`baking_options`)
+- `_make_bake_record(data)` / `_bake_history_item(record)` / `_recent_bakes()` → salvataggio e lettura del registro prove
 
 ### [templates/](src/doughlab/templates/)
 
-- **`base.html`**: layout minimale con variabili CSS semantiche (`--bg`, `--surface`, `--ac`…), dark mode automatica (preferenza di sistema) + toggle manuale persistente in `localStorage`. Alpine.js + HTMX + Chart.js caricati da CDN. Niente Node, niente build step.
+- **`base.html`**: layout minimale con variabili CSS semantiche (`--bg`, `--surface`, `--ac`…), dark mode automatica (preferenza di sistema) + toggle manuale persistente in `localStorage`. Alpine.js + HTMX + Chart.js caricati da CDN. Niente Node, niente build step. Il testo secondario (`--mut`) rispetta il contrasto AA in entrambi i temi.
 - **`planner.html`**: una tab bar nella stessa pagina separa **Pianifica** da **Registro prove**. La scheda Piano contiene input base, ricetta, fasi e suggerimenti di cottura in sola lettura, selezionabili per forno domestico o elettrico con cielo e platea. I parametri reali si annotano nel Registro e non influenzano la maturazione.
-- **`partials/plan_result.html`**: HTMX aggiorna ingredienti e riepilogo in `#result`, grafico e timeline in `#detailsResult`, e lo snapshot nel tab nascosto `#bakeHistory` con `hx-swap-oob`. Il tab Registro può quindi essere aperto senza ricalcolare o perdere il piano. Le prove sono salvate in `Bake.log` con snapshot, esito reale e parametri di cottura usati; l'asse X è il tempo trascorso in ore.
+- **`partials/plan_result.html`**: HTMX aggiorna ingredienti e riepilogo in `#result`, grafico e timeline in `#detailsResult`, e lo snapshot nel tab nascosto `#bakeHistory` con `hx-swap-oob`. Il tab Registro può quindi essere aperto senza ricalcolare o perdere il piano. Il grafico ha altezza responsive fissa (`.chart-wrap`), nasconde i titoli degli assi sotto i 560 px, legge i colori dalle variabili CSS e si ridisegna al cambio tema; l'asse X è il tempo trascorso in ore.
+- **`partials/bake_history.html`**: form del registro prove (orario reale di maturità, T° impasto, voto, note, parametri di cottura usati) e cronologia con lo scarto dalla stima. Il tipo di forno segue la scelta del planner e i valori consigliati compaiono come placeholder; le prove sono salvate in `Bake.log`.
 
 Nota UX: nel form le percentuali sono inserite in formato umano (`62`, `2.8`) e convertite server-side in frazioni per i calcoli. I decimali si possono digitare liberamente. Il lievito non è un input: la percentuale suggerita dall'app determina anche i grammi mostrati. Giorni e mesi nel risultato sono localizzati in italiano.
 
 ### [static/](src/doughlab/static/)
 
 - **`manifest.webmanifest`**: nome, colori, icone 192/512 → "installabile" come PWA.
-- **`sw.js`**: service worker minimale, cache-first per asset statici, network-first per il resto. Permette di aprire l'app con l'ultima pagina vista anche offline.
+- **`sw.js`**: service worker minimale, cache-first per asset statici, network-first per il resto. Salva l'ultima pagina vista, ma Alpine.js, HTMX e Chart.js arrivano da CDN e non sono nella cache: **offline la pagina si apre ma non è interattiva** finché non verranno serviti da `static/`.
 - **`icons/*.png`**: placeholder generati con Python puro (zlib). Da sostituire con grafica vera.
 
 ---
@@ -378,6 +417,7 @@ Nota UX: nel form le percentuali sono inserite in formato umano (`62`, `2.8`) e 
 | `test_rate_at_t_ref_equals_k_ref` | $k(T_{\text{ref}}) = k_{\text{ref}}$ |
 | `test_q10_doubles_every_10c` | $k(T+10)/k(T) = Q_{10}$ |
 | `test_dry_is_stronger_than_fresh` | k_ref secco > fresco |
+| `test_room_temperature_dose_matches_independent_calculators` | 9 h a 22 °C: secco attivo tra 0.09% e 0.13% (PizzApp 0.119%, Dough School 0.096%) e fresco = 2.4 × secco |
 | `test_fermentation_monotone` | W(t) sempre crescente |
 | `test_suggested_pct_hits_target` | con la % suggerita, maturità finale ≈ 100% |
 
@@ -436,7 +476,7 @@ Nota UX: nel form le percentuali sono inserite in formato umano (`62`, `2.8`) e 
 - **Import style**: ordinati da ruff (regola `I`); si importa SEMPRE con nomi relativi dentro `doughlab/`.
 - **Dataclass vs Pydantic**: Pydantic solo ai confini (settings, schema API). Dentro i servizi, `dataclass` semplici per minimo overhead.
 - **Numpy ovunque**: le curve termiche/fermentazione viaggiano come `np.ndarray`. Nel template, `.tolist()` per Chart.js.
-- **Nessun bundler**: HTMX+Tailwind da CDN. Niente Node, niente webpack, niente step di build.
+- **Nessun bundler**: HTMX, Alpine.js e Chart.js da CDN, CSS scritto a mano con variabili. Niente Node, niente webpack, niente step di build.
 - **Niente lazy-load SQLAlchemy in async**: `expire_on_commit=False`.
 - **Documentazione**: questo README va tenuto aggiornato ad ogni cambio di API o aggiunta di modulo. Niente file `.md` paralleli per feature singole.
 
@@ -446,20 +486,24 @@ Nota UX: nel form le percentuali sono inserite in formato umano (`62`, `2.8`) e 
 
 ### ✅ MVP (fatto)
 - Modello termico Newton con profili contenitore/ambiente
-- Modello fermentazione Q10 (fresco/secco/LM)
+- Modello fermentazione Q10 (fresco/secco attivo/LM), tarato sulle dosi di calcolatori di riferimento
 - Calcolatore grammature baker's percentage (con prefermento)
 - 5 preset ricette (napoletana / napoletana frigo / teglia / pinsa / pane biga)
 - Pianificatore HTMX con grafico Chart.js
+- Suggerimenti di cottura per forno domestico o elettrico cielo/platea
+- Registro prove: esito reale, voto, note e parametri di cottura, con scarto dalla stima
 - Export `.ics` per Calendario iOS
 - PWA installabile
-- UI con palette rivista + dark mode (auto + toggle)
+- UI con palette rivista + dark mode (auto + toggle), verificata da 320 px a desktop
+- Input del form validati lato server
 - 53 test unitari verdi
 
 ### 🔜 Fase 2 — Il tool completo per il pizzaiolo
 - Persistenza ricette con versioning (ORM già pronto)
 - UI load/save/elenco ricette (unificare con preset bar)
 - **Live Bake mode**: timer mobile per fase corrente + checkpoint
-- Diario infornate con upload foto e rating
+- Diario infornate: upload foto e storico per ricetta (il registro prove base è già disponibile)
+- Librerie JS in `static/` per far funzionare davvero l'app offline
 
 ### 🔮 Fase 3 — Analisi
 - Analisi alveolatura via OpenCV (contorni bolle, uniformità, densità)
