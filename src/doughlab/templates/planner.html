@@ -2,9 +2,13 @@
 {% block content %}
 <div class="space-y" x-data="plannerUI('{{ recipe.oven_profile }}')">
   <header class="page-heading">
-    <div>
+    <div x-show="activeTab === 'planner'">
       <h1>Pianifica un impasto</h1>
       <p>La formula definisce le grammature; tempi e temperature definiscono il piano e la stima del lievito.</p>
+    </div>
+    <div x-show="activeTab === 'registry'" x-cloak>
+      <h1>Registro prove</h1>
+      <p>Confronta l'orario in cui l'impasto era pronto con la stima salvata dal piano.</p>
     </div>
   </header>
 
@@ -265,12 +269,6 @@
   </section>
 
   <section id="panel-registry" class="workspace-panel space-y" role="tabpanel" aria-labelledby="tab-registry" x-show="activeTab === 'registry'" x-cloak>
-    <header class="section-heading">
-      <div>
-        <h2>Registro prove</h2>
-        <p>Confronta l'orario in cui l'impasto era pronto con la stima salvata dal piano.</p>
-      </div>
-    </header>
     {% set bake_history = bake_history|default([]) %}
     {% set bake_snapshot = none %}
     {% set bake_saved = false %}
