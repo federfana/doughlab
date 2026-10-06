@@ -29,6 +29,7 @@ def run_with_db(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, check: Check) -
         sessions = async_sessionmaker(engine, expire_on_commit=False)
         monkeypatch.setattr("doughlab.diary.SessionLocal", sessions)
         monkeypatch.setattr("doughlab.recipes.SessionLocal", sessions)
+        monkeypatch.setattr("doughlab.flours.SessionLocal", sessions)
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             await check(client, sessions)
         await engine.dispose()

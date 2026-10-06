@@ -1,0 +1,72 @@
+{# Pannello "Le mie farine": fuori dal form del piano, sostituito da HTMX come blocco unico. #}
+{% set flours_total = flours_total|default(0) %}
+<div id="floursPanel" class="space-y" hx-target="#floursPanel" hx-swap="outerHTML">
+  {% if flours_message %}<p class="diary-status" role="status">{{ flours_message }}</p>{% endif %}
+
+  <div class="flour-toolbar">
+    <button type="button" class="btn" hx-get="/farine/nuova">Nuova farina</button>
+    <button type="button" class="btn-ghost" hx-post="/farine/ripristina" title="Aggiunge le farine predefinite mancanti, senza toccare le tue">Ripristina predefinite</button>
+    <input type="search" name="q" value="{{ flours_query|default('') }}" placeholder="Cerca farina o produttore..." aria-label="Cerca tra le farine" hx-get="/farine" hx-trigger="input changed delay:300ms, search" hx-target="#floursList" hx-select="#floursList" hx-swap="outerHTML">
+  </div>
+
+  {% if flours_form %}
+  <form class="flour-form" hx-post="{{ '/farine/' ~ flours_form.flour_id if flours_form.flour_id else '/farine' }}">
+    <h3 style="margin:0">{{ 'Modifica farina' if flours_form.flour_id else 'Nuova farina' }}</h3>
+    {% if flours_form.error %}<p class="diary-status error" role="alert">{{ flours_form.error }}</p>{% endif %}
+    {% set f = flours_form.data %}
+    <div class="diary-grid">
+      <label class="field"><span class="lab">Produttore</span><input type="text" name="brand" value="{{ f.brand }}" maxlength="80" list="flourBrands"></label>
+      <label class="field"><span class="lab">Nome *</span><input type="text" name="name" value="{{ f.name }}" maxlength="80" required></label>
+      <label class="field"><span class="lab">Tipo</span><input type="text" name="kind" value="{{ f.kind }}" maxlength="60" placeholder="00, 0, 1, integrale..."></label>
+      <label class="field"><span class="lab">Impasto</span>
+        <select name="method">
+          {% for value, label in [('', 'Non indicato'), ('entrambi', 'Diretto o indiretto'), ('diretto', 'Solo diretto'), ('indiretto', 'Solo indiretto')] %}<option value="{{ value }}" {% if f.method == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select>
+      </label>
+      <label class="field"><span class="lab">Forza (W)</span><input type="number" name="w" value="{{ f.w }}" min="0" max="1000" step="any" inputmode="decimal"></label>
+      <label class="field"><span class="lab">P/L</span><input type="number" name="pl" value="{{ f.pl }}" min="0" max="10" step="any" inputmode="decimal"></label>
+      <label class="field"><span class="lab">Proteine %</span><input type="number" name="protein" value="{{ f.protein }}" min="0" max="30" step="any" inputmode="decimal"></label>
+      <label class="field"><span class="lab">Idratazione min %</span><input type="number" name="hydration_min" value="{{ f.hydration_min }}" min="30" max="200" step="any" inputmode="decimal"></label>
+      <label class="field"><span class="lab">Idratazione max %</span><input type="number" name="hydration_max" value="{{ f.hydration_max }}" min="30" max="200" step="any" inputmode="decimal"></label>
+      <label class="field diary-wide"><span class="lab">Uso consigliato</span><input type="text" name="use" value="{{ f.use }}" maxlength="200"></label>
+      <label class="field diary-wide"><span class="lab">Nota sull'impasto (parole del produttore)</span><input type="text" name="method_note" value="{{ f.method_note }}" maxlength="200" placeholder="Es. diretto o indiretto con biga"></label>
+      <label class="field diary-wide"><span class="lab">Note</span><textarea name="notes" maxlength="4000" rows="2">{{ f.notes }}</textarea></label>
+    </div>
+    <datalist id="flourBrands">{% for brand in flours_brands|default([]) %}<option value="{{ brand }}">{% endfor %}</datalist>
+    <p class="hint">Senza i due estremi dell'idratazione la stimo dalla forza W.</p>
+    <div class="diary-actions">
+      <button type="submit" class="btn">Salva</button>
+      <button type="button" class="btn-ghost" hx-get="/farine">Annulla</button>
+    </div>
+  </form>
+  {% endif %}
+
+  <div id="floursList">
+    {% for brand, items in flours_groups|default([]) %}
+    <details class="flour-group" {% if flours_query %}open{% endif %}>
+      <summary>{{ brand }} <span class="hint">({{ items|length }})</span></summary>
+      <ul class="recipe-list">
+        {% for flour in items %}
+        <li class="recipe-item">
+          <div class="recipe-head"><strong>{{ flour.name }}</strong><span class="hint">{{ flour.kind }}</span></div>
+          <p class="flour-numbers">{{ flour.numbers }}</p>
+          {% if flour.hydration %}<p class="flour-numbers">Idratazione consigliata: {{ flour.hydration }}</p>{% endif %}
+          {% if flour.method or flour.method_note %}<p class="flour-numbers">Impasto: {% if flour.method %}{{ flour.method }}{% endif %}{% if flour.method_note %} <span class="hint">«{{ flour.method_note }}»</span>{% endif %}</p>{% endif %}
+          {% if flour.use %}<p class="hint" style="margin:.2rem 0 0">{{ flour.use }}</p>{% endif %}
+          {% if flour.notes %}<p class="hint" style="margin:.2rem 0 0">{{ flour.notes }}</p>{% endif %}
+          <div class="diary-actions" style="margin-top:.4rem">
+            <button type="button" class="btn-ghost" hx-get="/farine/{{ flour.id }}/modifica">Modifica</button>
+            <button type="button" class="btn-ghost" hx-post="/farine/{{ flour.id }}/elimina" hx-confirm="Eliminare «{{ flour.name }}»? Le ricette e le prove già salvate restano.">Elimina</button>
+            {% if flour.source_url %}<a class="btn-ghost" href="{{ flour.source_url }}" target="_blank" rel="noopener noreferrer">Scheda del produttore</a>{% endif %}
+          </div>
+        </li>
+        {% endfor %}
+      </ul>
+    </details>
+    {% else %}
+    <p class="hint">{{ 'Nessuna farina corrisponde alla ricerca.' if flours_query else 'Nessuna farina: aggiungine una o ripristina le predefinite.' }}</p>
+    {% endfor %}
+  </div>
+  <p class="hint">Dati dichiarati dai produttori (ottobre 2026): variano da partita a partita, fa fede l'etichetta del sacco.</p>
+  {% if flours_oob %}<select id="flourOptionsSource" hx-swap-oob="true" hidden aria-hidden="true" tabindex="-1">{% include "partials/flour_optgroups.html" %}</select>{% endif %}
+</div>

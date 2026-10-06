@@ -56,6 +56,33 @@ class RecipeVersion(Base):
     recipe: Mapped[Recipe] = relationship(back_populates="versions")
 
 
+class Flour(Base):
+    """Una farina con i dati tecnici dichiarati dal produttore (o inseriti a mano dall'etichetta)."""
+
+    __tablename__ = "flours"
+    __table_args__ = (UniqueConstraint("brand", "name"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    brand: Mapped[str] = mapped_column(String(80), default="")
+    name: Mapped[str] = mapped_column(String(80))
+    kind: Mapped[str] = mapped_column(String(60), default="")
+    w: Mapped[float | None] = mapped_column(Float, default=None)
+    pl: Mapped[float | None] = mapped_column(Float, default=None)
+    protein: Mapped[float | None] = mapped_column(Float, default=None)
+    hydration_min: Mapped[float | None] = mapped_column(Float, default=None)
+    hydration_max: Mapped[float | None] = mapped_column(Float, default=None)
+    # Le parole del produttore ("oltre il 65%"), quando i due estremi sono un'interpretazione.
+    hydration_note: Mapped[str] = mapped_column(String(200), default="")
+    # "diretto", "indiretto", "entrambi" o vuoto; la nota riporta le parole del produttore.
+    method: Mapped[str] = mapped_column(String(12), default="")
+    method_note: Mapped[str] = mapped_column(String(200), default="")
+    use: Mapped[str] = mapped_column(String(200), default="")
+    notes: Mapped[str] = mapped_column(Text, default="")
+    source_url: Mapped[str] = mapped_column(String(300), default="")
+    builtin: Mapped[bool] = mapped_column(default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
 class DiaryEntry(Base):
     """Una voce del diario: una prova reale, con foto, note e (se c'è) il piano da cui nasce."""
 

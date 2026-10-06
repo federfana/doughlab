@@ -14,12 +14,17 @@
       <h1>Diario</h1>
       <p>Le tue prove con foto, note e orari reali. Importa il backup o esporta tutto in JSON.</p>
     </div>
+    <div x-show="activeTab === 'flours'" x-cloak>
+      <h1>Farine</h1>
+      <p>W, P/L, proteine e idratazione consigliata dichiarati dai produttori, più le tue farine. Le scegli nel piano, nella sezione Farina.</p>
+    </div>
   </header>
 
   <div class="workspace-tabs" role="tablist" aria-label="Aree DoughLab">
     <button id="tab-planner" class="workspace-tab" type="button" role="tab" aria-controls="panel-planner" :aria-selected="activeTab === 'planner'" :tabindex="activeTab === 'planner' ? 0 : -1" x-ref="plannerTab" @click="focusTab('planner')" @keydown.right.prevent="focusTab('live')">Pianifica</button>
     <button id="tab-live" class="workspace-tab" type="button" role="tab" aria-controls="panel-live" :aria-selected="activeTab === 'live'" :tabindex="activeTab === 'live' ? 0 : -1" x-ref="liveTab" @click="focusTab('live')" @keydown.left.prevent="focusTab('planner')" @keydown.right.prevent="focusTab('diary')">In corso<span class="live-dot" x-show="live && !liveDone()" x-cloak role="img" aria-label="impasto in corso"></span></button>
-    <button id="tab-diary" class="workspace-tab" type="button" role="tab" aria-controls="panel-diary" :aria-selected="activeTab === 'diary'" :tabindex="activeTab === 'diary' ? 0 : -1" x-ref="diaryTab" @click="focusTab('diary')" @keydown.left.prevent="focusTab('live')">Diario</button>
+    <button id="tab-diary" class="workspace-tab" type="button" role="tab" aria-controls="panel-diary" :aria-selected="activeTab === 'diary'" :tabindex="activeTab === 'diary' ? 0 : -1" x-ref="diaryTab" @click="focusTab('diary')" @keydown.left.prevent="focusTab('live')" @keydown.right.prevent="focusTab('flours')">Diario</button>
+    <button id="tab-flours" class="workspace-tab" type="button" role="tab" aria-controls="panel-flours" :aria-selected="activeTab === 'flours'" :tabindex="activeTab === 'flours' ? 0 : -1" x-ref="floursTab" @click="focusTab('flours')" @keydown.left.prevent="focusTab('diary')">Farine</button>
   </div>
 
   <section id="panel-planner" class="workspace-panel space-y" role="tabpanel" aria-labelledby="tab-planner" x-show="activeTab === 'planner'" x-cloak>
@@ -132,6 +137,29 @@
         <p class="hint">Regola pratica: lato × lato ÷ 2 = grammi di impasto per la teglia (30 × 40 cm ≈ 600 g, 40 × 40 cm ≈ 800 g).</p>
       </div>
       {% endif %}
+    </section>
+
+    {# Farina o miscela: W, proteine e idratazione consigliata nel risultato #}
+    <section class="card" style="padding: 1rem">
+      <div class="lab-row">Farina</div>
+      {% set flour_rows = recipe.flour_rows|default([]) %}
+      <div class="flour-rows">
+        {% for i in range(3) %}
+        {% set row = flour_rows[i] if i < flour_rows|length else none %}
+        <div class="flour-row">
+          <select name="flour_id_{{ i }}" aria-label="Farina {{ loop.index }}">
+            <option value="">{{ 'Nessuna farina scelta' if i == 0 else 'Aggiungi un\'altra farina' }}</option>
+            {% for brand, group in flours_options|default([])|groupby('brand') %}
+            <optgroup label="{{ brand }}">{% for o in group %}<option value="{{ o.id }}" {% if row and row[0] == o.id %}selected{% endif %}>{{ o.label }}</option>{% endfor %}</optgroup>
+            {% endfor %}
+          </select>
+          <input type="number" name="flour_pct_{{ i }}" value="{{ ('%g'|format(row[1])) if row else (100 if i == 0 else '') }}" min="0" max="100" step="any" inputmode="decimal" aria-label="Percentuale della farina {{ loop.index }}"><span>%</span>
+        </div>
+        {% endfor %}
+      </div>
+      {# Copia delle opzioni: il tab Farine la aggiorna e gli elenchi sopra si rigenerano senza perdere la scelta. #}
+      <select id="flourOptionsSource" hidden aria-hidden="true" tabindex="-1">{% include "partials/flour_optgroups.html" %}</select>
+      <p class="hint" style="margin:.5rem 0 0">Scegli una farina o una miscela (fino a 3, percentuali sul totale della farina): il piano calcola W, proteine e idratazione consigliata. Le farine si gestiscono nel tab «Farine».</p>
     </section>
 
     {# Partenza #}
@@ -365,6 +393,10 @@
 
   <section id="panel-diary" class="workspace-panel space-y" role="tabpanel" aria-labelledby="tab-diary" x-show="activeTab === 'diary'" x-cloak>
     {% include "partials/diary_panel.html" %}
+  </section>
+
+  <section id="panel-flours" class="workspace-panel space-y" role="tabpanel" aria-labelledby="tab-flours" x-show="activeTab === 'flours'" x-cloak>
+    {% include "partials/flours_panel.html" %}
   </section>
 </div>
 
@@ -698,6 +730,11 @@ function plannerUI(initialOvenProfile) {
       if (oven) params.set('oven', oven);
       window.location.href = '/?' + params.toString();
     },
+    useHydration(value) {
+      const input = document.querySelector('#planForm [name="hydration_pct"]');
+      input.value = String(value);
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    },
     useTray(grams) {
       const input = document.querySelector('#planForm [name="panetto_g"]');
       input.value = String(Math.min(2000, Math.max(30, grams)));
@@ -718,5 +755,18 @@ function plannerUI(initialOvenProfile) {
   };
 }
 window.addEventListener('load', () => document.getElementById('planForm').requestSubmit());
+
+// Dopo una modifica nel tab Farine rigenera gli elenchi del piano, tenendo la scelta se esiste ancora.
+document.body.addEventListener('htmx:oobAfterSwap', event => {
+  if (event.detail.target?.id !== 'flourOptionsSource') return;
+  const source = document.getElementById('flourOptionsSource');
+  document.querySelectorAll('#planForm select[name^="flour_id_"]').forEach(select => {
+    const previous = select.value;
+    select.querySelectorAll('optgroup').forEach(group => group.remove());
+    select.append(...[...source.children].map(group => group.cloneNode(true)));
+    select.value = previous;
+    if (select.value !== previous) select.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+});
 </script>
 {% endblock %}

@@ -13,6 +13,7 @@ from .db import SessionLocal
 from .models import DiaryEntry, Recipe, RecipeVersion
 from .planning import default_recipe_ctx, number, parse_ingredients, parse_phase_form, preset_ctx
 from .services.fermentation import DEFAULT_TARGET_WORK, YeastKind
+from .services.flour_blend import parse_rows
 from .services.ingredients import STYLE_LABELS, RecipeIngredients, RecipeStyle
 from .services.presets import PRESETS_BY_KEY
 from .services.thermal import parse_container, parse_environment
@@ -60,6 +61,7 @@ def payload_from_form(data: dict[str, str]) -> dict[str, Any]:
             }
             for phase in parse_phase_form(data)
         ],
+        "flours": [{"id": flour_id, "pct": pct} for flour_id, pct in parse_rows(data)],
     }
 
 
@@ -90,6 +92,11 @@ def _recipe_ctx(recipe: Recipe, version: RecipeVersion) -> dict[str, Any] | None
         return None
     if not phases:
         return None
+    base["flour_rows"] = [
+        (item["id"], float(item["pct"]))
+        for item in payload.get("flours", [])
+        if isinstance(item, dict) and isinstance(item.get("id"), int) and isinstance(item.get("pct"), (int, float))
+    ][:3]
     return base
 
 

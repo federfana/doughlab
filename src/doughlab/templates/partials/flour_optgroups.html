@@ -1,0 +1,1 @@
+{% for brand, group in flours_options|default([])|groupby('brand') %}<optgroup label="{{ brand }}">{% for o in group %}<option value="{{ o.id }}">{{ o.label }}</option>{% endfor %}</optgroup>{% endfor %}

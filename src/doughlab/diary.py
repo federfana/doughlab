@@ -140,6 +140,10 @@ def form_from_plan(snapshot: dict[str, Any]) -> dict[str, Any]:
 
     values["name"] = clean_text(snapshot.get("recipe_name"), 120)
     values["pizza_type"] = preset.label[:60] if preset else ""
+    if snapshot.get("flour_label"):
+        values["flour"] = clean_text(snapshot["flour_label"], TEXT_COLUMNS["flour"])
+        values["flour_w"] = format_number(snapshot.get("flour_w"))
+        values["protein"] = format_number(snapshot.get("flour_protein"))
     if started:
         values["date"] = started.date().isoformat()
         values["started_at"] = started.strftime(DATETIME_LOCAL)
