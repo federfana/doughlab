@@ -165,7 +165,7 @@ def parse_backup(raw: bytes | str) -> ParseResult:
         raise ValueError("Il file non è un JSON valido") from error
     entries = payload.get("entries") if isinstance(payload, dict) else payload
     if not isinstance(entries, list):
-        raise ValueError("Non trovo l'elenco `entries`: non sembra un backup di Pizza Lab")
+        raise ValueError("Non trovo l'elenco `entries`: non sembra un backup")
 
     result = ParseResult()
     for index, item in enumerate(entries[:MAX_ENTRIES], start=1):

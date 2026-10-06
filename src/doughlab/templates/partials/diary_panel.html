@@ -26,7 +26,7 @@
   {% if diary_form %}{% include "partials/diary_form.html" %}{% endif %}
 
   <details class="card diary-import">
-    <summary>Importa un backup di Pizza Lab (o di DoughLab)</summary>
+    <summary>Importa un backup</summary>
     <form hx-post="/diario/importa" hx-encoding="multipart/form-data" class="space-y" style="margin-top:.7rem">
       <p class="hint">Scegli il file JSON esportato dall'app. Le prove già presenti non vengono duplicate: si aggiornano solo se nel file sono più recenti.</p>
       <input type="file" name="file" accept=".json,application/json" required>
