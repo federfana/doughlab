@@ -4,7 +4,7 @@ from __future__ import annotations
 import math
 from contextlib import suppress
 from dataclasses import asdict
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any
 
 from .services.fermentation import (
@@ -101,8 +101,7 @@ def baking_advice(preset: Preset, oven_profile: str) -> dict[str, Any]:
 
 def default_recipe_ctx() -> dict[str, Any]:
     """Dati per prima apertura: usa il primo preset come default."""
-    now = datetime.now().replace(minute=0, second=0, microsecond=0)
-    start_default = (now + timedelta(days=1)).strftime("%Y-%m-%dT%H:%M")
+    start_default = datetime.now().replace(second=0, microsecond=0).strftime("%Y-%m-%dT%H:%M")
     p = PRESETS[0]
     return {
         "start_at": start_default,

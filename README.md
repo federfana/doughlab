@@ -32,7 +32,7 @@ Laboratorio digitale per impasti pizza/pane. Prevede **quando** l'impasto è dav
 - **Fasi e temperature**: la sequenza di fasi (TA/TC, contenitore) genera la curva termica e la maturità. La **dose di lievito non si inserisce**: è calcolata dal piano.
 - **Ricette base**: 5 preset caricabili con un click, con un orientamento sulla farina. Per la teglia c'è un piccolo calcolatore: *lato × lato ÷ 2* = grammi di impasto (30 × 40 cm ≈ 600 g) e un pulsante per usarlo come peso del panetto.
 - **Suggerimenti di cottura**: in sola lettura, per forno domestico o elettrico con cielo e platea indipendenti. Non influenzano la maturazione.
-- **Diario**: ogni prova ha nome, data, formula, forno, voto a mezzi punti, note, "da cambiare" e fino a 5 foto. Può nascere da un piano (pulsante *Salva questa prova nel diario*, che precompila ingredienti, fasi e forno) e, con gli orari reali, mostra lo scarto rispetto alla stima.
+- **Diario**: ogni prova ha nome, data, formula, forno, voto a stelle (mezze stelle: tocca la metà sinistra di una stella; ritocca lo stesso valore per toglierlo), note, "da cambiare" e fino a 5 foto. Può nascere da un piano (pulsante *Salva questa prova nel diario*, che precompila ingredienti, fasi e forno) e, con gli orari reali, mostra la partenza e il pronto stimati, quelli reali e lo scarto tra le DURATE (non tra le date: se il piano partiva un altro giorno il confronto resta valido).
 - **Ricette salvate**: formula, fasi, lievito e forno si salvano con un nome (*Le mie ricette*); salvare di nuovo con lo stesso nome crea una nuova versione, e ogni versione si può riaprire. Le prove del diario nate da una ricetta salvata restano collegate e si filtrano per ricetta.
 - **In corso (Live Bake)**: *Avvia in cucina* segue le fasi in tempo reale con timer, avanzamento manuale, ±15 min, controlli per fase, temperatura misurata, avviso a fine fase e schermo acceso. Lo stato resta nel browser (sopravvive a ricarica e chiusura) e a fine impasto precompila il diario con gli orari reali.
 - **Ricerca nel Diario** per nome, tipo, note, forno.
@@ -470,7 +470,7 @@ Sicurezza e robustezza: il tipo dell'immagine è deciso dai primi byte (solo JPE
 - **`partials/plan_result.html`**: HTMX aggiorna ingredienti e riepilogo in `#result`, grafico e timeline in `#detailsResult`, e offre il pulsante per salvare la prova nel Diario. Il grafico ha altezza responsive fissa (`.chart-wrap`), nasconde i titoli degli assi sotto i 560 px, legge i colori dalle variabili CSS e si ridisegna al cambio tema; l'asse X è il tempo trascorso in ore.
 - **`partials/flours_panel.html`**: elenco per produttore (con scheda del produttore, in nuova scheda), ricerca, modulo; vive nel tab *Farine*, fuori da `#planForm`. Ogni risposta include fuori banda (`hx-swap-oob`) `#flourOptionsSource`, la copia delle opzioni: un listener `htmx:oobAfterSwap` in `planner.html` rigenera i selettori del piano tenendo la scelta se la farina esiste ancora. Nel pianificatore, la sezione *Farina* ha tre righe farina+percentuale e il blocco *Farina* del risultato mostra miscela, statistiche e idratazione consigliata (pulsante `useHydration`).
 - **`partials/recipes_panel.html`**: salvataggio con nome, elenco ricette con versioni, prove collegate; sta fuori da `#planForm` per non innescare ricalcoli.
-- **`partials/diary_panel.html`, `diary_form.html`, `diary_entry.html`**: barra (nuova prova, esporta), importazione, modulo a sezioni (prova, impasto, cottura, note, foto) ed elenco di schede con miniatura, voto, dati chiave e confronto stima/reale.
+- **`partials/diary_panel.html`, `diary_form.html`, `diary_entry.html`**: barra (nuova prova, esporta), importazione, modulo a sezioni (prova, impasto, cottura, note, foto) ed elenco di schede con miniatura, voto a stelle (`starRating()` in `planner.html`, valore nel campo nascosto `rating`; sulla scheda `.stars-static` riempito via `--fill`), dati chiave e confronto stima/reale.
 
 Nota UX: nel form le percentuali sono inserite in formato umano (`62`, `2.8`) e convertite server-side in frazioni per i calcoli. I decimali si possono digitare liberamente: i campi numerici usano `step="any"` perché un valore non multiplo dello step rende il form non valido e HTMX non ricalcola. Le frecce di idratazione, sale, prefermento e peso panetto (±5 g) sono pulsanti custom (`adjustPercent`). La durata di ogni fase si digita in **ore e minuti** (due campi; il campo nascosto `phase_hours_N` porta al server ore decimali, quindi l'API non cambia) e ovunque viene mostrata come `1 h 30 min`, `45 min` o `1 min 15 s` con i filtri Jinja `hours` e `minutes` (`format_hours`/`format_minutes` in `services/fields.py`): niente più `0.5 h` o `1.25 min`. Il lievito non è un input: la percentuale suggerita dall'app determina anche i grammi mostrati. Giorni e mesi nel risultato sono localizzati in italiano.
 
@@ -484,7 +484,7 @@ Nota UX: nel form le percentuali sono inserite in formato umano (`62`, `2.8`) e 
 
 ## Testing
 
-119 test (al 2026-10-06). Lanciali con `uv run pytest`.
+124 test (al 2026-10-06). Lanciali con `uv run pytest`.
 
 ### [tests/test_thermal.py](tests/test_thermal.py)
 
@@ -531,6 +531,7 @@ Nota UX: nel form le percentuali sono inserite in formato umano (`62`, `2.8`) e 
 
 | Test | Proprietà verificata |
 |---|---|
+| `test_default_plan_starts_now_not_tomorrow` | l'inizio predefinito del piano è adesso, non il giorno dopo |
 | `test_suggested_yeast_is_used_for_plan_and_weights` | dose suggerita usata nel piano e nei grammi |
 | `test_hydration_change_recalculates_all_ingredient_weights` | variazione idratazione aggiorna pesi ingredienti a peso totale costante |
 | `test_planner_shows_primary_inputs_and_hides_manual_yeast_dose` | UI mostra i quattro input base e non chiede la dose di lievito |
@@ -587,6 +588,10 @@ Nota UX: nel form le percentuali sono inserite in formato umano (`62`, `2.8`) e 
 | `test_import_rejects_non_backup_files` | file non validi o assenti danno un messaggio |
 | `test_plan_prefills_new_diary_entry` | il piano precompila la voce e viene conservato |
 | `test_diary_shows_prediction_error_for_linked_plan` | confronto stima/reale nella scheda |
+| `test_comparison_uses_durations_so_a_wrong_plan_date_does_not_skew_it` | con partenza del piano nota lo scarto è tra durata stimata e reale, non tra date; la scheda mostra entrambi gli intervalli |
+| `test_form_shows_the_planned_start_of_a_linked_plan` | il modulo mostra la partenza prevista del piano collegato |
+| `test_rating_is_a_star_widget_and_entries_show_stars_not_numbers` | il modulo usa il widget a stelle, le schede mostrano stelle riempite in proporzione (solo se c'è un voto) e la modifica riapre il valore |
+| `test_hostile_rating_value_cannot_reach_javascript` | un voto malevolo non finisce mai nel JavaScript del modulo |
 | `test_out_of_range_ids_are_rejected_not_crashing` | id enormi danno 422, non 500 (overflow SQLite) |
 | `test_service_worker_never_caches_dynamic_responses` | il service worker mette in cache solo `/static/*` e pagine HTML |
 
@@ -662,7 +667,7 @@ Nota UX: nel form le percentuali sono inserite in formato umano (`62`, `2.8`) e 
 - PWA installabile
 - UI con palette rivista + dark mode (auto + toggle), verificata da 320 px a desktop
 - Input del form validati lato server
-- 119 test unitari verdi
+- 124 test unitari verdi
 
 ### ✅ Fase 2 (fatta)
 - Ricette salvate con versioning, riapribili e collegate alle prove del Diario

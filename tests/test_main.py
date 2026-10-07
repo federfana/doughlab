@@ -410,3 +410,9 @@ def test_stesura_phases_use_the_dough_ball_profile_not_the_bowl() -> None:
         stesure = [p for p in PRESETS_BY_KEY[key].phases if p.kind == PhaseKind.OPEN]
         assert stesure
         assert all(p.container == Container.BALLS_BOX for p in stesure)
+
+
+def test_default_plan_starts_now_not_tomorrow() -> None:
+    start = datetime.fromisoformat(default_recipe_ctx()["start_at"])
+
+    assert abs((datetime.now() - start).total_seconds()) < 120

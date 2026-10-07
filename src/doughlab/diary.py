@@ -285,7 +285,16 @@ def _matches(entry: DiaryEntry, query: str) -> bool:
 def _entry_view(entry: DiaryEntry) -> dict[str, Any]:
     plan = entry.plan or {}
     predicted = parse_datetime(plan.get("predicted_ready_at"))
+    plan_start = parse_datetime(plan.get("started_at"))
     ready, started = entry.ready_at, entry.started_at
+    duration = (ready - started).total_seconds() / 3600 if ready and started else None
+    predicted_hours = (predicted - plan_start).total_seconds() / 3600 if predicted and plan_start else None
+    if duration is not None and predicted_hours is not None:
+        delta: float | None = duration - predicted_hours
+    elif ready and predicted:
+        delta = (ready - predicted).total_seconds() / 3600  # piani vecchi senza partenza
+    else:
+        delta = None
     chips: list[str] = []
     if entry.hydration is not None:
         chips.append(f"idratazione {format_number(entry.hydration)}%")
@@ -309,6 +318,7 @@ def _entry_view(entry: DiaryEntry) -> dict[str, Any]:
         "pizza_type": entry.pizza_type,
         "oven": entry.oven,
         "rating": format_number(entry.rating).replace(".", ","),
+        "rating_pct": round(entry.rating / 5 * 100) if entry.rating else None,
         "chips": chips,
         "photos": photos,
         "cover_id": next(
@@ -322,8 +332,10 @@ def _entry_view(entry: DiaryEntry) -> dict[str, Any]:
         "started_at": started,
         "ready_at": ready,
         "predicted_ready_at": predicted,
-        "delta_hours": (ready - predicted).total_seconds() / 3600 if ready and predicted else None,
-        "duration_hours": (ready - started).total_seconds() / 3600 if ready and started else None,
+        "plan_start": plan_start,
+        "predicted_hours": predicted_hours,
+        "delta_hours": delta,
+        "duration_hours": duration,
     }
 
 

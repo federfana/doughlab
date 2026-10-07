@@ -281,3 +281,79 @@ def test_service_worker_never_caches_dynamic_responses() -> None:
 
     assert "startsWith('/static/')" in source
     assert "text/html" in source
+
+
+def test_rating_is_a_star_widget_and_entries_show_stars_not_numbers(tmp_path, monkeypatch) -> None:
+    async def check(client: AsyncClient, sessions: async_sessionmaker) -> None:
+        form = (await client.get("/diario/nuova")).text
+        assert 'x-data="starRating()"' in form and 'name="rating"' in form
+        assert "<select name=\"rating\"" not in form
+
+        await client.post("/diario", data={"name": "Con voto", "date": "2026-10-06", "rating": "4.5"})
+        await client.post("/diario", data={"name": "Senza voto", "date": "2026-10-05"})
+        listing = (await client.get("/diario")).text
+
+        assert 'class="stars-static"' in listing and "--fill: 90%" in listing
+        assert 'aria-label="Voto 4,5 su 5"' in listing
+        assert listing.count('class="stars-static"') == 1
+        assert "★ 4,5" not in listing
+
+        async with sessions() as session:
+            entry = await session.scalar(select(DiaryEntry).where(DiaryEntry.name == "Con voto"))
+            assert entry is not None
+            entry_id = entry.id
+        edit = (await client.get(f"/diario/{entry_id}/modifica")).text
+        assert 'data-value="4.5"' in edit and 'name="rating" value="4.5"' in edit
+
+    run_with_db(tmp_path, monkeypatch, check)
+
+
+def test_hostile_rating_value_cannot_reach_javascript(tmp_path, monkeypatch) -> None:
+    async def check(client: AsyncClient, sessions: async_sessionmaker) -> None:
+        bad = "');alert(1);//"
+        response = await client.post("/diario", data={"name": "", "date": "2026-10-06", "rating": bad})
+
+        assert "');alert(1)" not in response.text
+        assert 'x-data="starRating()"' in response.text
+
+    run_with_db(tmp_path, monkeypatch, check)
+
+
+def test_comparison_uses_durations_so_a_wrong_plan_date_does_not_skew_it(tmp_path, monkeypatch) -> None:
+    async def check(client: AsyncClient, sessions: async_sessionmaker) -> None:
+        plan = {"started_at": "2026-10-07T20:00", "predicted_ready_at": "2026-10-08T18:00"}
+        await client.post(
+            "/diario",
+            data={
+                "name": "Ieri",
+                "date": "2026-10-06",
+                "started_at": "2026-10-06T20:00",
+                "ready_at": "2026-10-07T16:00",
+                "plan_json": json.dumps(plan),
+            },
+        )
+        page = (await client.get("/")).text
+
+        assert "Stima DoughLab 22 h: 07/10 20:00 → 08/10 18:00" in page
+        assert "Reale 20 h: 06/10 20:00 → 07/10 16:00" in page
+        assert "Scarto −2 h" in page
+
+    run_with_db(tmp_path, monkeypatch, check)
+
+
+def test_form_shows_the_planned_start_of_a_linked_plan(tmp_path, monkeypatch) -> None:
+    async def check(client: AsyncClient, sessions: async_sessionmaker) -> None:
+        await client.post(
+            "/diario",
+            data={"name": "Collegata", "date": "2026-10-07", "plan_json": json.dumps({"started_at": "2026-10-07T20:00", "predicted_ready_at": "2026-10-08T18:00"})},
+        )
+        async with sessions() as session:
+            entry = await session.scalar(select(DiaryEntry).where(DiaryEntry.name == "Collegata"))
+            assert entry is not None
+            entry_id = entry.id
+
+        edit = (await client.get(f"/diario/{entry_id}/modifica")).text
+
+        assert "partenza prevista 2026-10-07 20:00" in edit
+
+    run_with_db(tmp_path, monkeypatch, check)

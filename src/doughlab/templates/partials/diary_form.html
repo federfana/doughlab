@@ -3,7 +3,7 @@
   <h2 style="margin-top:0">{{ 'Modifica prova' if diary_form.entry_id else 'Nuova prova' }}</h2>
   {% if diary_form.error %}<p class="diary-status error" role="alert">{{ diary_form.error }}{% if not diary_form.entry_id %} Se avevi scelto delle foto, selezionale di nuovo.{% endif %}</p>{% endif %}
   {% if diary_form.plan and diary_form.plan.predicted_ready_at is string %}
-  <p class="hint" style="margin:0 0 .8rem">Collegata a un piano DoughLab: pronto stimato {{ diary_form.plan.predicted_ready_at[:16]|replace('T', ' ') }}. Inserisci gli orari reali per confrontarli con la stima.</p>
+  <p class="hint" style="margin:0 0 .8rem">Collegata a un piano DoughLab{% if diary_form.plan.started_at is string %}, partenza prevista {{ diary_form.plan.started_at[:16]|replace('T', ' ') }}{% endif %}: pronto stimato {{ diary_form.plan.predicted_ready_at[:16]|replace('T', ' ') }}. Correggi "Inizio impasto" e "Pronto alle" con gli orari e le date reali: il confronto è sulla durata.</p>
   {% endif %}
   {% if not diary_form.entry_id and diary_form.plan %}<input type="hidden" name="plan_json" value="{{ diary_form.plan | tojson | forceescape }}">{% endif %}
 
@@ -13,12 +13,19 @@
       <label class="field diary-wide"><span class="lab">Nome *</span><input type="text" name="name" value="{{ f.name }}" maxlength="120" required></label>
       <label class="field"><span class="lab">Data</span><input type="date" name="date" value="{{ f.date }}" required></label>
       <label class="field"><span class="lab">Tipo di pizza</span><input type="text" name="pizza_type" value="{{ f.pizza_type }}" maxlength="60"></label>
-      <label class="field"><span class="lab">Voto</span>
-        <select name="rating">
-          <option value="">Nessun voto</option>
-          {% for v in ['0.5', '1', '1.5', '2', '2.5', '3', '3.5', '4', '4.5', '5'] %}<option value="{{ v }}" {% if f.rating == v %}selected{% endif %}>{{ v|replace('.', ',') }} / 5</option>{% endfor %}
-        </select>
-      </label>
+      <div class="field diary-wide">
+        <span class="lab" id="ratingLabel">Voto</span>
+        <div class="stars" x-data="starRating()" data-value="{{ f.rating }}" role="slider" tabindex="0" aria-labelledby="ratingLabel" aria-valuemin="0" aria-valuemax="5" :aria-valuenow="value" :aria-valuetext="value ? value + ' su 5' : 'nessun voto'" @keydown.right.prevent="step(.5)" @keydown.up.prevent="step(.5)" @keydown.left.prevent="step(-.5)" @keydown.down.prevent="step(-.5)">
+          <input type="hidden" name="rating" value="{{ f.rating }}" :value="value || ''">
+          <template x-for="n in 5" :key="n">
+            <button type="button" class="star" tabindex="-1" @click="pick($event, n)" :aria-label="'Voto ' + n + ' su 5 (tocca la metà sinistra per mezzo punto)'">
+              <span class="star-glyph star-empty">★</span>
+              <span class="star-fill" :style="`width:${fill(n)}%`"><span class="star-glyph">★</span></span>
+            </button>
+          </template>
+          <button type="button" class="btn-ghost star-clear" x-show="value" x-cloak @click="value = 0">Nessun voto</button>
+        </div>
+      </div>
       <label class="field"><span class="lab">Etichette</span><input type="text" name="tags" value="{{ f.tags }}" maxlength="200"></label>
       <label class="field"><span class="lab">Inizio impasto</span><input type="datetime-local" name="started_at" value="{{ f.started_at }}"></label>
       <label class="field"><span class="lab">Pronto alle</span><input type="datetime-local" name="ready_at" value="{{ f.ready_at }}"></label>

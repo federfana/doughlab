@@ -8,10 +8,12 @@
       {% if item.pizza_type %} · {{ item.pizza_type }}{% endif %}
       {% if item.oven %} · {{ item.oven }}{% endif %}
       {% if item.recipe_label %} · Ricetta {{ item.recipe_label }}{% endif %}
-      {% if item.rating %} · <span class="diary-rating" aria-label="Voto {{ item.rating }} su 5">★ {{ item.rating }}</span>{% endif %}
+      {% if item.rating_pct %} · <span class="stars-static" role="img" aria-label="Voto {{ item.rating }} su 5" style="--fill: {{ item.rating_pct }}%">★★★★★</span>{% endif %}
     </p>
     {% if item.chips %}<ul class="diary-chips">{% for chip in item.chips %}<li>{{ chip }}</li>{% endfor %}</ul>{% endif %}
-    {% if item.predicted_ready_at and item.ready_at %}
+    {% if item.predicted_hours is not none and item.duration_hours is not none %}
+    <p class="diary-compare">Stima DoughLab {{ item.predicted_hours|hours }}: {{ item.plan_start.strftime('%d/%m %H:%M') }} → {{ item.predicted_ready_at.strftime('%d/%m %H:%M') }}<br>Reale {{ item.duration_hours|hours }}: {{ item.started_at.strftime('%d/%m %H:%M') }} → {{ item.ready_at.strftime('%d/%m %H:%M') }}<br>Scarto {{ '+' if item.delta_hours >= 0 else '−' }}{{ item.delta_hours|abs|hours }}</p>
+    {% elif item.predicted_ready_at and item.ready_at %}
     <p class="diary-compare">Stima DoughLab {{ item.predicted_ready_at.strftime('%d/%m %H:%M') }}, reale {{ item.ready_at.strftime('%d/%m %H:%M') }} ({{ '+' if item.delta_hours >= 0 else '−' }}{{ item.delta_hours|abs|hours }})</p>
     {% elif item.duration_hours is not none %}
     <p class="diary-compare">Pronto dopo {{ item.duration_hours|hours }} dall'impasto</p>

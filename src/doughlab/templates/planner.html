@@ -440,6 +440,21 @@
 </template>
 
 <script>
+// Voto a stelle con mezzi punti: tocca la metà sinistra di una stella per .5, quella destra per il punto intero.
+function starRating() {
+  return {
+    value: 0,
+    init() { this.value = Math.min(5, Math.max(0, Math.round((Number(this.$el.dataset.value) || 0) * 2) / 2)); },
+    fill(n) { return Math.max(0, Math.min(1, this.value - (n - 1))) * 100; },
+    pick(event, n) {
+      const rect = event.currentTarget.getBoundingClientRect();
+      const next = event.clientX - rect.left < rect.width / 2 ? n - 0.5 : n;
+      this.value = this.value === next ? 0 : next;
+    },
+    step(delta) { this.value = Math.min(5, Math.max(0, this.value + delta)); },
+  };
+}
+
 function adjustPercent(button, delta) {
   const input = button.closest('.number-stepper').querySelector('input');
   const current = Number(input.value) || 0;
