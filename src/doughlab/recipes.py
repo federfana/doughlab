@@ -49,6 +49,7 @@ def payload_from_form(data: dict[str, str]) -> dict[str, Any]:
             "sugar_pct": ingredients.sugar_pct,
             "preferment_pct": ingredients.preferment_pct,
             "preferment_hydration_pct": ingredients.preferment_hydration_pct,
+            "preferment_yeast_share": ingredients.preferment_yeast_share,
         },
         "phases": [
             {

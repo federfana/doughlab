@@ -45,6 +45,12 @@
       <label class="field"><span class="lab">Ore in frigo</span><input type="number" name="cold_hours" value="{{ f.cold_hours }}" min="0" max="2000" step="any" inputmode="decimal"></label>
       <label class="field"><span class="lab">Ore a temp. ambiente</span><input type="number" name="room_hours" value="{{ f.room_hours }}" min="0" max="2000" step="any" inputmode="decimal"></label>
       <label class="field"><span class="lab">Temp. impasto (°C)</span><input type="number" name="dough_temp" value="{{ f.dough_temp }}" min="-20" max="100" step="any" inputmode="decimal"></label>
+      <label class="field"><span class="lab">Come impasti</span>
+        <select name="kneading">
+          <option value="">Non indicato</option>
+          {% for key, label in diary_kneading %}<option value="{{ key }}" {% if f.kneading == key %}selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select>
+      </label>
     </div>
   </fieldset>
 

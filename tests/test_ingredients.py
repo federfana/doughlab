@@ -56,3 +56,19 @@ def test_oil_included_in_total() -> None:
     assert w.oil_g / w.flour_g == pytest.approx(0.03)
     assert (w.flour_g + w.water_g + w.salt_g + w.yeast_g + w.oil_g) \
         == pytest.approx(800.0, rel=1e-6)
+
+
+def test_preferment_yeast_share_splits_the_total_dose() -> None:
+    ri = RecipeIngredients(panetto_g=500, n_panetti=2, hydration_pct=0.70, salt_pct=0.022, yeast_pct=0.002,
+                           preferment_pct=0.30, preferment_hydration_pct=0.45, preferment_yeast_share=0.25)
+    w = compute(ri)
+
+    assert w.preferment_yeast_g == pytest.approx(w.yeast_g * 0.25)
+    assert w.final_dough_yeast_g == pytest.approx(w.yeast_g * 0.75)
+
+
+def test_without_preferment_no_yeast_goes_in_a_preferment() -> None:
+    w = compute(RecipeIngredients(panetto_g=250, n_panetti=4, yeast_pct=0.002))
+
+    assert w.preferment_yeast_g == 0
+    assert w.final_dough_yeast_g == pytest.approx(w.yeast_g)

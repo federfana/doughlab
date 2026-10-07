@@ -4,6 +4,9 @@
   <section class="card diary-toolbar">
     <button type="button" class="btn" hx-get="/diario/nuova">Nuova prova</button>
     <a class="btn-ghost" href="/diario/export.json" download>Esporta backup</a>
+    <form class="file-btn-form" hx-post="/diario/importa" hx-encoding="multipart/form-data" hx-trigger="change">
+      <label class="btn-ghost file-btn" title="Le prove già presenti non vengono duplicate: si aggiornano solo se nel file sono più recenti">Importa backup<input type="file" name="file" accept=".json,application/json" aria-label="Importa un backup JSON"></label>
+    </form>
     <span class="hint count">{{ diary_items|length }}{% if diary_items|length != diary_total %} di {{ diary_total }}{% endif %} {{ 'prova' if diary_total == 1 else 'prove' }}</span>
   </section>
 
@@ -25,15 +28,6 @@
 
   {% if diary_form %}{% include "partials/diary_form.html" %}{% endif %}
 
-  <details class="card diary-import">
-    <summary>Importa un backup</summary>
-    <form hx-post="/diario/importa" hx-encoding="multipart/form-data" class="space-y" style="margin-top:.7rem">
-      <p class="hint">Scegli il file JSON esportato dall'app. Le prove già presenti non vengono duplicate: si aggiornano solo se nel file sono più recenti.</p>
-      <input type="file" name="file" accept=".json,application/json" required>
-      <div class="diary-actions"><button type="submit" class="btn">Importa</button></div>
-    </form>
-  </details>
-
   <div id="diaryList">
   {% if diary_items %}
   <div class="diary-list">
@@ -42,7 +36,7 @@
   {% elif diary_total and not diary_form %}
   <p class="card diary-empty">Nessuna prova corrisponde alla ricerca.</p>
   {% elif not diary_form %}
-  <p class="card diary-empty">Nessuna prova nel diario. Crea la prima, salva un piano dal pianificatore o importa un backup.</p>
+  <p class="card diary-empty">Nessuna prova nel diario. Crea la prima o salva un piano dal pianificatore.</p>
   {% endif %}
   </div>
 </div>

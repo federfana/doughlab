@@ -105,6 +105,7 @@ class DiaryEntry(Base):
     dough_ball_weight: Mapped[float | None] = mapped_column(Float, default=None)
     dough_ball_count: Mapped[int | None] = mapped_column(Integer, default=None)
     dough_temp: Mapped[float | None] = mapped_column(Float, default=None)
+    kneading: Mapped[str] = mapped_column(String(20), default="")
     bake_temp: Mapped[float | None] = mapped_column(Float, default=None)
     bake_time: Mapped[str] = mapped_column(String(40), default="")
     bake_setup: Mapped[str] = mapped_column(String(200), default="")

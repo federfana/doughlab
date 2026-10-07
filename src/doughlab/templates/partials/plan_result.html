@@ -11,6 +11,34 @@
       <div class="section-title-row">
         <div><h2>Ingredienti</h2><p>{{ '%.0f'|format(weights.total_g) }} g totali. Panetti, idratazione e sale definiscono la formula; fasi e temperature definiscono durata e lievito consigliato.</p></div>
       </div>
+      {% if weights.preferment_flour_g > 0 %}
+      {% set pref_name = 'Biga' if ingredients.preferment_hydration_pct <= 0.65 else 'Poolish' %}
+      {% set pref_phase = plan.phases|selectattr('phase.kind', 'equalto', 'preferment')|first %}
+      {% set pref_total = weights.preferment_flour_g + weights.preferment_water_g + weights.preferment_yeast_g %}
+      <div class="recipe-steps">
+        <div class="recipe-step">
+          <h3><span class="step-number">1</span> {{ pref_name }}{% if pref_phase %} <small>{{ pref_phase.phase.hours|hours }} di maturazione</small>{% endif %}</h3>
+          <dl class="recipe-lines">
+            <div><dt>Farina <small>{{ '%.0f'|format(ingredients.preferment_pct * 100) }}% del totale</small></dt><dd>{{ '%.0f'|format(weights.preferment_flour_g) }} g</dd></div>
+            <div><dt>Acqua <small>{{ '%.0f'|format(ingredients.preferment_hydration_pct * 100) }}%</small></dt><dd>{{ '%.0f'|format(weights.preferment_water_g) }} g</dd></div>
+            <div><dt>{{ yeast_label }}</dt><dd>{{ '%.2f'|format(weights.preferment_yeast_g) }} g</dd></div>
+          </dl>
+        </div>
+        <div class="recipe-step">
+          <h3><span class="step-number">2</span> Impasto finale</h3>
+          <dl class="recipe-lines">
+            <div><dt>{{ pref_name }} <small>tutto</small></dt><dd>{{ '%.0f'|format(pref_total) }} g</dd></div>
+            <div><dt>Farina</dt><dd>{{ '%.0f'|format(weights.final_dough_flour_g) }} g</dd></div>
+            <div><dt>Acqua</dt><dd>{{ '%.0f'|format(weights.final_dough_water_g) }} g</dd></div>
+            <div><dt>Sale <small>{{ '%.1f'|format(ingredients.salt_pct * 100) }}%</small></dt><dd>{{ '%.1f'|format(weights.salt_g) }} g</dd></div>
+            {% if weights.final_dough_yeast_g >= 0.005 %}<div><dt>{{ yeast_label }}</dt><dd>{{ '%.2f'|format(weights.final_dough_yeast_g) }} g</dd></div>{% endif %}
+            {% if weights.oil_g > 0 %}<div><dt>Olio <small>{{ '%.1f'|format(ingredients.oil_pct * 100) }}%</small></dt><dd>{{ '%.1f'|format(weights.oil_g) }} g</dd></div>{% endif %}
+            {% if weights.sugar_g > 0 %}<div><dt>Zucchero/malto <small>{{ '%.1f'|format(ingredients.sugar_pct * 100) }}%</small></dt><dd>{{ '%.1f'|format(weights.sugar_g) }} g</dd></div>{% endif %}
+          </dl>
+        </div>
+      </div>
+      <p class="hint recipe-totals"><strong>Totali</strong>: farina {{ '%.0f'|format(weights.flour_g) }} g · acqua {{ '%.0f'|format(weights.water_g) }} g ({{ '%.1f'|format(ingredients.hydration_pct * 100) }}%) · impasto {{ '%.0f'|format(weights.total_g) }} g · {{ ingredients.n_panetti }} × {{ '%.0f'|format(ingredients.panetto_g) }} g</p>
+      {% else %}
       <dl class="ingredient-list">
         <div><dt>Farina</dt><dd>{{ '%.0f'|format(weights.flour_g) }} g</dd><small>100%</small></div>
         <div><dt>Acqua</dt><dd>{{ '%.0f'|format(weights.water_g) }} g</dd><small>{{ '%.1f'|format(ingredients.hydration_pct * 100) }}%</small></div>
@@ -19,6 +47,7 @@
         {% if weights.oil_g > 0 %}<div><dt>Olio</dt><dd>{{ '%.1f'|format(weights.oil_g) }} g</dd><small>{{ '%.1f'|format(ingredients.oil_pct * 100) }}%</small></div>{% endif %}
         {% if weights.sugar_g > 0 %}<div><dt>Zucchero/malto</dt><dd>{{ '%.1f'|format(weights.sugar_g) }} g</dd><small>{{ '%.1f'|format(ingredients.sugar_pct * 100) }}%</small></div>{% endif %}
       </dl>
+      {% endif %}
       {% if flour_blend %}
       <div class="flour-summary">
         <strong>Farina</strong>
@@ -55,13 +84,6 @@
         {% else %}
         <p class="hint">Nessun dato per consigliare l'idratazione: inserisci la W o l'intervallo del produttore.</p>
         {% endif %}
-      </div>
-      {% endif %}
-      {% if weights.preferment_flour_g > 0 %}
-      <div class="preferment-split">
-        <strong>Ripartizione del prefermento</strong>
-        <span>{{ '%.0f'|format(weights.preferment_flour_g) }} g farina + {{ '%.0f'|format(weights.preferment_water_g) }} g acqua nella biga</span>
-        <span>{{ '%.0f'|format(weights.final_dough_flour_g) }} g farina + {{ '%.0f'|format(weights.final_dough_water_g) }} g acqua nell'impasto finale</span>
       </div>
       {% endif %}
     </section>

@@ -95,6 +95,34 @@
           <span class="hint">La dose viene stimata in base al piano.</span>
         </fieldset>
       </div>
+      {% set pref = recipe.ingredients %}
+      {% set pref_kind = 'none' if pref.preferment_pct <= 0 else ('biga' if pref.preferment_hydration_pct <= 0.65 else 'poolish') %}
+      <fieldset class="preferment-control" x-data="{ kind: '{{ pref_kind }}' }">
+        <legend class="lab">Prefermento</legend>
+        <div class="yeast-segments" role="group" aria-label="Tipo di prefermento">
+          {% for v, label in [('none', 'Diretto'), ('biga', 'Biga'), ('poolish', 'Poolish')] %}
+          <label class="yeast-segment">
+            <input type="radio" name="preferment_kind" value="{{ v }}" x-model="kind" @change="setPreferment($el.form, '{{ v }}')" {% if pref_kind == v %}checked{% endif %}>
+            <span>{{ label }}</span>
+          </label>
+          {% endfor %}
+        </div>
+        <div class="preferment-fields" x-show="kind !== 'none'" x-cloak>
+          <label class="field" title="Quota della farina totale messa nel prefermento">
+            <span class="lab">Farina %</span>
+            <input type="number" name="preferment_pct" value="{{ '%.1f'|format(pref.preferment_pct * 100) }}" step="any" min="0" max="100" inputmode="decimal" aria-label="Percentuale di farina nel prefermento">
+          </label>
+          <label class="field" title="Acqua rispetto alla farina del prefermento">
+            <span class="lab">Idratazione %</span>
+            <input type="number" name="preferment_hydration_pct" value="{{ '%.0f'|format(pref.preferment_hydration_pct * 100) }}" step="any" min="30" max="150" inputmode="decimal" aria-label="Idratazione del prefermento">
+          </label>
+          <label class="field" title="Quota della dose di lievito stimata messa nel prefermento; il resto va nell'impasto finale">
+            <span class="lab">Lievito %</span>
+            <input type="number" name="preferment_yeast_pct" value="{{ '%.0f'|format(pref.preferment_yeast_share * 100) }}" step="any" min="0" max="100" inputmode="decimal" aria-label="Quota di lievito nel prefermento">
+          </label>
+          <p class="hint">Farina e idratazione del prefermento; lievito = quota della dose totale che ci metti.</p>
+        </div>
+      </fieldset>
       <div class="hint" style="margin-top: .45rem;">
         Le frecce cambiano le percentuali di 1 punto; puoi anche digitare valori decimali, per esempio 62.5%.
       </div>
@@ -305,26 +333,6 @@
             </span>
           </span>
         </label>
-        <label class="field">
-          <span class="lab">Prefermento % farina</span>
-          <span class="number-stepper">
-            <input type="number" name="preferment_pct" value="{{ '%.1f'|format(recipe.ingredients.preferment_pct * 100) }}" step="any" min="0" max="100">
-            <span class="number-stepper-controls">
-              <button type="button" aria-label="Aumenta prefermento di 1 punto" title="Aumenta di 1" onclick="adjustPercent(this, 1)">↑</button>
-              <button type="button" aria-label="Riduci prefermento di 1 punto" title="Riduci di 1" onclick="adjustPercent(this, -1)">↓</button>
-            </span>
-          </span>
-        </label>
-        <label class="field">
-          <span class="lab">Idratazione prefermento %</span>
-          <span class="number-stepper">
-            <input type="number" name="preferment_hydration_pct" value="{{ '%.0f'|format(recipe.ingredients.preferment_hydration_pct * 100) }}" step="any" min="30" max="150">
-            <span class="number-stepper-controls">
-              <button type="button" aria-label="Aumenta idratazione prefermento di 1 punto" title="Aumenta di 1" onclick="adjustPercent(this, 1)">↑</button>
-              <button type="button" aria-label="Riduci idratazione prefermento di 1 punto" title="Riduci di 1" onclick="adjustPercent(this, -1)">↓</button>
-            </span>
-          </span>
-        </label>
       </div>
     </details>
 
@@ -440,6 +448,13 @@
 </template>
 
 <script>
+// Valori di partenza del prefermento scelto (farina %, idratazione %); i campi restano modificabili.
+function setPreferment(form, kind) {
+  const defaults = { none: [0, 100], biga: [30, 44], poolish: [30, 100] }[kind];
+  form.elements.preferment_pct.value = defaults[0];
+  form.elements.preferment_hydration_pct.value = defaults[1];
+}
+
 // Voto a stelle con mezzi punti: tocca la metà sinistra di una stella per .5, quella destra per il punto intero.
 function starRating() {
   return {

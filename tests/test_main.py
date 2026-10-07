@@ -416,3 +416,34 @@ def test_default_plan_starts_now_not_tomorrow() -> None:
     start = datetime.fromisoformat(default_recipe_ctx()["start_at"])
 
     assert abs((datetime.now() - start).total_seconds()) < 120
+
+
+def test_preferment_choice_is_in_the_main_formula_not_in_advanced_parameters() -> None:
+    context = _common_ctx()
+    context["recipe"] = default_recipe_ctx()
+    rendered = templates.get_template("planner.html").render(**context)
+
+    assert rendered.count('<input type="radio" name="preferment_kind"') == 3
+    for name in ("preferment_pct", "preferment_hydration_pct", "preferment_yeast_pct"):
+        assert rendered.index(f'name="{name}"') < rendered.index("Parametri avanzati")
+
+
+def test_final_recipe_lists_preferment_and_final_dough_steps() -> None:
+    biga = _render_plan_summary({**_form(65), "preferment_pct": "30", "preferment_hydration_pct": "44"})
+    poolish = _render_plan_summary({**_form(65), "preferment_pct": "30", "preferment_hydration_pct": "100"})
+    direct = _render_plan_summary(_form(65))
+
+    assert "Impasto finale" in biga and "<span class=\"step-number\">1</span> Biga" in biga
+    assert "<span class=\"step-number\">1</span> Poolish" in poolish
+    assert "<strong>Totali</strong>" in biga and "impasto 1000 g" in biga
+    assert "4 × 250 g" in biga and "\\u00d7" not in biga
+    assert "Impasto finale" not in direct and "step-number" not in direct
+
+
+def test_preferment_gets_all_the_yeast_by_default_and_a_share_can_be_set() -> None:
+    base = {**_form(65), "preferment_pct": "30", "preferment_hydration_pct": "44"}
+    everything = compute_plan_and_ingredients(base)["weights"]
+    half = compute_plan_and_ingredients({**base, "preferment_yeast_pct": "50"})["weights"]
+
+    assert everything.final_dough_yeast_g == pytest.approx(0)
+    assert half.preferment_yeast_g == pytest.approx(half.yeast_g / 2)

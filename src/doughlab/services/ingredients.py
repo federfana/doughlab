@@ -48,6 +48,8 @@ class RecipeIngredients:
     sugar_pct: float = 0.0
     preferment_pct: float = 0.0
     preferment_hydration_pct: float = 1.0
+    # Quota (0-1) del lievito totale messa nel prefermento; il resto va nell'impasto finale.
+    preferment_yeast_share: float = 1.0
 
 
 @dataclass
@@ -62,8 +64,10 @@ class IngredientWeights:
     sugar_g: float
     preferment_flour_g: float
     preferment_water_g: float
+    preferment_yeast_g: float
     final_dough_flour_g: float
     final_dough_water_g: float
+    final_dough_yeast_g: float
     total_g: float
 
 
@@ -87,6 +91,7 @@ def compute(ri: RecipeIngredients) -> IngredientWeights:
     pref_flour = flour * ri.preferment_pct
     # Il prefermento non può contenere più acqua di tutto l'impasto.
     pref_water = min(pref_flour * ri.preferment_hydration_pct, water)
+    pref_yeast = yeast * ri.preferment_yeast_share if pref_flour > 0 else 0.0
 
     return IngredientWeights(
         flour_g=flour,
@@ -97,7 +102,9 @@ def compute(ri: RecipeIngredients) -> IngredientWeights:
         sugar_g=sugar,
         preferment_flour_g=pref_flour,
         preferment_water_g=pref_water,
+        preferment_yeast_g=pref_yeast,
         final_dough_flour_g=flour - pref_flour,
         final_dough_water_g=water - pref_water,
+        final_dough_yeast_g=yeast - pref_yeast,
         total_g=total,
     )

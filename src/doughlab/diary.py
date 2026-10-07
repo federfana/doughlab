@@ -18,6 +18,7 @@ from .db import SessionLocal
 from .models import DiaryEntry, DiaryPhoto, utcnow
 from .services.backup import (
     FLOAT_FIELDS,
+    KNEADING_LABELS,
     MAX_PLAN_BYTES,
     TEXT_FIELDS,
     DiaryData,
@@ -58,6 +59,7 @@ ALL_COLUMNS = (
     *FLOAT_COLUMNS,
     "dough_ball_count",
     "rating",
+    "kneading",
     "date",
     "plan",
     "started_at",
@@ -73,7 +75,7 @@ DATETIME_LOCAL = "%Y-%m-%dT%H:%M"
 
 def _blank_values() -> dict[str, str]:
     values = dict.fromkeys((*TEXT_COLUMNS, *FLOAT_COLUMNS), "")
-    values.update(dough_ball_count="", rating="", started_at="", ready_at="")
+    values.update(dough_ball_count="", rating="", kneading="", started_at="", ready_at="")
     values["date"] = date.today().isoformat()
     return values
 
@@ -109,6 +111,7 @@ def _values_from_entry(entry: DiaryEntry) -> dict[str, str]:
     for column in (*FLOAT_COLUMNS, "dough_ball_count", "rating"):
         values[column] = format_number(getattr(entry, column))
     values["date"] = entry.date.isoformat()
+    values["kneading"] = entry.kneading
     for column in ("started_at", "ready_at"):
         moment: datetime | None = getattr(entry, column)
         values[column] = moment.strftime(DATETIME_LOCAL) if moment else ""
@@ -186,7 +189,8 @@ def form_from_plan(snapshot: dict[str, Any]) -> dict[str, Any]:
     if _hours(weights.get("preferment_flour_g")) > 0:
         lines.append(
             f"Prefermento: farina {_hours(weights['preferment_flour_g']):.0f} g, "
-            f"acqua {_hours(weights.get('preferment_water_g')):.0f} g"
+            f"acqua {_hours(weights.get('preferment_water_g')):.0f} g, "
+            f"lievito {_hours(weights.get('preferment_yeast_g')):.2f} g"
         )
     values["ingredients"] = "\n".join(lines)
 
@@ -208,6 +212,8 @@ def _parse_fields(data: dict[str, str]) -> tuple[dict[str, Any], str | None]:
         fields[column] = parse_float(data.get(column), low, high)
     fields["dough_ball_count"] = parse_int(data.get("dough_ball_count"), 0, 1_000)
     fields["rating"] = parse_rating(data.get("rating"))
+    kneading = data.get("kneading", "")
+    fields["kneading"] = kneading if kneading in KNEADING_LABELS else ""
     if not fields["name"]:
         return fields, "Dai un nome alla prova."
     day = parse_date(data.get("date"))
@@ -304,6 +310,8 @@ def _entry_view(entry: DiaryEntry) -> dict[str, Any]:
         chips.append(f"{format_hours(entry.room_hours)} a temp. ambiente")
     if entry.dough_ball_count and entry.dough_ball_weight:
         chips.append(f"{entry.dough_ball_count} × {format_number(entry.dough_ball_weight)} g")
+    if entry.kneading in KNEADING_LABELS:
+        chips.append(f"impastato: {KNEADING_LABELS[entry.kneading].lower()}")
     if entry.bake_temp is not None:
         chips.append(f"{format_number(entry.bake_temp)} °C")
     if entry.bake_time:
@@ -376,6 +384,7 @@ async def panel_context(
         "diary_message": message,
         "diary_report": report,
         "diary_slots": SLOT_LABELS,
+        "diary_kneading": tuple(KNEADING_LABELS.items()),
     }
 
 

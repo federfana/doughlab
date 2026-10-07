@@ -72,6 +72,7 @@ def parse_ingredients(data: dict[str, str]) -> RecipeIngredients:
         sugar_pct=pct("sugar_pct", 0.0, 0, 20),
         preferment_pct=pct("preferment_pct", 0.0, 0, 100),
         preferment_hydration_pct=pct("preferment_hydration_pct", 1.0, 30, 150),
+        preferment_yeast_share=pct("preferment_yeast_pct", 1.0, 0, 100),
     )
 
 

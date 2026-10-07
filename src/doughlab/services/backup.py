@@ -24,6 +24,9 @@ MAX_ENTRIES = 5000
 MAX_EXTRA_BYTES = 20_000
 MAX_PLAN_BYTES = 100_000
 
+# Come si impasta: chiave salvata -> etichetta (nel backup sta nel blocco `doughlab`).
+KNEADING_LABELS = {"hand": "A mano", "planetary": "Planetaria", "mixer": "Impastatrice"}
+
 # chiave del backup -> (colonna, lunghezza massima)
 TEXT_FIELDS: dict[str, tuple[str, int]] = {
     "name": ("name", 120),
@@ -142,7 +145,10 @@ def _parse_entry(item: dict[str, Any]) -> tuple[DiaryData, list[str]]:
         )
 
     block = item.get("doughlab")
+    fields["kneading"] = ""
     if isinstance(block, dict):
+        if block.get("kneading") in KNEADING_LABELS:
+            fields["kneading"] = block["kneading"]
         if isinstance(block.get("plan"), dict) and _small_json(block["plan"], MAX_PLAN_BYTES):
             fields["plan"] = block["plan"]
         fields["started_at"] = parse_datetime(block.get("startedAt"))
@@ -208,6 +214,8 @@ def to_backup_entry(entry: DiaryData) -> dict[str, Any]:
         out["updatedAt"] = entry.updated_at.isoformat(timespec="milliseconds") + "Z"
 
     doughlab: dict[str, Any] = {}
+    if fields.get("kneading"):
+        doughlab["kneading"] = fields["kneading"]
     if fields.get("plan"):
         doughlab["plan"] = fields["plan"]
     if fields.get("started_at"):

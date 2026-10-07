@@ -357,3 +357,39 @@ def test_form_shows_the_planned_start_of_a_linked_plan(tmp_path, monkeypatch) ->
         assert "partenza prevista 2026-10-07 20:00" in edit
 
     run_with_db(tmp_path, monkeypatch, check)
+
+
+def test_kneading_method_is_saved_shown_and_survives_export_import(tmp_path, monkeypatch) -> None:
+    async def check(client: AsyncClient, sessions: async_sessionmaker) -> None:
+        assert 'name="kneading"' in (await client.get("/diario/nuova")).text
+        await client.post("/diario", data={"name": "Planetaria", "date": "2026-10-07", "kneading": "planetary"})
+        await client.post("/diario", data={"name": "Strana", "date": "2026-10-07", "kneading": "<b>x</b>"})
+
+        listing = (await client.get("/diario")).text
+        assert "impastato: planetaria" in listing
+        assert listing.count("impastato:") == 1
+
+        backup = (await client.get("/diario/export.json")).json()
+        by_name = {e["name"]: e for e in backup["entries"]}
+        assert by_name["Planetaria"]["doughlab"]["kneading"] == "planetary"
+        assert "doughlab" not in by_name["Strana"]
+
+        async with sessions() as session:
+            for entry in await session.scalars(select(DiaryEntry)):
+                await session.delete(entry)
+            await session.commit()
+        await client.post("/diario/importa", files={"file": ("b.json", json.dumps(backup).encode(), "application/json")})
+        assert "impastato: planetaria" in (await client.get("/diario")).text
+
+    run_with_db(tmp_path, monkeypatch, check)
+
+
+def test_import_is_a_toolbar_button_next_to_export(tmp_path, monkeypatch) -> None:
+    async def check(client: AsyncClient, sessions: async_sessionmaker) -> None:
+        page = (await client.get("/diario")).text
+
+        assert 'hx-post="/diario/importa"' in page and 'type="file"' in page
+        assert page.index("Esporta backup") < page.index("Importa backup")
+        assert "<summary>Importa un backup</summary>" not in page
+
+    run_with_db(tmp_path, monkeypatch, check)
