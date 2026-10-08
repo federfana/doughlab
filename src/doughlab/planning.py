@@ -22,6 +22,12 @@ from .services.scheduler import (
     build_plan,
     fermentation_activity_mask,
 )
+from .services.strategies import (
+    BIGA_HOURS,
+    OPEN_HOURS,
+    POOLISH_HOURS,
+    build_phases,
+)
 from .services.thermal import Container, Environment, parse_container, parse_environment
 
 # Gli stessi limiti degli input HTML: il server non si fida del client.
@@ -100,6 +106,56 @@ def baking_advice(preset: Preset, oven_profile: str) -> dict[str, Any]:
     }
 
 
+DEFAULT_ROOM_C = 22.0
+DEFAULT_FRIDGE_C = 4.0
+
+
+def phase_dicts(phases: list[PlanPhase]) -> list[dict[str, Any]]:
+    return [
+        {
+            "kind": ph.kind.value, "label": ph.label, "hours": ph.hours,
+            "ambient_c": ph.ambient_c, "container": ph.container.value,
+            "environment": ph.environment.value,
+        }
+        for ph in phases
+    ]
+
+
+def guided_settings(preset: Preset | None = None) -> dict[str, Any]:
+    """Valori iniziali della modalità guidata: strategia di lievitazione e temperature."""
+    return {
+        "mode": "guided",
+        "mode_forced": False,
+        "strategy": preset.strategy if preset else "fridge_24",
+        "room_c": DEFAULT_ROOM_C,
+        "fridge_c": DEFAULT_FRIDGE_C,
+    }
+
+
+def guided_phases(
+    data: dict[str, str], ingredients: RecipeIngredients, preset: Preset
+) -> list[PlanPhase]:
+    """Fasi generate dalla strategia scelta (modalità guidata); le temperature restano dell'utente."""
+    pref_hours, pref_label = 0.0, "Prefermento"
+    if ingredients.preferment_pct > 0:
+        biga = ingredients.preferment_hydration_pct <= 0.65
+        pref_hours, pref_label = (BIGA_HOURS, "Biga") if biga else (POOLISH_HOURS, "Poolish")
+    return build_phases(
+        data.get("strategy", ""),
+        number(data, "room_c", DEFAULT_ROOM_C, 5, 40),
+        number(data, "fridge_c", DEFAULT_FRIDGE_C, 0, 12),
+        preferment_hours=pref_hours,
+        preferment_label=pref_label,
+        open_hours=OPEN_HOURS.get(preset.style.value, 0.0),
+    )
+
+
+def generated_phase_dicts(data: dict[str, str]) -> list[dict[str, Any]]:
+    """Fasi della strategia scelta, per mostrarle e modificarle passando a «Esperto»."""
+    preset = PRESETS_BY_KEY.get(data.get("preset_key", ""), PRESETS[0])
+    return phase_dicts(guided_phases(data, parse_ingredients(data), preset))
+
+
 def default_recipe_ctx() -> dict[str, Any]:
     """Dati per prima apertura: usa il primo preset come default."""
     start_default = datetime.now().replace(second=0, microsecond=0).strftime("%Y-%m-%dT%H:%M")
@@ -125,6 +181,7 @@ def default_recipe_ctx() -> dict[str, Any]:
             for ph in p.phases
         ],
         "active_preset": p.key,
+        **guided_settings(p),
     }
 
 
@@ -158,6 +215,7 @@ def preset_ctx(
             for ph in p.phases
         ],
         active_preset=p.key,
+        **guided_settings(p),
     )
     return ctx
 
@@ -185,7 +243,7 @@ def compute_plan_and_ingredients(data: dict[str, str]) -> dict[str, Any]:
 
     baking = baking_advice(preset, oven_profile)
 
-    phases = parse_phase_form(data)
+    phases = guided_phases(data, ingredients, preset) if data.get("mode") == "guided" else parse_phase_form(data)
     if not phases:
         phases = [PlanPhase(kind=PhaseKind.MIX, label="Impasto", hours=0.5, ambient_c=22,
                             container=Container.MASS_BOWL, environment=Environment.AMBIENT)]

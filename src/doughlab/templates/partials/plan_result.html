@@ -48,43 +48,8 @@
         {% if weights.sugar_g > 0 %}<div><dt>Zucchero/malto</dt><dd>{{ '%.1f'|format(weights.sugar_g) }} g</dd><small>{{ '%.1f'|format(ingredients.sugar_pct * 100) }}%</small></div>{% endif %}
       </dl>
       {% endif %}
-      {% if flour_blend %}
-      <div class="flour-summary">
-        <strong>Farina</strong>
-        {% if flour_blend.components|length > 1 %}
-        <ul>
-          {% for c in flour_blend.components %}<li>{{ c.flour.brand }} {{ c.flour.name }}: {{ '%.0f'|format(c.share) }}% · {{ '%.0f'|format(weights.flour_g * c.share / 100) }} g</li>{% endfor %}
-        </ul>
-        {% else %}
-        <span>{{ flour_blend.components[0].flour.brand }} {{ flour_blend.components[0].flour.name }}</span>
-        {% endif %}
-        <span class="hint">
-          {% if flour_blend.w is not none %}W circa {{ '%.0f'|format(flour_blend.w) }}{% endif %}
-          {% if flour_blend.pl is not none %} · P/L {{ ('%.2f'|format(flour_blend.pl))|replace('.', ',') }}{% endif %}
-          {% if flour_blend.protein is not none %} · proteine {{ ('%.1f'|format(flour_blend.protein))|replace('.', ',') }}%{% endif %}
-          {% if flour_blend.components|length > 1 %}(medie pesate: per la miscela sono stime){% endif %}
-        </span>
-        {% if flour_normalized %}<span class="hint">Le percentuali inserite fanno {{ '%.0f'|format(flour_blend.entered_pct) }}%: le ho riportate a 100%.</span>{% endif %}
-        {% for warning in flour_warnings|default([]) %}<p class="flour-advice sotto" role="alert">{{ warning }}</p>{% endfor %}
-        {% if flour_methods %}
-        <ul class="flour-methods">
-          {% for flour, label in flour_methods %}<li>{{ flour.brand }} {{ flour.name }}: {{ ('impasto ' ~ label) if label else 'nota del produttore' }}{% if flour.method_note %} <span class="hint">«{{ flour.method_note }}»</span>{% endif %}</li>{% endfor %}
-        </ul>
-        {% endif %}
-        {% if flour_blend.hydration %}
-        {% set h = flour_blend.hydration %}
-        <p class="flour-advice {{ flour_position }}">
-          Idratazione consigliata <strong>{{ '%g'|format(h.low) }}-{{ '%g'|format(h.high) }}%</strong> ({{ h.basis }}).
-          La tua è {{ '%g'|format(flour_current_hydration) }}%:
-          {% if flour_position == 'sotto' %}sotto l'intervallo, l'impasto verrà più sodo.
-          {% elif flour_position == 'sopra' %}sopra l'intervallo, l'impasto verrà più molle e difficile da gestire.
-          {% else %}nell'intervallo consigliato.{% endif %}
-          {% if flour_position != 'dentro' %}<button type="button" class="btn-ghost" @click="useHydration({{ h.mid }})">Usa {{ '%g'|format(h.mid) }}%</button>{% endif %}
-        </p>
-        {% else %}
-        <p class="hint">Nessun dato per consigliare l'idratazione: inserisci la W o l'intervallo del produttore.</p>
-        {% endif %}
-      </div>
+      {% if flour_blend and flour_blend.components|length > 1 %}
+      <p class="hint recipe-totals"><strong>Miscela</strong>: {% for c in flour_blend.components %}{{ c.flour.brand }} {{ c.flour.name }} {{ '%.0f'|format(c.share) }}% ({{ '%.0f'|format(weights.flour_g * c.share / 100) }} g){% if not loop.last %} · {% endif %}{% endfor %}</p>
       {% endif %}
     </section>
 
@@ -206,3 +171,74 @@
 })();
 </script>
 </section>
+
+<div id="flourAdvice" hx-swap-oob="innerHTML">
+  {% if flour_blend %}
+      {% if flour_blend.hydration %}
+      {% set h = flour_blend.hydration %}
+      <p class="flour-advice {{ flour_position }}">
+        Idratazione consigliata <strong>{{ '%g'|format(h.low) }}-{{ '%g'|format(h.high) }}%</strong> ({{ h.basis }}).
+        La tua è {{ '%g'|format(flour_current_hydration) }}%:
+        {% if flour_position == 'sotto' %}sotto l'intervallo, l'impasto verrà più sodo.
+        {% elif flour_position == 'sopra' %}sopra l'intervallo, l'impasto verrà più molle e difficile da gestire.
+        {% else %}nell'intervallo consigliato.{% endif %}
+        {% if flour_position != 'dentro' %}<button type="button" class="btn-ghost" @click="useHydration({{ h.mid }})">Usa {{ '%g'|format(h.mid) }}%</button>{% endif %}
+      </p>
+      {% else %}
+      <p class="hint">Nessun dato per consigliare l'idratazione: inserisci la W o l'intervallo del produttore.</p>
+      {% endif %}
+      <div class="flour-summary">
+        <strong>Farina</strong>
+        {% if flour_blend.components|length > 1 %}
+        <ul>
+          {% for c in flour_blend.components %}<li>{{ c.flour.brand }} {{ c.flour.name }}: {{ '%.0f'|format(c.share) }}% · {{ '%.0f'|format(weights.flour_g * c.share / 100) }} g</li>{% endfor %}
+        </ul>
+        {% else %}
+        <span>{{ flour_blend.components[0].flour.brand }} {{ flour_blend.components[0].flour.name }}</span>
+        {% endif %}
+        <span class="hint">
+          {% if flour_blend.w is not none %}W circa {{ '%.0f'|format(flour_blend.w) }}{% endif %}
+          {% if flour_blend.pl is not none %} · P/L {{ ('%.2f'|format(flour_blend.pl))|replace('.', ',') }}{% endif %}
+          {% if flour_blend.protein is not none %} · proteine {{ ('%.1f'|format(flour_blend.protein))|replace('.', ',') }}%{% endif %}
+          {% if flour_blend.components|length > 1 %}(medie pesate: per la miscela sono stime){% endif %}
+        </span>
+        {% if flour_normalized %}<span class="hint">Le percentuali inserite fanno {{ '%.0f'|format(flour_blend.entered_pct) }}%: le ho riportate a 100%.</span>{% endif %}
+        {% for warning in flour_warnings|default([]) %}<p class="flour-advice sotto" role="alert">{{ warning }}</p>{% endfor %}
+        {% if flour_methods %}
+        <ul class="flour-methods">
+          {% for flour, label in flour_methods %}<li>{{ flour.brand }} {{ flour.name }}: {{ ('impasto ' ~ label) if label else 'nota del produttore' }}{% if flour.method_note %} <span class="hint">«{{ flour.method_note }}»</span>{% endif %}</li>{% endfor %}
+        </ul>
+        {% endif %}
+      </div>
+  {% else %}
+  <p class="hint">Scegli una farina o una miscela per ricevere un consiglio sull'idratazione.</p>
+  {% endif %}
+</div>
+
+<div id="planBar" hx-swap-oob="innerHTML">
+  <span><strong>{{ ingredients.n_panetti }} × {{ '%.0f'|format(ingredients.panetto_g) }} g</strong></span>
+  <span>idratazione {{ '%.1f'|format(ingredients.hydration_pct * 100) }}%</span>
+  <span>lievito {{ '%.2f'|format(suggested_pct * 100) }}%</span>
+  <span>{% if ready %}pronto {{ weekdays_it[ready.weekday()] }} {{ ready.day }} {{ months_it[ready.month - 1] }} · {{ ready.strftime('%H:%M') }}{% else %}<em>target non raggiunto</em>{% endif %}</span>
+  <button type="button" class="btn-ghost" x-show="step < 4" @click="goStep(4)">Vedi la ricetta</button>
+</div>
+
+<div id="flourSuggest" hx-swap-oob="innerHTML">
+  {% set selected = flour_blend.components|map(attribute='flour.id')|list if flour_blend else [] %}
+  {% if flour_suggestions %}
+  <div class="lab-row">Consigliate per questo impasto</div>
+  <ul class="suggest-list">
+    {% for sg in flour_suggestions %}
+    <li>
+      <div>
+        <strong>{{ sg.flour.brand }} {{ sg.flour.name }}</strong> <span class="hint">{{ sg.flour.kind }}</span>
+        <small class="hint">{{ sg.reason }}</small>
+      </div>
+      {% if sg.flour.id in selected %}<span class="hint">in uso</span>{% else %}<button type="button" class="btn-ghost" @click="useFlour({{ sg.flour.id }})">Usa</button>{% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="hint">Nessuna farina dell'archivio corrisponde bene a questo impasto: aggiungine una nel tab «Farine».</p>
+  {% endif %}
+</div>

@@ -11,11 +11,20 @@ from sqlalchemy.orm import selectinload
 
 from .db import SessionLocal
 from .models import DiaryEntry, Recipe, RecipeVersion
-from .planning import default_recipe_ctx, number, parse_ingredients, parse_phase_form, preset_ctx
+from .planning import (
+    DEFAULT_FRIDGE_C,
+    DEFAULT_ROOM_C,
+    default_recipe_ctx,
+    number,
+    parse_ingredients,
+    parse_phase_form,
+    preset_ctx,
+)
 from .services.fermentation import DEFAULT_TARGET_WORK, YeastKind
 from .services.flour_blend import parse_rows
 from .services.ingredients import STYLE_LABELS, RecipeIngredients, RecipeStyle
 from .services.presets import PRESETS_BY_KEY
+from .services.strategies import strategy_for
 from .services.thermal import parse_container, parse_environment
 from .web import RowId, common_ctx, templates
 
@@ -40,6 +49,10 @@ def payload_from_form(data: dict[str, str]) -> dict[str, Any]:
         "target_work": number(data, "target_work", DEFAULT_TARGET_WORK, 0.01, 100),
         "oven_profile": oven if oven in {"home", "split"} else "split",
         "initial_dough_c": number(data, "initial_dough_c", 24, 0, 40),
+        "mode": "guided" if data.get("mode") == "guided" else "expert",
+        "strategy": strategy_for(data.get("strategy", "")).key,
+        "room_c": number(data, "room_c", DEFAULT_ROOM_C, 5, 40),
+        "fridge_c": number(data, "fridge_c", DEFAULT_FRIDGE_C, 0, 12),
         "ingredients": {
             "panetto_g": ingredients.panetto_g,
             "n_panetti": ingredients.n_panetti,
@@ -88,6 +101,12 @@ def _recipe_ctx(recipe: Recipe, version: RecipeVersion) -> dict[str, Any] | None
             initial_dough_c=float(payload["initial_dough_c"]),
             ingredients=asdict(ingredients),
             phases=phases,
+            # Le ricette salvate prima della modalità guidata restano con le loro fasi.
+            mode="guided" if payload.get("mode") == "guided" else "expert",
+            mode_forced=True,
+            strategy=strategy_for(str(payload.get("strategy", ""))).key,
+            room_c=float(payload.get("room_c", DEFAULT_ROOM_C)),
+            fridge_c=float(payload.get("fridge_c", DEFAULT_FRIDGE_C)),
         )
     except (KeyError, TypeError, ValueError, AttributeError):
         return None

@@ -13,6 +13,7 @@ from .services.fields import format_hours, format_minutes
 from .services.ingredients import STYLE_LABELS, RecipeStyle
 from .services.presets import PRESETS
 from .services.scheduler import PHASE_LABELS, PhaseKind
+from .services.strategies import STRATEGIES
 from .services.thermal import (
     CONTAINER_LABELS,
     ENVIRONMENT_LABELS,
@@ -68,6 +69,7 @@ def common_ctx() -> dict[str, Any]:
             (e.value, ENVIRONMENT_LABELS[e], ENVIRONMENT_ICONS[e]) for e in UI_ENVIRONMENTS
         ],
         "styles": [(s.value, STYLE_LABELS[s]) for s in RecipeStyle],
+        "strategies": STRATEGIES,
         "presets": [
             {
                 "key": p.key,

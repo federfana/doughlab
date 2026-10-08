@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 from .fermentation import DEFAULT_TARGET_WORK, YeastKind
 from .ingredients import RecipeIngredients, RecipeStyle
 from .scheduler import PhaseKind, PlanPhase
+from .strategies import DEFAULT_STRATEGY
 from .thermal import Container, Environment
 
 
@@ -40,6 +41,8 @@ class Preset:
     yeast_kind: YeastKind
     target_work: float
     phases: list[PlanPhase] = field(default_factory=list)
+    # Scorciatoia di lievitazione usata dalla modalità guidata (vedi strategies.py).
+    strategy: str = DEFAULT_STRATEGY
 
 
 def _phase(kind: PhaseKind, label: str, hours: float, amb: float,
@@ -52,6 +55,7 @@ def _phase(kind: PhaseKind, label: str, hours: float, amb: float,
 PRESETS: list[Preset] = [
     Preset(
         key="napoletana",
+        strategy="direct_8",
         label="Napoletana",
         style=RecipeStyle.NAPOLETANA,
         description="Impasto diretto: 62% idratazione, 2.8% sale, puntata e appretto a temperatura ambiente.",
@@ -84,6 +88,7 @@ PRESETS: list[Preset] = [
     ),
     Preset(
         key="napoletana_frigo",
+        strategy="fridge_24",
         label="Napoletana 24h frigo",
         style=RecipeStyle.NAPOLETANA,
         description="Puntata a temperatura ambiente, 20 ore in frigorifero e appretto finale.",
@@ -120,6 +125,7 @@ PRESETS: list[Preset] = [
     ),
     Preset(
         key="teglia",
+        strategy="fridge_24",
         label="Teglia romana 24h",
         style=RecipeStyle.TEGLIA,
         description="Idratazione 75%, olio 3% e maturazione in frigorifero.",
@@ -157,6 +163,7 @@ PRESETS: list[Preset] = [
     ),
     Preset(
         key="pinsa",
+        strategy="fridge_48",
         label="Pinsa 48h",
         style=RecipeStyle.PINSA,
         description="Idratazione 80%, olio 2% e maturazione lunga in frigorifero.",
@@ -193,6 +200,7 @@ PRESETS: list[Preset] = [
     ),
     Preset(
         key="pane_biga",
+        strategy="fridge_24",
         label="Pane 48h con biga",
         style=RecipeStyle.PANE,
         description="Biga al 30% della farina, 18 ore a 18 °C e maturazione successiva in frigorifero.",

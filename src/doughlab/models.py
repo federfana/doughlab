@@ -26,6 +26,15 @@ def utcnow() -> datetime:
     return datetime.now(UTC).replace(tzinfo=None)
 
 
+class AppSetting(Base):
+    """Piccole impostazioni interne (per ora la versione dell'archivio delle farine predefinite)."""
+
+    __tablename__ = "app_settings"
+
+    key: Mapped[str] = mapped_column(String(40), primary_key=True)
+    value: Mapped[str] = mapped_column(String(200), default="")
+
+
 class Recipe(Base):
     __tablename__ = "recipes"
 

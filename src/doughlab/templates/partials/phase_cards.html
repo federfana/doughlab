@@ -1,0 +1,43 @@
+{# Schede delle fasi (modalità esperto). Variabile `phases`: elenco di dict kind/label/hours/ambient_c/container/environment. #}
+{% for p in phases %}
+{% set i = loop.index0 %}
+<article class="phase-card" data-row>
+  <div class="phase-card-head">
+    <span class="phase-number">{{ loop.index }}</span>
+    <select class="phase-kind" name="phase_kind_{{ i }}" aria-label="Fase {{ loop.index }}" onchange="syncPhaseLabel(this)">
+      {% for v, label in phase_kinds %}
+        <option value="{{ v }}" {% if p.kind==v %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+    <button type="button" class="icon-button phase-move" aria-label="Sposta fase {{ loop.index }} in alto" title="Sposta in alto" @click="movePhase($event, -1)">↑</button>
+    <button type="button" class="icon-button phase-move" aria-label="Sposta fase {{ loop.index }} in basso" title="Sposta in basso" @click="movePhase($event, 1)">↓</button>
+    <button type="button" class="icon-button" aria-label="Rimuovi fase" title="Rimuovi fase" @click="removePhase($event)">×</button>
+  </div>
+  <input type="hidden" name="phase_label_{{ i }}" value="{{ p.label }}">
+  <div class="phase-fields">
+    <label class="field"><span class="lab">Durata</span>
+      {% set total_min = (p.hours * 60)|round|int %}
+      <span class="duration-input" role="group" aria-label="Durata fase {{ loop.index }}">
+        <input type="number" class="dur-h" value="{{ total_min // 60 }}" min="0" max="720" step="any" inputmode="numeric" aria-label="Ore" oninput="syncDuration(this)" onchange="normalizeDuration(this)"><span>h</span>
+        <input type="number" class="dur-m" value="{{ total_min % 60 }}" min="0" step="any" inputmode="numeric" aria-label="Minuti" oninput="syncDuration(this)" onchange="normalizeDuration(this)"><span>min</span>
+      </span>
+      <input type="hidden" name="phase_hours_{{ i }}" value="{{ p.hours }}">
+    </label>
+    <label class="field"><span class="lab">Temp. (°C)</span><input type="number" name="phase_ambient_{{ i }}" value="{{ p.ambient_c }}" step="any" min="-5" max="50"></label>
+  </div>
+  <div class="phase-fields phase-selects">
+    <label class="field"><span class="lab">Condizione</span>
+      <select name="phase_env_{{ i }}">
+        {% for v, label, icon in environments %}
+          <option value="{{ v }}" {% if p.environment==v %}selected{% endif %}>{{ icon }} {% if v=='ambient' %}TA{% else %}TC{% endif %} · {{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="field"><span class="lab">Contenitore</span>
+      <select name="phase_container_{{ i }}">
+        {% for v, label, icon in containers %}<option value="{{ v }}" {% if p.container==v %}selected{% endif %}>{{ icon }} {{ label }}</option>{% endfor %}
+      </select>
+    </label>
+  </div>
+</article>
+{% endfor %}

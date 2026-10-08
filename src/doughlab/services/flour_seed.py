@@ -143,6 +143,69 @@ _BASE_SEEDS: tuple[dict[str, Any], ...] = (
          notes=GENERIC_NOTE),
 )
 
+# Aggiunte della versione 2 dell'archivio, con i dati delle pagine dei produttori (verificati a ottobre 2026).
+# Dove la scheda non riporta W e P/L (Le 5 Stagioni) o non li esprime (Petra 3) restano vuoti.
+FIVE = "https://le5stagioni.com/prodotto/"
+PETRA = "https://www.farinapetra.it/pg23/?bn=farinapetra&ct=card&dfbg=catalogopetra&mt=no&nosh=1&nmm=1&codice=10555"
+SEED_VERSION = 3
+
+_V2_SEEDS: tuple[dict[str, Any], ...] = (
+    dict(brand="Molino Caputo", name="Nuvola Super", kind="Tipo 0", w=330, pl=0.55, protein=13.5,
+         use="Tutti i tipi di pizza (classica, al taglio, alla pala, contemporanea) e focaccia.",
+         notes="W 320-340; P/L 0,50-0,60; proteine 13,5%.", source_url=CAPUTO + "nuvola-super/"),
+    dict(brand="Le 5 Stagioni", name="Pizza Napoletana Rossa", kind="Tipo 00", protein=13,
+         use="Impasti alla napoletana a lunga maturazione.",
+         notes="Proteine 13% s.s.; farinografo: assorbimento 57%, stabilità 13'; estensografo: energia 120, "
+               "rapporto 1,7. La scheda non riporta W e P/L.",
+         source_url=FIVE + "pizza-napoletana-rossa/"),
+    dict(brand="Le 5 Stagioni", name="Superiore", kind="Tipo 00", protein=13,
+         use="Impasti diretti e indiretti a lunga lievitazione, anche con maturazione in frigorifero.",
+         notes="Proteine 13% s.s.; farinografo: assorbimento 57%, stabilità 13'; estensografo: energia 125, "
+               "rapporto 1,7. La scheda non riporta W e P/L.",
+         source_url=FIVE + "superiore/"),
+    dict(brand="Le 5 Stagioni", name="Mora", kind="Integrale a granulometria fine", protein=15,
+         use="Pizza tonda classica, napoletana e in pala; in purezza o in miscela parziale.",
+         notes="Proteine 15 g e fibre 8,5 g (dati nutrizionali). La scheda non riporta W e P/L.",
+         source_url=FIVE + "mora/"),
+    dict(brand="Molino Quaglia", name="Petra 3", kind="Tipo 1", protein=13.5,
+         hydration_min=55, hydration_max=75, hydration_note="idratazioni medie (55-75%); assorbimento fino a 85%",
+         use="Impasti a media idratazione: a 20 °C fino a 16 ore, oppure a +4 °C fino a 48 ore.",
+         notes="Proteine 13,0-14,0%; glutine umido 42-44%; sali minerali max 0,80%. W e P/L non sono espressi dal "
+               "produttore: la fibra non permette risultati significativi all'alveografo.",
+         source_url=PETRA + "&urlplk=macinate-a-pietra&permalink=petra-3"),
+    dict(brand="Molino Quaglia", name="Petra 5037", kind="Tipo 0", w=320, pl=0.60, protein=13.3,
+         hydration_min=65, hydration_max=85, hydration_note="idratazioni medie o alte (65-85%); assorbimento oltre 85%",
+         use="Pizza a lunga lievitazione; con alta idratazione maturazione a +4 °C per 24-48 ore.",
+         notes="W 300-340; P/L 0,55-0,65; proteine 13,0-13,5%; glutine umido 43-45%.",
+         source_url=PETRA + "&urlplk=farine-pizzeria&permalink=petra-5037"),
+    dict(brand="Pastificio Garofalo", name="Farina W 350", kind="Tipo 00", w=350,
+         use="Pizza in teglia a lunga maturazione, brioches, grandi lievitati e prodotti ad alta idratazione.",
+         notes="La scheda la descrive come la 00 più forte della linea, con alto contenuto di glutine; lievitazioni "
+               "fino a 48 ore. Non riporta P/L e proteine.",
+         source_url="https://www.pasta-garofalo.com/it/prodotto/farina-w-350/"),
+    dict(brand="Polselli", name="Vivace", kind="Tipo 00", w=290,
+         use="Impasti a lunga lievitazione, pizza al piatto e in teglia.",
+         notes="Indice di panificazione W 290 (+0-5%). La scheda non riporta P/L e proteine.",
+         source_url="https://www.polselli.it/it/farina/nome/Vivace/linea/convenzionale"),
+)
+SEED_SINCE: dict[tuple[str, str], int] = {(s["brand"], s["name"]): 2 for s in _V2_SEEDS}
+# Nome come era nella prima versione (dati ripresi da un'app di terzi) -> nome corretto.
+# La sincronizzazione della versione 3 le corregge solo se non le hai modificate.
+DRAFT_NOTE = (
+    "Dati ripresi dall'app MakeMyPizza, non dalla scheda del produttore: W, P/L e proteine sono indicativi; "
+    "fa fede l'etichetta del sacco."
+)
+SEED_CORRECTIONS: dict[tuple[str, str], tuple[str, str]] = {
+    ("Molino Caputo", "Nuvola Super"): ("Molino Caputo", "Nuvola Super"),
+    ("Le 5 Stagioni", "Pizza Napoletana"): ("Le 5 Stagioni", "Pizza Napoletana Rossa"),
+    ("Le 5 Stagioni", "Superiore"): ("Le 5 Stagioni", "Superiore"),
+    ("Le 5 Stagioni", "Mora Integrale / Semi"): ("Le 5 Stagioni", "Mora"),
+    ("Molino Quaglia", "Petra 3"): ("Molino Quaglia", "Petra 3"),
+    ("Molino Quaglia", "Petra 5037 Speciale Pizza"): ("Molino Quaglia", "Petra 5037"),
+    ("Pastificio Garofalo", "W350 Forte"): ("Pastificio Garofalo", "Farina W 350"),
+    ("Polselli", "Vivace"): ("Polselli", "Vivace"),
+}
+
 # (produttore, nome) -> (impasto, parole del produttore). L'impasto è "diretto" o "indiretto" solo
 # se la scheda dice "esclusivamente"; se ammette entrambi è "entrambi"; se cita solo un uso, resta vuoto.
 _METHODS: dict[tuple[str, str], tuple[str, str]] = {
@@ -163,6 +226,10 @@ _METHODS: dict[tuple[str, str], tuple[str, str]] = {
     ("Molino Vigevano", "Vesuvio"): ("entrambi", "Adatta anche a impasti indiretti"),
     ("Molino Vigevano", "Pizza in Teglia"): ("entrambi", "Adatta anche a prefermenti"),
     ("Molino Casillo", "Zero XL"): ("", "Ottima per lunghe lievitazioni e per la preparazione di bighe"),
+    ("Molino Caputo", "Nuvola Super"): ("entrambi", "Ideale sia per pre-fermenti che per impasti diretti"),
+    ("Le 5 Stagioni", "Superiore"): ("entrambi", "Adatta a tutti gli impasti diretti e indiretti con lunga lievitazione"),
+    ("Le 5 Stagioni", "Mora"): ("entrambi", "In purezza, al 100%, in impasti diretti o indiretti"),
+    ("Molino Quaglia", "Petra 5037"): ("entrambi", "Impasti diretti, indiretti e con lievito madre"),
 }
 
 FLOUR_SEEDS: tuple[dict[str, Any], ...] = tuple(
@@ -170,5 +237,5 @@ FLOUR_SEEDS: tuple[dict[str, Any], ...] = tuple(
         **seed,
         **dict(zip(("method", "method_note"), _METHODS.get((seed["brand"], seed["name"]), ("", "")), strict=True)),
     }
-    for seed in _BASE_SEEDS
+    for seed in (*_BASE_SEEDS, *_V2_SEEDS)
 )

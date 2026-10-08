@@ -9,7 +9,7 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 
 from .db import SessionLocal
-from .models import Flour
+from .models import AppSetting, Flour
 from .services.fields import clean_text, format_number, parse_float
 from .services.flour_blend import (
     METHOD_LABELS,
@@ -20,7 +20,8 @@ from .services.flour_blend import (
     method_warnings,
     parse_rows,
 )
-from .services.flour_seed import FLOUR_SEEDS
+from .services.flour_seed import DRAFT_NOTE, FLOUR_SEEDS, SEED_CORRECTIONS, SEED_SINCE, SEED_VERSION
+from .services.flour_suggest import suggest_flours
 from .web import RowId, common_ctx, templates
 
 router = APIRouter(prefix="/farine")
@@ -35,13 +36,76 @@ NUMBER_LIMITS = {
 }
 
 
+SEED_VERSION_KEY = "flour_seed_version"
+# Campi che la sincronizzazione riempie nelle predefinite quando nel database mancano.
+FILL_FIELDS = ("kind", "w", "pl", "protein", "hydration_min", "hydration_max", "hydration_note", "use")
+
+
+_NUMBER_COLUMNS = ("w", "pl", "protein", "hydration_min", "hydration_max")
+_TEXT_COLUMNS = ("name", "kind", "hydration_note", "method", "method_note", "use", "notes", "source_url")
+
+
+def _apply_seed(flour: Flour, seed: dict[str, Any]) -> None:
+    """Sostituisce i dati tecnici di una predefinita con quelli del seme (anche i vuoti)."""
+    for column in _NUMBER_COLUMNS:
+        setattr(flour, column, seed.get(column))
+    for column in _TEXT_COLUMNS:
+        setattr(flour, column, seed.get(column) or "")
+
+
+async def _set_seed_version(session: Any, version: int) -> None:
+    row = await session.get(AppSetting, SEED_VERSION_KEY)
+    if row is None:
+        session.add(AppSetting(key=SEED_VERSION_KEY, value=str(version)))
+    else:
+        row.value = str(version)
+
+
 async def seed_if_empty() -> None:
     """Alla prima apertura carica le farine predefinite; poi le tue modifiche restano tue."""
     async with SessionLocal() as session:
         if await session.scalar(select(func.count(Flour.id))):
             return
         session.add_all(Flour(builtin=True, **seed) for seed in FLOUR_SEEDS)
+        await _set_seed_version(session, SEED_VERSION)
         await session.commit()
+
+
+async def sync_builtin_seeds() -> int:
+    """Allinea le predefinite alla versione corrente dell'archivio; restituisce quante ne ha aggiunte.
+
+    Ad ogni avvio corregge le predefinite della versione 2 ancora con la nota provvisoria (mai
+    modificate da te). Una volta per versione aggiunge le nuove e riempie i dati mancanti. Non
+    rimette le farine eliminate e non sovrascrive altri valori presenti.
+    """
+    async with SessionLocal() as session:
+        row = await session.get(AppSetting, SEED_VERSION_KEY)
+        stored = int(row.value) if row is not None and row.value.isdecimal() else 1
+        existing = {(f.brand, f.name): f for f in await session.scalars(select(Flour))}
+        seeds = {(s["brand"], s["name"]): s for s in FLOUR_SEEDS}
+        corrected = False
+        for old_key, new_key in SEED_CORRECTIONS.items():
+            draft = existing.get(old_key)
+            if draft is not None and draft.builtin and draft.notes == DRAFT_NOTE:
+                _apply_seed(draft, seeds[new_key])
+                existing[new_key] = existing.pop(old_key)
+                corrected = True
+        added = 0
+        if stored < SEED_VERSION:
+            for seed in FLOUR_SEEDS:
+                flour = existing.get((seed["brand"], seed["name"]))
+                if flour is None:
+                    if SEED_SINCE.get((seed["brand"], seed["name"]), 1) > stored:
+                        session.add(Flour(builtin=True, **seed))
+                        added += 1
+                elif flour.builtin:
+                    for field in FILL_FIELDS:
+                        if field in seed and getattr(flour, field) in (None, ""):
+                            setattr(flour, field, seed[field])
+            await _set_seed_version(session, SEED_VERSION)
+        if stored < SEED_VERSION or corrected:
+            await session.commit()
+        return added
 
 
 async def backfill_builtin_methods() -> None:
@@ -271,6 +335,23 @@ async def blend_context(
             for c in blend.components
             if c.flour.method or c.flour.method_note
         ],
+    }
+
+
+async def suggest_context(
+    *, style: str, total_hours: float, hydration_pct: float, has_preferment: bool
+) -> dict[str, Any]:
+    """Farine consigliate per stile, durata, idratazione e metodo del piano."""
+    async with SessionLocal() as session:
+        flours = list(await session.scalars(select(Flour)))
+    return {
+        "flour_suggestions": suggest_flours(
+            flours,
+            style=style,
+            total_hours=total_hours,
+            hydration_pct=hydration_pct,
+            has_preferment=has_preferment,
+        )
     }
 
 

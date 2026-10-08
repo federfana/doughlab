@@ -13,8 +13,14 @@ from ics import Calendar, Event
 from . import diary, flours, recipes
 from .config import settings
 from .db import init_db
-from .planning import compute_plan_and_ingredients, default_recipe_ctx, preset_ctx
+from .planning import (
+    compute_plan_and_ingredients,
+    default_recipe_ctx,
+    generated_phase_dicts,
+    preset_ctx,
+)
 from .services.fermentation import YeastKind
+from .services.presets import PRESETS, PRESETS_BY_KEY
 from .services.scheduler import PHASE_LABELS, PhaseKind
 from .services.thermal import CONTAINER_LABELS, ENVIRONMENT_LABELS
 from .web import STATIC_DIR, common_ctx, templates
@@ -24,6 +30,7 @@ from .web import STATIC_DIR, common_ctx, templates
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     added = await init_db()
     await flours.seed_if_empty()
+    await flours.sync_builtin_seeds()
     if ("flours", "method") in added:
         await flours.backfill_builtin_methods()
     yield
@@ -73,6 +80,15 @@ async def _plan_bundle(data: dict[str, str]) -> dict[str, Any]:
         phase.phase.kind == PhaseKind.PREFERMENT for phase in bundle["plan"].phases
     )
     bundle.update(await flours.blend_context(data, hydration_pct, has_preferment))
+    preset = PRESETS_BY_KEY.get(data.get("preset_key", ""), PRESETS[0])
+    bundle.update(
+        await flours.suggest_context(
+            style=preset.style.value,
+            total_hours=bundle["plan"].total_hours,
+            hydration_pct=hydration_pct,
+            has_preferment=has_preferment,
+        )
+    )
     bundle["plan_snapshot"].update(flours.snapshot_extras(bundle["flour_blend"]))
     return bundle
 
@@ -84,6 +100,14 @@ async def compute_plan(request: Request) -> HTMLResponse:
     ctx = common_ctx()
     ctx.update(await _plan_bundle(data))
     return templates.TemplateResponse(request, "partials/plan_result.html", ctx)
+
+
+@app.post("/fasi", response_class=HTMLResponse)
+async def generated_phases(request: Request) -> HTMLResponse:
+    form = await request.form()
+    ctx = common_ctx()
+    ctx["phases"] = generated_phase_dicts({k: str(v) for k, v in form.items()})
+    return templates.TemplateResponse(request, "partials/phase_cards.html", ctx)
 
 
 @app.post("/diario/da-piano", response_class=HTMLResponse)

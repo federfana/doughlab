@@ -168,12 +168,16 @@ def test_planner_shows_primary_inputs_and_hides_manual_yeast_dose() -> None:
     assert 'step="any"' in rendered
     assert 'aria-label="Aumenta idratazione di 1 punto"' in rendered
     assert 'aria-label="Riduci sale di 1 punto"' in rendered
-    assert rendered.index('id="result"') < rendered.index('name="start_at"')
-    assert rendered.index('id="result"') < rendered.index('Ricetta base')
+    assert (
+        rendered.index('Ricetta base')
+        < rendered.index('name="hydration_pct"')
+        < rendered.index('name="start_at"')
+        < rendered.index('id="result"')
+    )
     assert 'id="detailsResult"' in rendered
     assert rendered.count('<input type="radio" name="yeast_kind"') == 3
     assert '<select name="yeast_kind"' not in rendered
-    assert rendered.index('name="yeast_kind"') < rendered.index('<details class="panel">')
+    assert rendered.index('name="yeast_kind"') < rendered.index('<details class="panel"')
     assert rendered.count('role="tab"') == 4
     assert rendered.index('id="panel-planner"') < rendered.index('id="panel-live"') < rendered.index('id="panel-diary"') < rendered.index('id="panel-flours"')
     assert 'id="panel-diary"' in rendered
