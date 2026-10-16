@@ -102,14 +102,16 @@ uv run doughlab-service cert      # crea CA e certificato in data/certs/ (gitign
 uv run doughlab-service restart   # il servizio ora ascolta anche su https://…:8443
 ```
 
-Il certificato è valido per `localhost`, `<nome-del-Mac>.local` e l'IP attuale (825 giorni, limite di Apple). La CA resta la stessa quando lo rigeneri, quindi il telefono non va riconfigurato; rigenera con `cert` se cambia l'IP o dopo circa 2 anni.
+Il certificato è valido per `localhost`, `<nome-del-Mac>.local`, il nome assegnato dal router e l'IP attuale (800 giorni, sotto il limite di 825 di Apple). La CA resta la stessa quando lo rigeneri, quindi il telefono non va riconfigurato; rigenera con `cert` se cambia l'IP o dopo circa 2 anni.
 
-Sull'iPhone (una volta sola):
+Sull'iPhone (una volta sola), con l'IP del Mac (`ipconfig getifaddr en0`):
 
-1. Apri `http://<nome-del-Mac>.local:8000/ca.crt` in Safari e scegli *Consenti*.
+1. Apri `http://<IP-del-Mac>:8000/ca.crt` in Safari e scegli *Consenti*.
 2. Impostazioni → *Profilo scaricato* → *Installa*.
 3. Impostazioni → Generali → Info → *Impostazioni attendibilità certificati* → attiva «DoughLab (rete locale)».
-4. Apri `https://<nome-del-Mac>.local:8443` e aggiungi alla schermata Home.
+4. Apri `https://<IP-del-Mac>:8443` e aggiungi alla schermata Home.
+
+Se l'IP cambia (DHCP), riserva un indirizzo fisso al Mac nel router, oppure rigenera il certificato con `cert`. Gli indirizzi `<nome-del-Mac>.local` funzionano solo se il telefono risolve i nomi Bonjour: su alcune reti (router con isolamento, VPN, Private Relay) la pagina risulta «server non trovato» e conviene usare l'IP.
 
 La chiave privata della CA (`data/certs/doughlab-ca.key`) non lascia il Mac: solo `doughlab-ca.crt` viene servito dall'app.
 

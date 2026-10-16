@@ -61,3 +61,9 @@ def test_ca_certificate_is_served_for_the_phone_only_when_it_exists(tmp_path: Pa
 
     monkeypatch.setattr("doughlab.main.CA_CERT", ca)
     run_with_db(tmp_path, monkeypatch, check)
+
+
+def test_extra_hostnames_are_added_once() -> None:
+    names = serve.subject_alt_names("pizza.local", "192.168.1.9", "mac.home", "PIZZA.local", "")
+
+    assert names == "DNS:localhost,DNS:pizza.local,IP:127.0.0.1,DNS:mac.home,IP:192.168.1.9"

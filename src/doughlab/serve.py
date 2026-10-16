@@ -29,8 +29,8 @@ SERVER_KEY = CERT_DIR / "server.key"
 AGENT_LABEL = "it.doughlab.server"
 AGENT_PLIST = Path.home() / "Library" / "LaunchAgents" / f"{AGENT_LABEL}.plist"
 LOG_FILE = Path.home() / "Library" / "Logs" / "DoughLab" / "server.log"
-# Apple rifiuta certificati server validi più di 825 giorni.
-SERVER_CERT_DAYS = 825
+# Apple rifiuta certificati server validi più di 825 giorni: margine per sicurezza.
+SERVER_CERT_DAYS = 800
 CA_DAYS = 3650
 
 
@@ -55,8 +55,9 @@ def local_hostname() -> str:
     return f"{name}.local"
 
 
-def subject_alt_names(hostname: str, ip: str) -> str:
+def subject_alt_names(hostname: str, ip: str, *extra_hosts: str) -> str:
     names = ["DNS:localhost", f"DNS:{hostname}", "IP:127.0.0.1"]
+    names += [f"DNS:{host}" for host in extra_hosts if host and host.lower() != hostname.lower()]
     if ip != "127.0.0.1":
         names.append(f"IP:{ip}")
     return ",".join(names)
@@ -90,7 +91,7 @@ def ensure_certs(cert_dir: Path = CERT_DIR, hostname: str | None = None, ip: str
             ca_key.chmod(0o600)
         server_conf.write_text(
             "basicConstraints=CA:FALSE\nkeyUsage=critical,digitalSignature,keyEncipherment\n"
-            f"extendedKeyUsage=serverAuth\nsubjectAltName={subject_alt_names(hostname, ip)}\n"
+            f"extendedKeyUsage=serverAuth\nsubjectAltName={subject_alt_names(hostname, ip, socket.gethostname())}\n"
         )
         _openssl("req", "-new", "-newkey", "rsa:2048", "-nodes", "-keyout", str(server_key),
                  "-out", str(server_csr), "-subj", f"/CN={hostname}")
@@ -218,7 +219,8 @@ def cli(argv: Sequence[str] | None = None) -> None:
         ca = ensure_certs()
         print(f"Certificato del server rigenerato per {local_hostname()} e {local_ip()}.")
         print(f"Certificato da installare sul telefono: {ca}")
-        print(f"Oppure, dal telefono: http://{local_hostname()}:{settings.port}/ca.crt")
+        print(f"Oppure, dal telefono: http://{local_ip()}:{settings.port}/ca.crt")
+        print(f"Poi apri: https://{local_ip()}:{settings.https_port} (o https://{local_hostname()}:{settings.https_port})")
     elif command == "install":
         install_agent()
     elif command == "uninstall":
