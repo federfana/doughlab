@@ -35,6 +35,28 @@
   <fieldset>
     <legend>Impasto</legend>
     <div class="diary-grid">
+      {% if diary_flours %}
+      <div class="field diary-wide flour-picker" x-data="{ rows: 1 }" @input="applyFlourPicker($el)">
+        <span class="lab">Dall'archivio farine</span>
+        <div class="flour-rows">
+          {% for i in range(3) %}
+          <div class="flour-row" {% if i %}x-show="rows > {{ i }}" x-cloak{% else %}:class="{ single: rows === 1 }"{% endif %}>
+            <select aria-label="Farina {{ loop.index }} dall'archivio">
+              <option value="">{{ 'Scegli una farina' if i == 0 else 'Aggiungi un\'altra farina' }}</option>
+              {% for brand, group in diary_flours|groupby('brand') %}
+              <optgroup label="{{ brand }}">{% for o in group %}<option value="{{ o.id }}" data-label="{{ o.label }}" data-w="{{ '' if o.w is none else o.w }}" data-protein="{{ '' if o.protein is none else o.protein }}">{{ o.label }}</option>{% endfor %}</optgroup>
+              {% endfor %}
+            </select>
+            <input type="number" value="{{ 100 if i == 0 else '' }}" min="0" max="100" step="any" inputmode="decimal" aria-label="Percentuale della farina {{ loop.index }}" {% if i == 0 %}x-show="rows > 1" x-cloak{% endif %}><span {% if i == 0 %}x-show="rows > 1" x-cloak{% endif %}>%</span>
+          </div>
+          {% endfor %}
+        </div>
+        <div class="flour-picker-foot">
+          <button type="button" class="btn-ghost" x-show="rows < 3" @click="rows++; $nextTick(() => { splitFlourPicker($el.closest('.flour-picker'), rows); applyFlourPicker($el.closest('.flour-picker')); })">+ farina</button>
+          <span class="hint">Compila Farina, W e Proteine qui sotto, che puoi comunque correggere.</span>
+        </div>
+      </div>
+      {% endif %}
       <label class="field diary-wide"><span class="lab">Farina</span><input type="text" name="flour" value="{{ f.flour }}" maxlength="200"></label>
       <label class="field"><span class="lab">Forza (W)</span><input type="number" name="flour_w" value="{{ f.flour_w }}" min="0" max="1000" step="any" inputmode="decimal"></label>
       <label class="field"><span class="lab">Proteine %</span><input type="number" name="protein" value="{{ f.protein }}" min="0" max="100" step="any" inputmode="decimal"></label>

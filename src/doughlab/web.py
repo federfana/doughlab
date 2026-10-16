@@ -8,6 +8,7 @@ from fastapi import Path as PathParam
 from fastapi.templating import Jinja2Templates
 
 from .config import settings
+from .services.backup import KNEADING_LABELS
 from .services.fermentation import YEAST_PARAMS, YeastKind
 from .services.fields import format_hours, format_minutes
 from .services.ingredients import STYLE_LABELS, RecipeStyle
@@ -22,6 +23,7 @@ from .services.thermal import (
     Container,
     Environment,
 )
+from .services.water import FRICTION_C
 
 STATIC_DIR = Path(__file__).parent / "static"
 TEMPLATES_DIR = Path(__file__).parent / "templates"
@@ -70,6 +72,7 @@ def common_ctx() -> dict[str, Any]:
         ],
         "styles": [(s.value, STYLE_LABELS[s]) for s in RecipeStyle],
         "strategies": STRATEGIES,
+        "kneading_options": [(key, label, FRICTION_C[key]) for key, label in KNEADING_LABELS.items()],
         "presets": [
             {
                 "key": p.key,

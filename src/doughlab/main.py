@@ -16,6 +16,7 @@ from .db import init_db
 from .planning import (
     compute_plan_and_ingredients,
     default_recipe_ctx,
+    folded_phase_dicts,
     generated_phase_dicts,
     preset_ctx,
 )
@@ -107,6 +108,14 @@ async def generated_phases(request: Request) -> HTMLResponse:
     form = await request.form()
     ctx = common_ctx()
     ctx["phases"] = generated_phase_dicts({k: str(v) for k, v in form.items()})
+    return templates.TemplateResponse(request, "partials/phase_cards.html", ctx)
+
+
+@app.post("/fasi/pieghe", response_class=HTMLResponse)
+async def folded_phases(request: Request) -> HTMLResponse:
+    form = await request.form()
+    ctx = common_ctx()
+    ctx["phases"] = folded_phase_dicts({k: str(v) for k, v in form.items()})
     return templates.TemplateResponse(request, "partials/phase_cards.html", ctx)
 
 

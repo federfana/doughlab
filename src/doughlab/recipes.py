@@ -26,6 +26,7 @@ from .services.ingredients import STYLE_LABELS, RecipeIngredients, RecipeStyle
 from .services.presets import PRESETS_BY_KEY
 from .services.strategies import strategy_for
 from .services.thermal import parse_container, parse_environment
+from .services.water import DEFAULT_FLOUR_C, DEFAULT_KNEADING, FRICTION_C
 from .web import RowId, common_ctx, templates
 
 router = APIRouter(prefix="/ricette")
@@ -49,6 +50,8 @@ def payload_from_form(data: dict[str, str]) -> dict[str, Any]:
         "target_work": number(data, "target_work", DEFAULT_TARGET_WORK, 0.01, 100),
         "oven_profile": oven if oven in {"home", "split"} else "split",
         "initial_dough_c": number(data, "initial_dough_c", 24, 0, 40),
+        "flour_c": number(data, "flour_c", DEFAULT_FLOUR_C, 0, 40),
+        "kneading": data.get("kneading") if data.get("kneading") in FRICTION_C else DEFAULT_KNEADING,
         "mode": "guided" if data.get("mode") == "guided" else "expert",
         "strategy": strategy_for(data.get("strategy", "")).key,
         "room_c": number(data, "room_c", DEFAULT_ROOM_C, 5, 40),
@@ -104,6 +107,8 @@ def _recipe_ctx(recipe: Recipe, version: RecipeVersion) -> dict[str, Any] | None
             # Le ricette salvate prima della modalità guidata restano con le loro fasi.
             mode="guided" if payload.get("mode") == "guided" else "expert",
             mode_forced=True,
+            flour_c=float(payload.get("flour_c", DEFAULT_FLOUR_C)),
+            kneading=payload.get("kneading") if payload.get("kneading") in FRICTION_C else DEFAULT_KNEADING,
             strategy=strategy_for(str(payload.get("strategy", ""))).key,
             room_c=float(payload.get("room_c", DEFAULT_ROOM_C)),
             fridge_c=float(payload.get("fridge_c", DEFAULT_FRIDGE_C)),

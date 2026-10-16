@@ -7,7 +7,7 @@ from sqlalchemy import select
 from doughlab.models import RecipeVersion
 from doughlab.planning import compute_plan_and_ingredients
 from doughlab.services.scheduler import PhaseKind
-from doughlab.services.strategies import STRATEGIES, build_phases, strategy_for
+from doughlab.services.strategies import STRATEGIES, build_phases, strategy_for, with_folds
 from doughlab.services.thermal import Container, Environment
 
 from .test_diary import run_with_db
@@ -109,7 +109,7 @@ def test_planner_page_offers_steps_modes_and_all_strategies(tmp_path, monkeypatc
 
 def test_phases_endpoint_returns_the_phases_of_the_chosen_strategy(tmp_path, monkeypatch) -> None:
     async def check(client, sessions) -> None:
-        response = await client.post("/fasi", data=_guided(strategy="direct_8", room_c="28"))
+        response = await client.post("/fasi", data=_guided(strategy="direct_8", room_c="28", kneading="mixer"))
 
         assert response.status_code == 200
         assert response.text.count('class="phase-card"') == 4
@@ -145,5 +145,66 @@ def test_saved_recipe_keeps_its_mode_and_old_recipes_open_in_expert(tmp_path, mo
             }
             await session.commit()
         assert "plannerUI('home', 'expert', true)" in (await client.get("/?recipe=2")).text
+
+    run_with_db(tmp_path, monkeypatch, check)
+
+
+def test_cold_24h_dose_sits_between_the_lowest_and_highest_independent_calculators() -> None:
+    """Teglia 72%, 24 h di frigo: Bonci/PizzaPlan ~0.17% di lievito istantaneo, PizzApp 0.30%."""
+    plan = compute_plan_and_ingredients(_guided(hydration_pct="72", room_c="20", yeast_kind="dry"))
+    instant_pct = plan["suggested_pct"] * 100 / 1.25
+
+    assert 0.12 <= instant_pct <= 0.25
+    assert plan["plan"].fermentation.final_pct == pytest.approx(100.0, abs=1.0)
+
+
+def test_room_only_dose_does_not_get_the_long_program_boost() -> None:
+    direct = compute_plan_and_ingredients(_guided(strategy="direct_8", yeast_kind="dry"))
+
+    assert 0.09 <= direct["suggested_pct"] * 100 <= 0.20
+
+
+def test_folds_are_taken_out_of_the_bulk_and_keep_the_total() -> None:
+    plain = build_phases("fridge_24", 22, 4)
+    folded = build_phases("fridge_24", 22, 4, folds=True)
+    short = build_phases("fridge_only_24", 22, 4, folds=True)
+
+    assert [p.kind for p in folded[1:8]] == [
+        PhaseKind.BULK, PhaseKind.FOLD, PhaseKind.BULK, PhaseKind.FOLD,
+        PhaseKind.BULK, PhaseKind.FOLD, PhaseKind.BULK,
+    ]
+    assert [round(p.hours * 60) for p in folded[1:7]] == [30, 5, 20, 5, 15, 5]
+    assert sum(p.hours for p in folded) == pytest.approx(sum(p.hours for p in plain))
+    assert sum(p.kind == PhaseKind.FOLD for p in short) == 1
+
+
+def test_guided_plan_adds_folds_by_hand_and_planetary_but_not_with_a_mixer() -> None:
+    def kinds(kneading: str) -> list[PhaseKind]:
+        plan = compute_plan_and_ingredients(_guided(kneading=kneading))["plan"]
+        return [result.phase.kind for result in plan.phases]
+
+    assert PhaseKind.FOLD in kinds("hand")
+    assert PhaseKind.FOLD in kinds("planetary")
+    assert PhaseKind.FOLD not in kinds("mixer")
+
+
+def test_with_folds_adds_them_to_the_first_bulk_and_takes_them_out_again() -> None:
+    plain = build_phases("fridge_24", 22, 4)
+    folded = with_folds(plain, True)
+
+    assert [p.kind for p in folded].count(PhaseKind.FOLD) == 3
+    assert sum(p.hours for p in folded) == pytest.approx(sum(p.hours for p in plain))
+    assert with_folds(folded, True) == folded
+    assert with_folds(folded, False) == plain
+    assert with_folds(plain, False) == plain
+
+
+def test_changing_kneading_in_expert_mode_updates_the_phase_cards(tmp_path, monkeypatch) -> None:
+    async def check(client, sessions) -> None:
+        hand = (await client.post("/fasi/pieghe", data={**_form(62), "kneading": "hand"})).text
+        mixer = (await client.post("/fasi/pieghe", data={**_form(62), "kneading": "mixer"})).text
+
+        assert 'value="fold" selected' in hand and 'value="fold" selected' not in mixer
+        assert hand.count('class="phase-card"') == mixer.count('class="phase-card"') + 6
 
     run_with_db(tmp_path, monkeypatch, check)

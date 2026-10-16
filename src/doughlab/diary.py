@@ -15,7 +15,7 @@ from sqlalchemy.orm import selectinload, undefer
 from starlette.datastructures import FormData, UploadFile
 
 from .db import SessionLocal
-from .models import DiaryEntry, DiaryPhoto, utcnow
+from .models import DiaryEntry, DiaryPhoto, Flour, utcnow
 from .services.backup import (
     FLOAT_FIELDS,
     KNEADING_LABELS,
@@ -66,7 +66,7 @@ ALL_COLUMNS = (
     "ready_at",
 )
 OVEN_LABELS = {"home": "Forno di casa", "split": "Forno elettrico (cielo e platea)"}
-ROOM_PHASES = {"preferment", "bulk", "maturation", "temper", "proof"}
+ROOM_PHASES = {"preferment", "bulk", "fold", "maturation", "temper", "proof"}
 DATETIME_LOCAL = "%Y-%m-%dT%H:%M"
 
 
@@ -128,6 +128,22 @@ def _form_from_entry(entry: DiaryEntry) -> dict[str, Any]:
     }
 
 
+async def _flour_choices() -> list[dict[str, Any]]:
+    """Farine dell'archivio tra cui scegliere nel modulo (nome per esteso, W e proteine)."""
+    async with SessionLocal() as session:
+        flours = (await session.scalars(select(Flour).order_by(Flour.brand, Flour.name))).all()
+    return [
+        {
+            "id": f.id,
+            "brand": f.brand or "Altre",
+            "label": f"{f.brand} {f.name}".strip(),
+            "w": f.w,
+            "protein": f.protein,
+        }
+        for f in flours
+    ]
+
+
 def _hours(value: Any) -> float:
     return float(value) if isinstance(value, (int, float)) else 0.0
 
@@ -142,6 +158,8 @@ def form_from_plan(snapshot: dict[str, Any]) -> dict[str, Any]:
     started = parse_datetime(snapshot.get("started_at"))
 
     values["name"] = clean_text(snapshot.get("recipe_name"), 120)
+    if snapshot.get("kneading") in KNEADING_LABELS:
+        values["kneading"] = snapshot["kneading"]
     values["pizza_type"] = preset.label[:60] if preset else ""
     if snapshot.get("flour_label"):
         values["flour"] = clean_text(snapshot["flour_label"], TEXT_COLUMNS["flour"])
@@ -176,9 +194,11 @@ def form_from_plan(snapshot: dict[str, Any]) -> dict[str, Any]:
     if baking.get("bake_minutes") is not None:
         values["bake_time"] = format_minutes(float(baking["bake_minutes"]))
 
+    water_c = snapshot.get("water_c")
+    water_note = f" a {water_c:.1f} °C".replace(".", ",") if isinstance(water_c, (int, float)) else ""
     lines = [
         f"Farina {_hours(weights.get('flour_g')):.0f} g",
-        f"Acqua {_hours(weights.get('water_g')):.0f} g",
+        f"Acqua {_hours(weights.get('water_g')):.0f} g{water_note}",
         f"Sale {_hours(weights.get('salt_g')):.1f} g",
         f"Lievito {_hours(weights.get('yeast_g')):.2f} g",
     ]
@@ -197,7 +217,8 @@ def form_from_plan(snapshot: dict[str, Any]) -> dict[str, Any]:
     steps: list[str] = []
     for phase in phases:
         begin, end = parse_datetime(phase.get("start_at")), parse_datetime(phase.get("end_at"))
-        when = f" ({begin:%d/%m %H:%M} - {end:%H:%M})" if begin and end else ""
+        end_fmt = "%H:%M" if begin and end and begin.date() == end.date() else "%d/%m %H:%M"
+        when = f" ({begin:%d/%m %H:%M} - {end.strftime(end_fmt)})" if begin and end else ""
         steps.append(f"{phase.get('label', '')}: {format_hours(_hours(phase.get('hours')))}{when}")
     values["process"] = "\n".join(steps)
     return _new_form(values, snapshot)
@@ -375,6 +396,7 @@ async def panel_context(
     ]
     recipe_filter = next((i["recipe_name"] for i in items if recipe_id is not None), "")
     return {
+        "diary_flours": await _flour_choices() if form is not None else [],
         "diary_items": items,
         "diary_total": total,
         "diary_query": query,

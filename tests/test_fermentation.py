@@ -5,8 +5,11 @@ import numpy as np
 import pytest
 
 from doughlab.services.fermentation import (
+    LONG_PROGRAM_MAX_FACTOR,
+    LONG_PROGRAM_REF_H,
     YEAST_PARAMS,
     YeastKind,
+    program_length_factor,
     rate,
     simulate,
     suggest_yeast_pct,
@@ -71,3 +74,11 @@ def test_suggested_pct_hits_target() -> None:
     res = simulate(curve, YeastKind.FRESH, yeast_pct=pct, target_work=24.0)
     assert abs(res.final_pct - 100.0) < 1.0
     assert res.ready_at_h == pytest.approx(float(curve.time_h[-1]))
+
+
+def test_program_length_factor_grows_with_long_programs_and_is_capped() -> None:
+    assert program_length_factor(LONG_PROGRAM_REF_H, YeastKind.DRY) == 1.0
+    assert program_length_factor(5, YeastKind.FRESH) == 1.0
+    assert 1.0 < program_length_factor(24, YeastKind.FRESH) < program_length_factor(40, YeastKind.FRESH)
+    assert program_length_factor(500, YeastKind.DRY) == LONG_PROGRAM_MAX_FACTOR
+    assert program_length_factor(48, YeastKind.SOURDOUGH) == 1.0

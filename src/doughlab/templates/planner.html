@@ -121,23 +121,24 @@
     {# 2. Formula: farina, idratazione, sale, lievito, prefermento #}
     <div class="plan-step space-y" x-show="step === 2" x-cloak>
       {# Farina o miscela: W, proteine e idratazione consigliata nel risultato #}
-      <section class="card" style="padding: 1rem">
+      {% set flour_rows = recipe.flour_rows|default([]) %}
+      <section class="card" style="padding: 1rem" x-data="{ rows: {{ [flour_rows|length, 1]|max }} }" @flour-reset.window="rows = 1">
         <div class="lab-row">Farina</div>
-        {% set flour_rows = recipe.flour_rows|default([]) %}
         <div class="flour-rows">
           {% for i in range(3) %}
           {% set row = flour_rows[i] if i < flour_rows|length else none %}
-          <div class="flour-row">
+          <div class="flour-row" {% if i %}x-show="rows > {{ i }}" x-cloak{% else %}:class="{ single: rows === 1 }"{% endif %}>
             <select name="flour_id_{{ i }}" aria-label="Farina {{ loop.index }}">
               <option value="">{{ 'Nessuna farina scelta' if i == 0 else 'Aggiungi un\'altra farina' }}</option>
               {% for brand, group in flours_options|default([])|groupby('brand') %}
               <optgroup label="{{ brand }}">{% for o in group %}<option value="{{ o.id }}" {% if row and row[0] == o.id %}selected{% endif %}>{{ o.label }}</option>{% endfor %}</optgroup>
               {% endfor %}
             </select>
-            <input type="number" name="flour_pct_{{ i }}" value="{{ ('%g'|format(row[1])) if row else (100 if i == 0 else '') }}" min="0" max="100" step="any" inputmode="decimal" aria-label="Percentuale della farina {{ loop.index }}"><span>%</span>
+            <input type="number" name="flour_pct_{{ i }}" value="{{ 100 if (i == 0 and flour_rows|length <= 1) else (('%g'|format(row[1])) if row else '') }}" min="0" max="100" step="any" inputmode="decimal" aria-label="Percentuale della farina {{ loop.index }}" {% if i == 0 %}x-show="rows > 1"{% endif %}><span {% if i == 0 %}x-show="rows > 1"{% endif %}>%</span>
           </div>
           {% endfor %}
         </div>
+        <button type="button" class="btn-ghost flour-add" x-show="rows < 3" @click="rows++; $nextTick(() => { splitFlourPicker($el.closest('section'), rows); htmx.trigger('#planForm', 'change'); })">+ farina</button>
         {# Copia delle opzioni: il tab Farine la aggiorna e gli elenchi sopra si rigenerano senza perdere la scelta. #}
         <select id="flourOptionsSource" hidden aria-hidden="true" tabindex="-1">{% include "partials/flour_optgroups.html" %}</select>
         <div id="flourSuggest" class="flour-suggest" aria-live="polite"></div>
@@ -254,19 +255,43 @@
 
     {# 3. Lievitazione: partenza e strategia (guidata) o fasi (esperto) #}
     <div class="plan-step space-y" x-show="step === 3" x-cloak>
-      {# Partenza #}
+      {# Partenza: da quando inizi o a che ora vuoi infornare; temperatura dell'acqua #}
       <section class="card" style="padding: 1rem">
-        <div class="lab-row">Partenza</div>
-        <div style="display:grid; gap:.8rem; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr))">
-          <label class="field">
-            <span class="lab">Giorno e ora</span>
+        <div class="plan-anchor-head">
+          <div class="lab-row">Partenza</div>
+          <div class="mode-toggle" role="group" aria-label="Da dove parti">
+            <button type="button" :class="{ on: anchor === 'start' }" :aria-pressed="anchor === 'start'" @click="setAnchor('start')">Inizio impasto</button>
+            <button type="button" :class="{ on: anchor === 'bake' }" :aria-pressed="anchor === 'bake'" title="Scegli quando infornare: DoughLab calcola quando iniziare" @click="setAnchor('bake')">Infornata</button>
+          </div>
+        </div>
+        <input type="hidden" name="anchor" value="start" :value="anchor">
+        <div class="start-grid">
+          <label class="field" x-show="anchor === 'start'">
+            <span class="lab">Inizio impasto</span>
             <input type="datetime-local" name="start_at" value="{{ recipe.start_at }}" required>
           </label>
+          <label class="field" x-show="anchor === 'bake'" x-cloak>
+            <span class="lab">Voglio infornare</span>
+            <input type="datetime-local" name="bake_at" value="{{ recipe.bake_at }}">
+          </label>
           <label class="field">
-            <span class="lab">T° impasto iniziale</span>
-            <input type="number" name="initial_dough_c" value="{{ recipe.initial_dough_c }}" step="any" min="0" max="40">
+            <span class="lab">T° impasto desiderata (°C)</span>
+            <input type="number" name="initial_dough_c" value="{{ recipe.initial_dough_c }}" step="any" min="0" max="40" inputmode="decimal">
+          </label>
+          <label class="field">
+            <span class="lab">T° della farina (°C)</span>
+            <input type="number" name="flour_c" value="{{ '%g'|format(recipe.flour_c) }}" step="any" min="0" max="40" inputmode="decimal">
+          </label>
+          <label class="field">
+            <span class="lab">Come impasti</span>
+            <select name="kneading" @change="refoldPhases()">
+              {% for key, label, friction in kneading_options %}<option value="{{ key }}" {% if recipe.kneading == key %}selected{% endif %}>{{ label }} (+{{ friction|string|replace('.', ',') }} °C)</option>{% endfor %}
+            </select>
           </label>
         </div>
+        <p class="hint" style="margin:.3rem 0 0">A mano o in planetaria il piano aggiunge le pieghe di rinforzo durante la puntata (in Esperto puoi poi spostarle o modificarle).</p>
+        <div id="startInfo" class="start-info" aria-live="polite"></div>
+        <div id="waterInfo" class="water-info" aria-live="polite"></div>
       </section>
 
       <section class="card" style="padding: 1rem" x-show="mode === 'guided'">
@@ -473,7 +498,7 @@
     </div>
     <div class="phase-fields phase-selects">
       <label class="field"><span class="lab">Condizione</span>
-        <select name="phase_env_IDX">
+        <select name="phase_env_IDX" onchange="applyEnvironment(this)">
           {% for v, label, icon in environments %}<option value="{{ v }}">{{ icon }} {% if v=='ambient' %}TA{% else %}TC{% endif %} · {{ label }}</option>{% endfor %}
         </select>
       </label>
@@ -509,6 +534,37 @@ function starRating() {
   };
 }
 
+// Dal modulo del Diario: una farina o una miscela dell'archivio compila Farina, W e Proteine (medie pesate).
+function applyFlourPicker(box) {
+  const rows = [...box.querySelectorAll('.flour-row')].map(row => {
+    const option = row.querySelector('select').selectedOptions[0];
+    if (!option || !option.value) return null;
+    const number = text => (text === '' ? null : Number(text));
+    return { label: option.dataset.label, w: number(option.dataset.w), protein: number(option.dataset.protein), pct: Number(row.querySelector('input').value) || 0 };
+  }).filter(Boolean);
+  if (!rows.length) return;
+  const entered = rows.reduce((sum, r) => sum + r.pct, 0);
+  rows.forEach(r => { r.share = entered > 0 ? r.pct / entered * 100 : 100 / rows.length; });
+  const average = key => {
+    const known = rows.filter(r => r[key] !== null);
+    const total = known.reduce((sum, r) => sum + r.share, 0);
+    return total > 0 ? known.reduce((sum, r) => sum + r.share * r[key], 0) / total : null;
+  };
+  const form = box.closest('form');
+  form.elements.flour.value = (rows.length === 1 ? rows[0].label : rows.map(r => `${Math.round(r.share)}% ${r.label}`).join(' + ')).slice(0, 200);
+  const w = average('w');
+  const protein = average('protein');
+  if (w !== null) form.elements.flour_w.value = String(Math.round(w));
+  if (protein !== null) form.elements.protein.value = String(Math.round(protein * 10) / 10);
+}
+
+// Aggiungendo una farina alla miscela le percentuali si ripartiscono in parti uguali.
+function splitFlourPicker(box, count) {
+  const inputs = [...box.querySelectorAll('.flour-row input')].slice(0, count);
+  const each = Math.floor(100 / count);
+  inputs.forEach((input, i) => { input.value = String(i === count - 1 ? 100 - each * (count - 1) : each); });
+}
+
 function adjustPercent(button, delta) {
   const input = button.closest('.number-stepper').querySelector('input');
   const current = Number(input.value) || 0;
@@ -539,9 +595,30 @@ function normalizeDuration(input) {
   syncDuration(input);
 }
 
+// La maturazione prende il nome dalla condizione scelta (frigo, cella o temperatura ambiente).
+function phaseLabelFor(card) {
+  const kind = card.querySelector('.phase-kind');
+  if (kind.value !== 'maturation') return kind.selectedOptions[0].textContent.trim();
+  const env = card.querySelector('[name^="phase_env_"]').value;
+  return { fridge_home: 'Maturazione in frigo', chamber: 'Maturazione in cella' }[env] || 'Maturazione a temperatura ambiente';
+}
+
 function syncPhaseLabel(select) {
   const card = select.closest('[data-row]');
-  card.querySelector('[name^="phase_label_"]').value = select.selectedOptions[0].textContent.trim();
+  card.querySelector('[name^="phase_label_"]').value = phaseLabelFor(card);
+}
+
+// Temperature di partenza per condizione: cucina e frigo scelti nel passo Lievitazione (22 e 4 °C di base).
+function environmentTemps(form) {
+  const read = (name, fallback) => Number(form.elements[name]?.value) || fallback;
+  return { ambient: read('room_c', 22), fridge_home: read('fridge_c', 4), chamber: 18 };
+}
+
+function applyEnvironment(select) {
+  const card = select.closest('[data-row]');
+  const temp = environmentTemps(select.form)[select.value];
+  if (temp !== undefined) card.querySelector('[name^="phase_ambient_"]').value = String(temp);
+  syncPhaseLabel(select);
 }
 
 // Riduce le foto a max 1600 px (JPEG) prima del caricamento: sul telefono sono molti MB.
@@ -570,11 +647,13 @@ async function compressPhotoInput(input) {
 
 const LIVE_KEY = 'dl-live';
 const MODE_KEY = 'dl-mode';
+const ANCHOR_KEY = 'dl-anchor';
 const LIVE_CHECKS = {
   preferment: ['Bolle in superficie', 'Volume quasi raddoppiato, con la cupola ancora tesa'],
   autolyse: ['Nessun grumo di farina asciutta'],
   mix: ['Impasto liscio ed elastico', 'Temperatura dell\'impasto vicina a quella prevista'],
   bulk: ['Impasto cresciuto del 30-50% circa', 'Bolle visibili sui bordi del contenitore'],
+  fold: ['Impasto steso e ripiegato su sé stesso, da tutti i lati', 'Impasto più tondo e tenace di prima'],
   maturation: ['Contenitore chiuso', 'Volume raddoppiato prima di usarlo'],
   temper: ['Impasto tornato morbido e senza zone fredde'],
   shape: ['Panetti pesati e uniformi', 'Chiusura sotto, superficie tesa'],
@@ -593,6 +672,7 @@ function plannerUI(initialOvenProfile, initialMode, modeForced) {
     activeTab: 'planner',
     ovenProfile: initialOvenProfile,
     step: 1,
+    anchor: 'start',
     mode: initialMode,
     // Fasi toccate a mano: passando a «Guidata» verrebbero sostituite, quindi si chiede conferma.
     phasesEdited: modeForced && initialMode === 'expert',
@@ -600,6 +680,7 @@ function plannerUI(initialOvenProfile, initialMode, modeForced) {
     now: Date.now(),
     init() {
       if (!modeForced) this.mode = localStorage.getItem(MODE_KEY) === 'expert' ? 'expert' : 'guided';
+      if (localStorage.getItem(ANCHOR_KEY) === 'bake') this.anchor = 'bake';
       try {
         const saved = JSON.parse(localStorage.getItem(LIVE_KEY));
         if (saved && Array.isArray(saved.phases) && saved.phases.length && Array.isArray(saved.actual) && saved.actual.length) {
@@ -609,6 +690,11 @@ function plannerUI(initialOvenProfile, initialMode, modeForced) {
       } catch (error) { /* stato locale illeggibile: si riparte da zero */ }
       setInterval(() => { this.now = Date.now(); this.liveTick(); }, 1000);
       document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') this.wakeLock(); });
+    },
+    setAnchor(next) {
+      this.anchor = next;
+      localStorage.setItem(ANCHOR_KEY, next);
+      this.$nextTick(() => htmx.trigger('#planForm', 'change'));
     },
     resetPlan() {
       if (!confirm('Azzerare il piano e ripartire dai valori della ricetta base?')) return;
@@ -632,6 +718,14 @@ function plannerUI(initialOvenProfile, initialMode, modeForced) {
       this.mode = next;
       localStorage.setItem(MODE_KEY, next);
       this.$nextTick(() => htmx.trigger('#planForm', 'change'));
+    },
+    // In Esperto le fasi sono tue: cambiando come impasti si aggiungono o tolgono solo le pieghe.
+    async refoldPhases() {
+      if (this.mode !== 'expert') return;
+      const values = Object.fromEntries(new FormData(document.getElementById('planForm')));
+      await htmx.ajax('POST', '/fasi/pieghe', { target: '#phases', swap: 'innerHTML', values });
+      this.reindex();
+      htmx.trigger('#planForm', 'change');
     },
     focusTab(tab) {
       this.activeTab = tab;
@@ -792,17 +886,16 @@ function plannerUI(initialOvenProfile, initialMode, modeForced) {
       const card = tpl.querySelector('[data-row]');
       const kind = card.querySelector('[name^="phase_kind_"]');
       kind.value = type;
-      card.querySelector('[name^="phase_label_"]').value = kind.selectedOptions[0].textContent.trim();
       const phaseDefaults = {
-        preferment: { environment: 'ambient', temperature: 18, container: 'mass_bowl' },
-        maturation: { environment: 'fridge_home', temperature: 4, container: 'mass_bowl' },
-        shape: { environment: 'ambient', temperature: 22, container: 'balls_box' },
-        proof: { environment: 'ambient', temperature: 22, container: 'balls_box' },
+        maturation: { environment: 'fridge_home', container: 'mass_bowl' },
+        shape: { environment: 'ambient', container: 'balls_box' },
+        proof: { environment: 'ambient', container: 'balls_box' },
       };
-      const defaults = phaseDefaults[type] || { environment: 'ambient', temperature: 22, container: 'mass_bowl' };
+      const defaults = phaseDefaults[type] || { environment: 'ambient', container: 'mass_bowl' };
       card.querySelector('[name^="phase_env_"]').value = defaults.environment;
-      card.querySelector('[name^="phase_ambient_"]').value = defaults.temperature;
+      card.querySelector('[name^="phase_ambient_"]').value = environmentTemps(document.getElementById('planForm'))[defaults.environment];
       card.querySelector('[name^="phase_container_"]').value = defaults.container;
+      card.querySelector('[name^="phase_label_"]').value = phaseLabelFor(card);
       document.getElementById('phases').appendChild(tpl);
       this.phasesEdited = true;
       this.reindex();
@@ -844,6 +937,7 @@ function plannerUI(initialOvenProfile, initialMode, modeForced) {
         form.elements['flour_id_' + i].value = '';
         form.elements['flour_pct_' + i].value = '';
       }
+      window.dispatchEvent(new Event('flour-reset'));
       form.elements.flour_id_0.dispatchEvent(new Event('change', { bubbles: true }));
     },
     useTray(grams) {

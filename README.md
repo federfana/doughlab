@@ -29,16 +29,17 @@ Laboratorio digitale per impasti pizza/pane. Prevede **quando** l'impasto è dav
 ## Funzionalità
 
 - **Formula**: numero e peso dei panetti, idratazione, sale e tipo di lievito (fresco, secco attivo, madre) danno le grammature; la scelta del prefermento (nessuno, biga, poolish) sta nella formula e la *Ricetta finale* si divide in 1. prefermento, 2. impasto finale e totali. Olio, zucchero e prefermento stanno nei parametri avanzati.
-- **Pianificatore a passi (Guidata / Esperto)** (pulsante *Azzera* per ripartire dalla ricetta base): in Guidata si vedono solo scelte semplici (prefermento nessuno/biga/poolish con valori standard, olio e zucchero della ricetta base, strategia di lievitazione); in Esperto compaiono anche i valori del prefermento, olio e zucchero e l'editor delle fasi. il piano si compila in 4 passi (*Impasto*, *Formula*, *Lievitazione*, *Piano*) con una barra riepilogo sempre visibile (panetti, idratazione, lievito, pronto per). In modalità **Guidata** (predefinita, ricordata nel browser) scegli una strategia di lievitazione (diretta 8 h, frigo + ambiente 24 h, solo frigo 24 h, 48 h, solo frigo 48 h, lunga 72 h) e le temperature reali di cucina e frigo (sempre modificabili): le fasi le genera DoughLab. In modalità **Esperto** compare l'editor delle fasi. Passando a Esperto le fasi generate restano modificabili; tornando a Guidata, se le hai modificate, viene chiesta conferma. Le ricette salvate prima della modalità guidata si aprono in Esperto.
+- **Pianificatore a passi (Guidata / Esperto)** (pulsante *Azzera* per ripartire dalla ricetta base): in Guidata si vedono solo scelte semplici (prefermento nessuno/biga/poolish con valori standard, olio e zucchero della ricetta base, strategia di lievitazione); in Esperto compaiono anche i valori del prefermento, olio e zucchero e l'editor delle fasi. il piano si compila in 4 passi (*Impasto*, *Formula*, *Lievitazione*, *Piano*) con una barra riepilogo sempre visibile (panetti, idratazione, lievito, pronto per). In modalità **Guidata** (predefinita, ricordata nel browser) scegli una strategia di lievitazione (diretta 8 h, frigo + ambiente 24 h, solo frigo 24 h, 48 h, solo frigo 48 h, lunga 72 h) e le temperature reali di cucina e frigo (sempre modificabili): le fasi le genera DoughLab. In modalità **Esperto** compare l'editor delle fasi: cambiando la *Condizione* di una fase la temperatura si imposta da sola (cucina e frigo indicati nel piano, 22 e 4 °C di base; cella 18 °C) e una maturazione prende il nome dalla condizione (in frigo, in cella, a temperatura ambiente). Passando a Esperto le fasi generate restano modificabili; tornando a Guidata, se le hai modificate, viene chiesta conferma. Le ricette salvate prima della modalità guidata si aprono in Esperto.
+- **Infornata a ritroso e temperatura dell'acqua** (passo *Lievitazione*): *Partenza* si sceglie come *Inizio impasto* oppure *Infornata*; con l'infornata DoughLab calcola quando iniziare sottraendo la durata delle fasi (avvisa se l'orario è già passato) e la scelta è ricordata nel browser. Con T° impasto desiderata, T° della farina, ambiente (la cucina in guidata, la fase di impasto in esperto) e come impasti (a mano +1,5 °C, planetaria +6,5, impastatrice +9) calcola la **temperatura dell'acqua** (3 × impasto − (ambiente + farina + attrito); con un prefermento a 4 fattori) con un consiglio (tiepida, fredda, ghiaccio). L'acqua consigliata resta tra 0 e 35 °C: se la formula ne chiede di più (cucina e farina molto fredde) o di meno, dice a che temperatura uscirà l'impasto e il piano usa quella. Compare anche nelle grammature e nel Diario, che precompila «Come impasti».
 - **Idratazione e farina**: scorciatoie (58-80%) e, accanto al campo, l'intervallo consigliato per la farina scelta con il pulsante *Usa X%*.
 - **Fasi e temperature**: la sequenza di fasi (TA/TC, contenitore) genera la curva termica e la maturità. La **dose di lievito non si inserisce**: è calcolata dal piano.
 - **Ricette base**: 5 preset caricabili con un click, con un orientamento sulla farina. Per la teglia c'è un piccolo calcolatore: *lato × lato ÷ 2* = grammi di impasto (30 × 40 cm ≈ 600 g) e un pulsante per usarlo come peso del panetto.
 - **Suggerimenti di cottura**: in sola lettura, per forno domestico o elettrico con cielo e platea indipendenti. Non influenzano la maturazione.
-- **Diario**: ogni prova ha nome, data, formula, forno, come si impasta (a mano, planetaria, impastatrice), voto a stelle (mezze stelle: tocca la metà sinistra di una stella; ritocca lo stesso valore per toglierlo), note, "da cambiare" e fino a 5 foto. Può nascere da un piano (pulsante *Salva questa prova nel diario*, che precompila ingredienti, fasi e forno) e, con gli orari reali, mostra la partenza e il pronto stimati, quelli reali e lo scarto tra le DURATE (non tra le date: se il piano partiva un altro giorno il confronto resta valido).
+- **Diario**: ogni prova ha nome, data, formula, forno, come si impasta (a mano, planetaria, impastatrice), voto a stelle (mezze stelle: tocca la metà sinistra di una stella; ritocca lo stesso valore per toglierlo), note, "da cambiare" e fino a 5 foto. Nel modulo puoi scegliere una **farina o una miscela dell'archivio** (una riga; il pulsante *+ farina* ne aggiunge fino a 3, con percentuali ripartite in parti uguali): compila Farina, W e Proteine (medie pesate), che restano modificabili. Può nascere da un piano (pulsante *Salva questa prova nel diario*, che precompila ingredienti, fasi e forno) e, con gli orari reali, mostra la partenza e il pronto stimati, quelli reali e lo scarto tra le DURATE (non tra le date: se il piano partiva un altro giorno il confronto resta valido).
 - **Ricette salvate**: formula, fasi, lievito e forno si salvano con un nome (*Le mie ricette*); salvare di nuovo con lo stesso nome crea una nuova versione, e ogni versione si può riaprire. Le prove del diario nate da una ricetta salvata restano collegate e si filtrano per ricetta.
 - **In corso (Live Bake)**: *Avvia in cucina* segue le fasi in tempo reale con timer, avanzamento manuale, ±15 min, controlli per fase, temperatura misurata, avviso a fine fase e schermo acceso. Lo stato resta nel browser (sopravvive a ricarica e chiusura) e a fine impasto precompila il diario con gli orari reali.
 - **Ricerca nel Diario** per nome, tipo, note, forno.
-- **Farine**: un archivio con W, P/L, proteine e idratazione consigliata, già carico con le farine di Agricola Piano, Caputo, Casillo, Le Farine Magiche, Vigevano (dati dichiarati dai produttori), altre dai siti dei produttori (Caputo Nuvola Super, Le 5 Stagioni, Molino Quaglia Petra, Garofalo, Polselli; dove la scheda non riporta W e P/L restano vuoti, e quelle senza W non entrano nei consigli) e alcune categorie generiche. Nel passo *Formula* il piano **consiglia fino a 3 farine** (marca e tipo) per stile, ore di maturazione, idratazione e metodo (diretto/indiretto), con il motivo e un pulsante *Usa*. Nel piano scegli una farina o una miscela (fino a 3): vedi W, P/L e proteine medi, i grammi per farina e l'**idratazione consigliata** (dal produttore, oppure stimata dalla forza W) confrontata con la tua, con un pulsante per adottarla. Ogni farina dice se è indicata per impasti **diretti o indiretti** (come sulle schede di Agricola Piano) e il piano avvisa se una farina "solo diretta" incontra un prefermento, o viceversa. La miscela passa a Diario (farina, W, proteine) e ricette salvate.
+- **Farine**: un archivio con W, P/L, proteine e idratazione consigliata, già carico con le farine di Agricola Piano, Caputo, Casillo, Le Farine Magiche, Vigevano (dati dichiarati dai produttori), altre dai siti dei produttori (Caputo Nuvola Super, Le 5 Stagioni, Molino Quaglia Petra, Garofalo, Polselli; dove la scheda non riporta W e P/L restano vuoti, e quelle senza W non entrano nei consigli) e alcune categorie generiche. Nel passo *Formula* il piano **consiglia fino a 3 farine** (marca e tipo) per stile, ore di maturazione, idratazione e metodo (diretto/indiretto), con il motivo e un pulsante *Usa*. Nel piano scegli una farina (una riga; *+ farina* ne aggiunge fino a 3 per una miscela, percentuali in parti uguali che puoi correggere): vedi W, P/L e proteine medi, i grammi per farina e l'**idratazione consigliata** (dal produttore, oppure stimata dalla forza W) confrontata con la tua, con un pulsante per adottarla. Ogni farina dice se è indicata per impasti **diretti o indiretti** (come sulle schede di Agricola Piano) e il piano avvisa se una farina "solo diretta" incontra un prefermento, o viceversa. La miscela passa a Diario (farina, W, proteine) e ricette salvate.
 - **Backup**: importa ed esporta il Diario in JSON con le foto (formato compatibile con il backup di [Pizza Lab](https://pizzalab.sibellutu.com/)). L'importazione è ripetibile: le voci già presenti non si duplicano e non sovrascrivono modifiche locali più recenti.
 - **Export `.ics`** per il Calendario, **PWA** installabile e tema chiaro/scuro. Le librerie JS sono locali (`static/vendor/`): su `localhost` o in HTTPS, dopo la prima visita, l'app si apre e funziona anche offline, tranne le operazioni che passano dal server.
 
@@ -106,6 +107,7 @@ doughlab/
 │   │   ├── ingredients.py         # calcolo baker's percentage
 │   │   ├── presets.py             # ricette predefinite
 │   │   ├── strategies.py          # strategie di lievitazione -> fasi (modalità guidata)
+│   │   ├── water.py               # temperatura dell'acqua dalla formula del pizzaiolo
 │   │   ├── fields.py              # lettura difensiva di numeri, testi, date
 │   │   ├── flour_blend.py         # medie pesate della miscela e idratazione consigliata
 │   │   ├── flour_seed.py          # farine predefinite con fonte
@@ -256,6 +258,19 @@ Ancore usate nel fit (dose di riferimento in lievito istantaneo, IDY; il fresco 
 
 Non usati nel fit e controllati dopo: frigo puro 24-72 h (when.pizza) e le dosi a temperatura ambiente di PizzaPlan.
 
+**Correzione per i programmi lunghi** (`program_length_factor`, solo lievito di birra): il lavoro richiesto cresce con le ore fermentanti dell'impasto finale (preimpasto escluso) oltre 10 h, $f = \min(1.5,\ (h/10)^{0.4})$. Sotto le 10 h non cambia nulla, quindi le ancore a temperatura ambiente restano valide; con frigo di 24 h o più la dose sale di circa 1.4-1.5×. Motivo: l'integrale Q10 puro dà dosi al limite basso dei calcolatori (nella pratica impasti poco lievitati). Le ancore Dough School con frigo sopra riportate risultano quindi 1.3-1.7× sotto la dose attuale. Confronto sulla teglia 72%, 5 h a 20 °C + 24 h a 4 °C (dose di lievito istantaneo, IDY):
+
+| Fonte | IDY | Note |
+|---|---|---|
+| DoughLab prima | 0.097% | |
+| DoughLab ora | 0.146% | |
+| Quelli di Bonci (formula del calcolatore teglia) | 0.09% | formula letta dal sito; sul frigo puro 24 h dà 0.17% |
+| PizzaPlan (Hamelman) | 0.167% | frigo 24 h, 65%, 20/6 °C, secco |
+| Dough School | 0.15% | 2 h + 22 h di frigo |
+| PizzApp | 0.30% | il più alto: circa il doppio degli altri |
+
+Il fattore è un compromesso voluto fra gli altri calcolatori e PizzApp, non una misura: va verificato sulle infornate reali.
+
 Dalla velocità al **lavoro cumulato** (= maturità):
 
 $$W(t) = \int_0^t k(T(\tau)) \cdot 100 \cdot p_{\text{lievito}} \, d\tau$$
@@ -357,6 +372,15 @@ Calcolo grammature con il sistema **baker's percentage**: tutto è relativo al 1
 
 La logica: dato peso_panetto×n_panetti = peso_totale, si imposta `denominatore = 1 + sum(percentuali)` e si ricava `farina = peso_totale / denominatore`. Da lì tutte le grammature sono `farina × percentuale`.
 
+### [services/water.py](src/doughlab/services/water.py)
+
+| Simbolo | Tipo | Scopo |
+|---|---|---|
+| `FRICTION_C` | dict | calore dell'impastatrice: `hand` 1,5, `planetary` 6,5, `mixer` 9 °C (stesse chiavi di `KNEADING_LABELS`) |
+| `water_temperature(target, ambient, flour, kneading, preferment_c=None)` | funzione | $3 \times T_{impasto} - (T_{amb} + T_{farina} + attrito)$, a 4 fattori con un prefermento; restituisce `WaterAdvice` (temperatura, formula, consiglio, livello `ok`/`cold`/`hot`) |
+
+`planning.py`: `local_datetime`, `hours_before_bake` (ore fino all'infornata) e, con `anchor=bake` e `bake_at` validi, `start_at = bake_at − ore`; il pacchetto restituito ha `water`, `anchor`, `plan_start_at`, `plan_oven_at`, `start_in_past`.
+
 ### [services/strategies.py](src/doughlab/services/strategies.py)
 
 Dalle scorciatoie di lievitazione alle fasi del piano (modalità guidata).
@@ -365,7 +389,7 @@ Dalle scorciatoie di lievitazione alle fasi del piano (modalità guidata).
 |---|---|---|
 | `Strategy` | `dataclass` | chiave, etichetta, durate di puntata/frigo/staglio/appretto, se i panetti maturano in frigo |
 | `STRATEGIES` | tupla | diretta 8 h, frigo + ambiente 24/48 h, solo frigo 24/48 h, lunga 72 h |
-| `build_phases(key, room_c, fridge_c, ...)` | funzione | fasi della strategia con le temperature scelte; opzionali prefermento davanti e stesura alla fine |
+| `build_phases(key, room_c, fridge_c, ...)` | funzione | fasi della strategia con le temperature scelte; opzionali prefermento davanti, stesura alla fine e pieghe di rinforzo (`folds=True`: fino a 3 pieghe da 5 min dopo pause di 30, 20 e 15 min, quante ne stanno lasciando almeno 15 min di puntata; tolte dalla puntata) |
 | `strategy_for(key)` | funzione | strategia per chiave, con ripiego su `fridge_24` |
 
 ### [services/presets.py](src/doughlab/services/presets.py)
@@ -394,7 +418,7 @@ Il "direttore d'orchestra". Converte una lista di fasi in un `PlanResult` comple
 
 | Simbolo | Tipo | Scopo |
 |---|---|---|
-| `PhaseKind` | `StrEnum` | 10 fasi (preferment, autolyse, mix, bulk, maturation, temper, shape, proof, open, bake) |
+| `PhaseKind` | `StrEnum` | 11 fasi (preferment, autolyse, mix, bulk, fold, maturation, temper, shape, proof, open, bake) |
 | `PHASE_LABELS` | `dict[PhaseKind, str]` | etichette italiane |
 | `FERMENTING_PHASES` | `set[PhaseKind]` | fasi la cui durata contribuisce all'attività del lievito; esclude autolisi e cottura |
 | `fermentation_activity_mask(thermal, phases)` | funzione | maschera booleana per intervallo di tempo: `True` dove la fase è fermentante |
@@ -415,6 +439,7 @@ L'app FastAPI. Route attuali:
 | `GET` | `/?recipe=<id>&version=<n>` | carica una ricetta salvata (ultima versione se `version` manca) |
 | `POST` | `/plan` | ritorna il **fragment HTML** `plan_result.html` (HTMX swap); con `mode=guided` le fasi vengono dalla strategia (`strategy`, `room_c`, `fridge_c`), con `mode=expert` (o senza `mode`) dai campi `phase_*` |
 | `POST` | `/fasi` | schede delle fasi generate dalla strategia scelta, per passare a Esperto |
+| `POST` | `/fasi/pieghe` | in Esperto: le fasi attuali con le pieghe di rinforzo aggiunte (a mano, planetaria) o tolte (impastatrice) |
 | `POST` | `/diario/da-piano` | apre il modulo del Diario precompilato con il piano corrente |
 | `POST` | `/plan.ics` | ritorna il piano come file `.ics` da aprire in Calendario (orari in ora locale del server) |
 | `GET` | `/static/*` | asset statici (PWA, icone, SW) |
@@ -503,7 +528,7 @@ Nota UX: nel form le percentuali sono inserite in formato umano (`62`, `2.8`) e 
 
 ## Testing
 
-159 test (al 2026-10-06). Lanciali con `uv run pytest`.
+187 test (al 2026-10-16). Lanciali con `uv run pytest`.
 
 ### [tests/test_thermal.py](tests/test_thermal.py)
 
@@ -526,6 +551,7 @@ Nota UX: nel form le percentuali sono inserite in formato umano (`62`, `2.8`) e 
 | `test_room_temperature_dose_matches_independent_calculators` | 9 h a 22 °C: secco attivo tra 0.09% e 0.13% (PizzApp 0.119%, Dough School 0.096%) e fresco = 2.4 × secco |
 | `test_fermentation_monotone` | W(t) sempre crescente |
 | `test_suggested_pct_hits_target` | con la % suggerita, maturità finale ≈ 100% |
+| `test_program_length_factor_grows_with_long_programs_and_is_capped` | fattore 1 sotto le 10 h, crescente, limitato a 1.5, LM escluso |
 
 ### [tests/test_scheduler.py](tests/test_scheduler.py)
 
@@ -611,8 +637,10 @@ Nota UX: nel form le percentuali sono inserite in formato umano (`62`, `2.8`) e 
 | `test_export_then_import_into_empty_diary_is_lossless` | export e reimport in un diario vuoto non perdono nulla |
 | `test_import_rejects_non_backup_files` | file non validi o assenti danno un messaggio |
 | `test_plan_prefills_new_diary_entry` | il piano precompila la voce e viene conservato |
+| `test_process_steps_show_the_end_date_only_when_it_is_another_day` | nel processo precompilato la fine mostra la data solo se cambia giorno |
 | `test_kneading_method_is_saved_shown_and_survives_export_import` | metodo di impasto salvato, mostrato come etichetta, valori non validi scartati, nel backup sotto `doughlab.kneading` |
 | `test_import_is_a_toolbar_button_next_to_export` | l'importazione è un pulsante nella barra, accanto a Esporta, non più un riquadro |
+| `test_diary_form_lets_you_pick_flours_from_the_archive` | il modulo offre la scelta dall'archivio farine (assente se l'archivio è vuoto), con nome, W e proteine nelle opzioni |
 | `test_diary_shows_prediction_error_for_linked_plan` | confronto stima/reale nella scheda |
 | `test_comparison_uses_durations_so_a_wrong_plan_date_does_not_skew_it` | con partenza del piano nota lo scarto è tra durata stimata e reale, non tra date; la scheda mostra entrambi gli intervalli |
 | `test_form_shows_the_planned_start_of_a_linked_plan` | il modulo mostra la partenza prevista del piano collegato |
@@ -678,6 +706,10 @@ Nota UX: nel form le percentuali sono inserite in formato umano (`62`, `2.8`) e 
 | `test_guided_plan_with_a_preferment_starts_with_it` | con un prefermento il piano guidato parte da biga/poolish |
 | `test_planner_page_offers_steps_modes_and_all_strategies` | la pagina ha passi, modalità, tutte le strategie e i campi di temperatura |
 | `test_phases_endpoint_returns_the_phases_of_the_chosen_strategy` | `/fasi` restituisce le schede della strategia con le temperature scelte |
+| `test_folds_are_taken_out_of_the_bulk_and_keep_the_total` | le pieghe di rinforzo spezzano la puntata senza cambiare la durata totale |
+| `test_guided_plan_adds_folds_by_hand_and_planetary_but_not_with_a_mixer` | il piano guidato inserisce le pieghe se si impasta a mano o in planetaria, non con l'impastatrice |
+| `test_with_folds_adds_them_to_the_first_bulk_and_takes_them_out_again` | `with_folds` aggiunge/toglie le pieghe senza cambiare la durata totale |
+| `test_changing_kneading_in_expert_mode_updates_the_phase_cards` | `/fasi/pieghe` restituisce le schede con o senza pieghe |
 | `test_plan_response_carries_the_advice_and_the_summary_bar` | `/plan` aggiorna anche `#flourAdvice` e `#planBar` |
 | `test_saved_recipe_keeps_its_mode_and_old_recipes_open_in_expert` | la ricetta salvata ricorda modalità e strategia; quelle vecchie si aprono in Esperto |
 
@@ -694,9 +726,38 @@ Nota UX: nel form le percentuali sono inserite in formato umano (`62`, `2.8`) e 
 | `test_sync_corrects_untouched_draft_flours_and_leaves_edited_ones` | le farine con i dati provvisori vengono corrette e rinominate (anche a versione già corrente); quelle modificate restano |
 | `test_sync_adds_new_seeds_once_fills_gaps_and_respects_user_choices` | la sincronizzazione aggiunge le nuove una volta, riempie i vuoti, non sovrascrive né ripristina le eliminate |
 | `test_fresh_database_is_seeded_at_the_current_version_and_sync_does_nothing` | un database nuovo parte già alla versione corrente |
+| `test_planner_flour_card_starts_with_one_row_and_reopens_saved_blends_fully` | la scelta della farina parte con una riga; le miscele salvate si riaprono con tutte le righe |
 | `test_plan_response_lists_suggested_flours_with_a_use_button` | `/plan` aggiorna `#flourSuggest` con pulsanti *Usa* e segna «in uso» |
 | `test_planner_page_has_a_reset_and_mode_dependent_controls` | la pagina ha *Azzera* e controlli diversi tra Guidata ed Esperto |
 | `test_suggestions_never_crash_on_the_real_seed` | nessun errore sui dati predefiniti, a diverse durate |
+
+### [tests/test_water_anchor.py](tests/test_water_anchor.py)
+
+| Test | Proprietà verificata |
+|---|---|
+| `test_water_follows_the_three_factor_formula_and_friction` | formula a 3 fattori e attrito per metodo |
+| `test_a_preferment_adds_its_temperature_and_a_fourth_factor` | con il prefermento si aggiunge la sua temperatura e un quarto fattore |
+| `test_hot_summer_asks_for_cold_water_and_ice_when_it_is_not_enough` | in estate acqua fredda, poi ghiaccio |
+| `test_water_is_capped_at_35_degrees_and_the_resulting_dough_temperature_is_reported` | oltre 35 °C si consiglia 35 e si indica la temperatura dell'impasto che ne esce |
+| `test_plan_uses_the_dough_temperature_that_the_capped_water_gives` | il piano parte dalla temperatura dell'impasto realmente ottenuta |
+| `test_planner_and_diary_use_the_same_kneading_keys` | planner e Diario usano le stesse chiavi di impasto |
+| `test_hours_before_bake_stops_at_a_bake_phase` | le ore contano fino a un'eventuale fase di cottura |
+| `test_reverse_scheduling_starts_the_right_time_before_the_oven` | l'inizio è l'infornata meno la durata; timeline e snapshot coerenti |
+| `test_start_mode_ignores_the_oven_time_and_bad_values_fall_back` | in modalità inizio l'infornata è ignorata; date illeggibili tornano all'inizio |
+| `test_an_oven_time_too_close_is_flagged_as_start_in_the_past` | infornata troppo vicina: segnalato inizio già passato |
+| `test_plan_exposes_water_and_a_hot_kitchen_cools_it` | il piano espone l'acqua; la cucina calda la abbassa; lo snapshot la riporta |
+| `test_plan_response_and_page_carry_the_new_fields` | `/plan` aggiorna `#startInfo` e `#waterInfo`; la pagina ha i nuovi campi |
+| `test_saved_recipe_remembers_flour_temperature_and_kneading` | la ricetta salvata ricorda T° farina e come impasti |
+| `test_diary_from_plan_prefills_kneading_and_water_temperature` | il Diario precompila «Come impasti» e la temperatura dell'acqua |
+
+### [tests/test_phase_labels.py](tests/test_phase_labels.py)
+
+| Test | Proprietà verificata |
+|---|---|
+| `test_maturation_is_named_after_its_condition` | la maturazione si chiama «in frigo», «in cella» o «a temperatura ambiente» secondo la condizione |
+| `test_custom_names_and_other_phases_are_left_alone` | i nomi scelti da te e le altre fasi non cambiano |
+| `test_plan_timeline_shows_the_chosen_condition_not_a_stale_label` | la timeline mostra la condizione scelta, non un nome rimasto vecchio |
+| `test_phase_editor_updates_label_and_temperature_when_the_condition_changes` | l'editor imposta nome e temperatura al cambio di condizione (schede e modello delle nuove fasi) |
 
 ---
 
@@ -728,7 +789,7 @@ Nota UX: nel form le percentuali sono inserite in formato umano (`62`, `2.8`) e 
 - PWA installabile
 - UI con palette rivista + dark mode (auto + toggle), verificata da 320 px a desktop
 - Input del form validati lato server
-- 159 test unitari verdi
+- 187 test unitari verdi
 
 ### ✅ Fase 2 (fatta)
 - Ricette salvate con versioning, riapribili e collegate alle prove del Diario

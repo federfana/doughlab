@@ -222,3 +222,27 @@ def test_suggestions_never_crash_on_the_real_seed(hours: int) -> None:
     found = suggest_flours(flours, style="napoletana", total_hours=hours, hydration_pct=65, has_preferment=False)
 
     assert len(found) <= 3 and all(s.flour.brand != "Generica" for s in found)
+
+
+def test_planner_flour_card_starts_with_one_row_and_reopens_saved_blends_fully(tmp_path, monkeypatch) -> None:
+    from .test_recipes import _save_data
+
+    async def check(client, sessions) -> None:
+        await seed_if_empty()
+        page = (await client.get("/")).text
+        assert 'x-data="{ rows: 1 }"' in page and "+ farina" in page
+        assert page.count('<div class="flour-row" x-show="rows >') == 2
+        assert 'name="flour_pct_0" value="100"' in page
+
+        async with sessions() as session:
+            first, second = (await session.scalars(select(Flour.id).order_by(Flour.id).limit(2))).all()
+        await client.post("/ricette", data=_save_data("Miscela", flour_id_0=str(first), flour_pct_0="70",
+                                                      flour_id_1=str(second), flour_pct_1="30"))
+        await client.post("/ricette", data=_save_data("Singola", flour_id_0=str(first), flour_pct_0="60"))
+
+        blend = (await client.get("/?recipe=1")).text
+        assert 'x-data="{ rows: 2 }"' in blend and 'name="flour_pct_1" value="30"' in blend
+        single = (await client.get("/?recipe=2")).text
+        assert 'x-data="{ rows: 1 }"' in single and 'name="flour_pct_0" value="100"' in single
+
+    run_with_db(tmp_path, monkeypatch, check)

@@ -393,3 +393,40 @@ def test_import_is_a_toolbar_button_next_to_export(tmp_path, monkeypatch) -> Non
         assert "<summary>Importa un backup</summary>" not in page
 
     run_with_db(tmp_path, monkeypatch, check)
+
+
+def test_diary_form_lets_you_pick_flours_from_the_archive(tmp_path, monkeypatch) -> None:
+    from doughlab.flours import seed_if_empty
+
+    async def check(client: AsyncClient, sessions: async_sessionmaker) -> None:
+        empty = (await client.get("/diario/nuova")).text
+        assert "flour-picker" not in empty
+
+        await seed_if_empty()
+        form = (await client.get("/diario/nuova")).text
+        assert 'class="field diary-wide flour-picker"' in form
+        assert 'x-data="{ rows: 1 }"' in form  # parte con una sola riga
+        assert form.count('<div class="flour-row" x-show="rows >') == 2  # le altre due compaiono con il +
+        assert "+ farina" in form
+        assert 'data-label="Molino Caputo Nuvola"' in form and 'data-w="280.0"' in form
+        assert "applyFlourPicker(" in (await client.get("/")).text
+
+        saved = await client.post(
+            "/diario",
+            data={"name": "Con miscela", "date": "2026-10-16", "flour": "60% A + 40% B", "flour_w": "300", "protein": "13"},
+        )
+        assert "Prova salvata" in saved.text
+
+    run_with_db(tmp_path, monkeypatch, check)
+
+
+def test_process_steps_show_the_end_date_only_when_it_is_another_day() -> None:
+    from doughlab.diary import form_from_plan
+
+    phases = [
+        {"label": "Puntata", "hours": 2, "start_at": "2026-10-03T11:00:00", "end_at": "2026-10-03T13:00:00"},
+        {"label": "Frigo", "hours": 18, "start_at": "2026-10-03T13:00:00", "end_at": "2026-10-04T07:00:00"},
+    ]
+    process = form_from_plan({"phases": phases})["data"]["process"].splitlines()
+
+    assert process == ["Puntata: 2 h (03/10 11:00 - 13:00)", "Frigo: 18 h (03/10 13:00 - 04/10 07:00)"]

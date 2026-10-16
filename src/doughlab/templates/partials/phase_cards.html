@@ -27,7 +27,7 @@
   </div>
   <div class="phase-fields phase-selects">
     <label class="field"><span class="lab">Condizione</span>
-      <select name="phase_env_{{ i }}">
+      <select name="phase_env_{{ i }}" onchange="applyEnvironment(this)">
         {% for v, label, icon in environments %}
           <option value="{{ v }}" {% if p.environment==v %}selected{% endif %}>{{ icon }} {% if v=='ambient' %}TA{% else %}TC{% endif %} · {{ label }}</option>
         {% endfor %}

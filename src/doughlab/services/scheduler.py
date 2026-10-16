@@ -25,6 +25,7 @@ class PhaseKind(StrEnum):
     AUTOLYSE = "autolyse"
     MIX = "mix"
     BULK = "bulk"
+    FOLD = "fold"
     MATURATION = "maturation"
     TEMPER = "temper"
     SHAPE = "shape"
@@ -38,6 +39,7 @@ PHASE_LABELS: dict[PhaseKind, str] = {
     PhaseKind.AUTOLYSE: "Autolisi",
     PhaseKind.MIX: "Impasto",
     PhaseKind.BULK: "Puntata",
+    PhaseKind.FOLD: "Pieghe di rinforzo",
     PhaseKind.MATURATION: "Maturazione",
     PhaseKind.TEMPER: "Cambio temperatura",
     PhaseKind.SHAPE: "Staglio",

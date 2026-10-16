@@ -394,6 +394,10 @@ html.dark .diary-status.error { background: #450a0a; color: #fecaca; border-colo
 .flour-rows { display: grid; gap: .45rem; }
 .flour-row { display: grid; grid-template-columns: minmax(0, 1fr) 4.5rem auto; gap: .4rem; align-items: center; }
 .flour-row select, .flour-row input { width: 100%; min-height: 2.2rem; }
+.flour-row.single { grid-template-columns: minmax(0, 1fr); }
+.flour-add { min-height: 0; margin-top: .5rem; padding: .2rem .7rem; font-size: .85rem; }
+.flour-picker-foot { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem .8rem; }
+.flour-picker-foot .btn-ghost { min-height: 0; padding: .2rem .7rem; font-size: .85rem; }
 .flour-row span { color: var(--mut); }
 .flour-summary { display: grid; gap: .25rem; margin-top: .75rem; padding-top: .75rem; border-top: 1px solid var(--border); font-size: .88rem; }
 .flour-summary ul { margin: 0; padding-left: 1.1rem; }
@@ -437,6 +441,14 @@ html.dark .diary-status.error { background: #450a0a; color: #fecaca; border-colo
 .plan-nav .hint { flex: 1; text-align: center; }
 .dough-input-grid.plan-pair { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); max-width: 44rem; }
 .temps-row { display: grid; gap: .8rem; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); max-width: 40rem; margin-top: .8rem; }
+.plan-anchor-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .5rem; margin-bottom: .6rem; }
+.plan-anchor-head .lab-row { margin: 0; }
+.start-grid { display: grid; gap: .8rem; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
+.start-info, .water-info { margin-top: .7rem; font-size: .9rem; }
+.start-info:empty, .water-info:empty { display: none; }
+.water-info { padding: .6rem .8rem; border-radius: 8px; background: var(--ac-soft); }
+.water-info.cold, .water-info.hot { border: 1px solid var(--warn); }
+.water-info strong { font-size: 1.15rem; }
 .hydration-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: .8rem 1.2rem; }
 .chips { display: flex; flex-wrap: wrap; gap: .3rem; }
 .chip { padding: .35rem .75rem; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--ink-2); font: 600 .8rem/1.2 inherit; cursor: pointer; }

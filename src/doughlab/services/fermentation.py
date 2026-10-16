@@ -28,6 +28,19 @@ from .thermal import ThermalCurve
 
 DEFAULT_TARGET_WORK = 1.0
 
+# Programmi lunghi: i calcolatori indipendenti dosano il lievito in modo
+# sub-lineare rispetto al tempo e, nella pratica, un impasto lungo e freddo
+# richiede piu' lievito di quello previsto da una pura integrazione Q10
+# (l'attivita' in frigo e' piu' bassa del modello, e l'ultima lievitazione a
+# temperatura ambiente deve partire con lievito ancora vigoroso). Il lavoro
+# richiesto cresce quindi con le ore fermentanti oltre LONG_PROGRAM_REF_H:
+#     fattore = min(CAP, (ore / REF) ** ESPONENTE)
+# Calibrato per stare tra Bonci/PizzaPlan/Dough School (piu' bassi) e PizzApp
+# (piu' alto) sui programmi con frigo di 24-48 h; invariato sotto le 10 ore.
+LONG_PROGRAM_REF_H = 10.0
+LONG_PROGRAM_EXPONENT = 0.4
+LONG_PROGRAM_MAX_FACTOR = 1.5
+
 
 class YeastKind(StrEnum):
     FRESH = "fresh"  # lievito di birra fresco
@@ -59,6 +72,13 @@ def rate(temp_c: float | np.ndarray, kind: YeastKind) -> float | np.ndarray:
     """Fattore di attività k(T) relativo al lievito scelto."""
     p = YEAST_PARAMS[kind]
     return p.k_ref * np.power(p.q10, (temp_c - p.t_ref_c) / 10.0)
+
+
+def program_length_factor(active_hours: float, kind: YeastKind) -> float:
+    """Moltiplicatore del lavoro richiesto per i programmi lunghi (lievito di birra)."""
+    if kind is YeastKind.SOURDOUGH or active_hours <= LONG_PROGRAM_REF_H:
+        return 1.0
+    return float(min(LONG_PROGRAM_MAX_FACTOR, (active_hours / LONG_PROGRAM_REF_H) ** LONG_PROGRAM_EXPONENT))
 
 
 @dataclass
