@@ -65,6 +65,20 @@ uv run ruff check --fix . # autofix sicuri
 uv run mypy               # type check
 ```
 
+### Uso quotidiano: avvio automatico
+
+`uv run doughlab` serve per sviluppare (reload). Per usare l'app ogni giorno c'è `doughlab-service`: server senza reload, sempre acceso, con HTTP sulla porta 8000 e (se hai creato i certificati) HTTPS sulla 8443.
+
+```bash
+uv run doughlab-service install    # avvio automatico a ogni accesso (launchd), parte subito
+uv run doughlab-service restart    # dopo aver aggiornato il codice
+uv run doughlab-service status     # Attivo / Non attivo
+uv run doughlab-service uninstall  # toglie l'avvio automatico
+uv run doughlab-service run        # avvio manuale, in primo piano
+```
+
+`install` crea `~/Library/LaunchAgents/it.doughlab.server.plist` (riavvia il server se si ferma) e scrive i log in `~/Library/Logs/DoughLab/server.log`. Se la porta 8000 è occupata (per esempio dal server di sviluppo) il servizio viene installato ma parte all'accesso successivo: ferma l'altro server e rilancia `install`. Mentre il servizio è acceso, per sviluppare usa un'altra porta: `DOUGHLAB_PORT=8001 uv run doughlab`. Il server resta fermo quando il Mac è in stop.
+
 ## Accesso dal cellulare in LAN
 
 ```bash
@@ -75,9 +89,29 @@ ipconfig getifaddr en0   # scopri l'IP del Mac sulla Wi-Fi
 Sull'iPhone, sulla stessa Wi-Fi, apri `http://192.168.1.126:8000`.
 Safari → Condividi → **Aggiungi alla schermata Home**: diventa un'icona come un'app.
 
-> **PWA e iOS**: senza HTTPS iOS non registra il service worker e non invia push. Per uso casalingo l'icona-home e l'export `.ics` nel Calendario coprono il 90% dei bisogni. Il resto lo abiliteremo quando aggiungeremo HTTPS.
+> **PWA e iOS**: senza HTTPS iOS non registra il service worker e non invia push. Con HTTPS (sezione sotto) funzionano installazione, uso offline e schermo acceso nel tab *In corso*.
 
-> **Contesto sicuro**: service worker (uso offline), Wake Lock (schermo acceso nel tab *In corso*) e notifiche funzionano solo su `localhost` o in HTTPS, non su `http://<IP-del-Mac>:8000`. Dal telefono in LAN il timer del Live Bake funziona, ma lo schermo può spegnersi e non ci sono notifiche: vibrazione e avvisi a schermo restano.
+> **Contesto sicuro**: service worker (uso offline), Wake Lock (schermo acceso nel tab *In corso*) e notifiche funzionano solo su `localhost` o in HTTPS, non su `http://<IP-del-Mac>:8000`. Dal telefono in LAN via HTTP il timer del Live Bake funziona, ma lo schermo può spegnersi e non ci sono notifiche: vibrazione e avvisi a schermo restano.
+
+### HTTPS sul telefono (certificato locale)
+
+Nessun account e nessun servizio esterno: DoughLab crea una piccola autorità di certificazione sua (CA) e un certificato per il Mac.
+
+```bash
+uv run doughlab-service cert      # crea CA e certificato in data/certs/ (gitignored)
+uv run doughlab-service restart   # il servizio ora ascolta anche su https://…:8443
+```
+
+Il certificato è valido per `localhost`, `<nome-del-Mac>.local` e l'IP attuale (825 giorni, limite di Apple). La CA resta la stessa quando lo rigeneri, quindi il telefono non va riconfigurato; rigenera con `cert` se cambia l'IP o dopo circa 2 anni.
+
+Sull'iPhone (una volta sola):
+
+1. Apri `http://<nome-del-Mac>.local:8000/ca.crt` in Safari e scegli *Consenti*.
+2. Impostazioni → *Profilo scaricato* → *Installa*.
+3. Impostazioni → Generali → Info → *Impostazioni attendibilità certificati* → attiva «DoughLab (rete locale)».
+4. Apri `https://<nome-del-Mac>.local:8443` e aggiungi alla schermata Home.
+
+La chiave privata della CA (`data/certs/doughlab-ca.key`) non lascia il Mac: solo `doughlab-ca.crt` viene servito dall'app.
 
 > **Sicurezza**: l'app non ha autenticazione né protezione CSRF, pensata per una rete domestica fidata. Non esporla su Internet senza metterle davanti un proxy con login e HTTPS.
 
@@ -91,7 +125,8 @@ doughlab/
 ├── README.md                      # questo file
 ├── data/                          # DB SQLite (gitignored)
 ├── src/doughlab/
-│   ├── __init__.py                # entry point `doughlab` (uvicorn)
+│   ├── __init__.py                # entry point `doughlab` (uvicorn con reload)
+│   ├── serve.py                   # `doughlab-service`: server HTTP+HTTPS, certificati, launchd
 │   ├── config.py                  # Settings (env + .env)
 │   ├── db.py                      # engine async + session + init_db()
 │   ├── models.py                  # ORM: Recipe, RecipeVersion, DiaryEntry, DiaryPhoto
@@ -114,6 +149,7 @@ doughlab/
 │   │   ├── flour_suggest.py       # farine consigliate per stile, ore, idratazione e metodo
 │   │   ├── images.py              # controllo del tipo di immagine dai primi byte
 │   │   ├── backup.py              # parsing/scrittura del backup JSON del Diario
+│   │   ├── calibration.py         # scarto stima/reale per ricetta e target del lievito consigliato
 │   │   └── scheduler.py           # orchestra tutto in un PlanResult
 │   ├── templates/
 │   │   ├── base.html              # layout, CSS con variabili, tema chiaro/scuro
@@ -306,6 +342,9 @@ Carica configurazione da variabili d'ambiente e `.env` tramite `pydantic-setting
 | `db_url` | `sqlite+aiosqlite:///data/doughlab.db` | async |
 | `default_ambient_c` | `22.0` | previsto come fallback del form (non ancora usato) |
 | `default_fridge_c` | `4.0` | previsto come fallback del form (non ancora usato) |
+| `host` | `0.0.0.0` | indirizzo di ascolto (`DOUGHLAB_HOST`) |
+| `port` | `8000` | porta HTTP (`DOUGHLAB_PORT`) |
+| `https_port` | `8443` | porta HTTPS, attiva solo con i certificati di `doughlab-service cert` |
 
 Crea `data/` automaticamente al primo import.
 
@@ -443,6 +482,7 @@ L'app FastAPI. Route attuali:
 | `POST` | `/diario/da-piano` | apre il modulo del Diario precompilato con il piano corrente |
 | `POST` | `/plan.ics` | ritorna il piano come file `.ics` da aprire in Calendario (orari in ora locale del server) |
 | `GET` | `/static/*` | asset statici (PWA, icone, SW) |
+| `GET` | `/ca.crt` | certificato della CA locale da installare sul telefono (404 se non creato) |
 
 `main.py` contiene solo le rotte; i calcoli del form vivono in `planning.py`.
 
@@ -462,7 +502,10 @@ Router `/ricette` (risposte HTML di `partials/recipes_panel.html`).
 | Metodo | Path | Scopo |
 |---|---|---|
 | `POST` | `/ricette` | salva la ricetta del form con `save_name` (e `save_message` facoltativo): nome nuovo = v1, nome esistente = nuova versione |
+| `POST` | `/ricette/{id}/taratura` | nuova versione con il target del lievito consigliato dalle prove (ricalcolato lato server) |
 | `POST` | `/ricette/{id}/elimina` | elimina ricetta e versioni (le prove del diario restano) |
+
+**Taratura sulle prove** ([services/calibration.py](src/doughlab/services/calibration.py)): per ogni prova del Diario collegata alla ricetta, con orari reali e stima, si confronta la durata reale con quella stimata. Il lievito è proporzionale al target; se con un target $T$ il reale è durato $r$ volte la stima, quel target avrebbe dovuto essere $T \cdot r$. Il consiglio è la media geometrica di questi valori, ognuno riferito al target della versione con cui la prova è stata fatta (così una taratura già applicata non viene contata due volte). Servono almeno 2 prove, lo scarto deve superare il 5%, un singolo passo non supera ×1.5 e i rapporti fuori da 0.25–4 sono ignorati come errori di inserimento. L'applicazione crea una **nuova versione** (la precedente resta). I valori sono stime sul tuo modo di decidere "pronto": con poche prove vanno letti come indicazione.
 
 `payload_from_form` salva ciò che definisce la ricetta (formula, fasi, lievito, `target_work`, forno, T° iniziale) e non l'orario di partenza. `load_recipe(id, version)` ricostruisce il contesto del pianificatore a partire dal preset di origine; un payload illeggibile viene ignorato. Dopo un salvataggio, il pannello aggiorna i campi nascosti `recipe_id`/`recipe_version` del piano con `hx-swap-oob`.
 
@@ -528,7 +571,7 @@ Nota UX: nel form le percentuali sono inserite in formato umano (`62`, `2.8`) e 
 
 ## Testing
 
-187 test (al 2026-10-16). Lanciali con `uv run pytest`.
+197 test (al 2026-10-16). Lanciali con `uv run pytest`.
 
 ### [tests/test_thermal.py](tests/test_thermal.py)
 
@@ -761,6 +804,26 @@ Nota UX: nel form le percentuali sono inserite in formato umano (`62`, `2.8`) e 
 
 ---
 
+### [tests/test_calibration.py](tests/test_calibration.py)
+
+| Test | Proprietà verificata |
+|---|---|
+| `test_trial_hours_needs_the_plan_and_the_real_times` | la durata stimata e quella reale servono entrambe e devono essere positive |
+| `test_one_trial_shows_the_gap_but_does_not_suggest_a_change` | con una prova si vede lo scarto ma non si propone nulla |
+| `test_slower_than_predicted_raises_the_target_and_faster_lowers_it` | reale più lungo = più lievito, più corto = meno |
+| `test_trials_made_with_an_older_target_are_rescaled_to_the_current_one` | una taratura già applicata non viene contata due volte |
+| `test_small_gaps_outliers_and_big_jumps_are_handled` | scarti sotto il 5% ignorati, errori di inserimento esclusi, passo massimo ×1.5 |
+| `test_recipe_panel_proposes_the_calibration_and_applying_it_adds_a_version` | il pannello propone la taratura e applicarla crea la v2 senza toccare il resto |
+
+### [tests/test_serve.py](tests/test_serve.py)
+
+| Test | Proprietà verificata |
+|---|---|
+| `test_subject_alt_names_cover_localhost_hostname_and_lan_ip` | il certificato copre localhost, nome `.local` e IP |
+| `test_launch_agent_runs_the_service_at_login_and_keeps_it_alive` | l'agente launchd parte all'accesso e si riavvia |
+| `test_server_certificate_is_signed_by_the_local_ca_and_the_ca_is_reused` | il certificato si verifica con la CA, che viene riusata alla rigenerazione |
+| `test_ca_certificate_is_served_for_the_phone_only_when_it_exists` | `/ca.crt` risponde 404 senza CA e scarica il certificato quando c'è |
+
 ## Convenzioni di sviluppo
 
 - **Formattazione**: `ruff` fa sia linting che format (`line-length=100`, target `py312`).
@@ -789,19 +852,22 @@ Nota UX: nel form le percentuali sono inserite in formato umano (`62`, `2.8`) e 
 - PWA installabile
 - UI con palette rivista + dark mode (auto + toggle), verificata da 320 px a desktop
 - Input del form validati lato server
-- 187 test unitari verdi
+- 197 test unitari verdi
 
 ### ✅ Fase 2 (fatta)
 - Ricette salvate con versioning, riapribili e collegate alle prove del Diario
 - Live Bake: timer per fase, controlli, orari reali che precompilano il diario
 - Ricerca nel Diario e filtro per ricetta
 - Database farine con miscele e idratazione consigliata
+- Avvio automatico (`doughlab-service`) e HTTPS locale per il telefono
+- Taratura del lievito sulle prove di ogni ricetta (nuova versione applicabile con un tasto)
 - Librerie JS in `static/vendor/`: offline su `localhost`/HTTPS (su HTTP in LAN il browser non attiva il service worker)
 
 ### 🔜 Prossimi passi
-- Confrontare le prove di una ricetta (scarto medio stima/reale) e usarlo per tarare `target_work`
 - Migrazioni vere (rinomine, cambi di tipo, vincoli): oggi si aggiungono solo colonne nuove
 - Notifiche di fine fase anche a pagina chiusa (richiede Web Push/server)
+- Scheda cucina stampabile (fasi, orari e grammature)
+- Altre letture di calcolatori di riferimento per rifinire la taratura iniziale del lievito
 
 ### 🔮 Fase 3 — Analisi
 - Analisi alveolatura via OpenCV (contorni bolle, uniformità, densità)

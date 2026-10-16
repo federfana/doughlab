@@ -503,6 +503,76 @@ html.dark .diary-status.error { background: #450a0a; color: #fecaca; border-colo
 }
 .space-y > * + * { margin-top: 1rem; }
 .flex-wrap-row { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
+
+/* Rifiniture: profondità, tipografia, interazioni (sovrascrivono le regole sopra). */
+:root {
+  --ring: color-mix(in srgb, var(--ac) 28%, transparent);
+  --shadow: 0 1px 2px rgba(60, 35, 10, .06), 0 6px 18px -8px rgba(60, 35, 10, .16);
+  --radius: 14px;
+}
+html.dark { --shadow: 0 1px 2px rgba(0, 0, 0, .35), 0 8px 22px -10px rgba(0, 0, 0, .6); }
+html { scroll-behavior: smooth; -webkit-tap-highlight-color: transparent; }
+body {
+  background: radial-gradient(900px 380px at 50% -80px, color-mix(in srgb, var(--ac) 9%, transparent), transparent) no-repeat, var(--bg);
+  font-feature-settings: "tnum" 1, "cv11" 1;
+  letter-spacing: -.003em;
+}
+::selection { background: var(--ac-soft); color: var(--ink); }
+button, a, summary, label.strategy-card, label.yeast-segment { touch-action: manipulation; }
+.page-heading h1 { font-size: 1.6rem; font-weight: 750; letter-spacing: -.025em; }
+.section-heading h2, .section-title-row h2 { letter-spacing: -.018em; font-weight: 700; }
+.topbar { background: color-mix(in srgb, var(--bg) 82%, transparent); }
+.topbar-inner strong { letter-spacing: -.02em; font-weight: 750; }
+.card { border-color: color-mix(in srgb, var(--border) 70%, transparent); }
+.btn, .btn-ghost, .toggle, .chip, .plan-step-btn, .mode-toggle button, .strategy-body, .icon-button {
+  transition: background-color .15s, border-color .15s, color .15s, box-shadow .15s, transform .1s, filter .15s;
+}
+.btn {
+  min-height: 2.4rem;
+  padding: .5rem 1.1rem;
+  border-radius: 9px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--ac) 88%, white), var(--ac));
+  box-shadow: 0 1px 0 rgba(255, 255, 255, .25) inset, 0 4px 12px -5px color-mix(in srgb, var(--ac) 70%, transparent);
+}
+.btn:hover { filter: none; box-shadow: 0 1px 0 rgba(255, 255, 255, .25) inset, 0 6px 16px -5px color-mix(in srgb, var(--ac) 80%, transparent); transform: translateY(-1px); }
+.btn:active, .btn-ghost:active { transform: translateY(0) scale(.985); }
+.btn-ghost { min-height: 2.4rem; border-radius: 9px; }
+a.btn, a.btn-ghost { display: inline-flex; align-items: center; text-decoration: none; }
+.btn-ghost:hover { background: color-mix(in srgb, var(--ac) 6%, var(--surface)); }
+input, select, textarea { border-radius: 8px; transition: border-color .15s, box-shadow .15s; }
+input:focus, select:focus, textarea:focus { outline: none; border-color: var(--ac); box-shadow: 0 0 0 3px var(--ring); }
+.workspace-tab { transition: color .15s; }
+.workspace-tab:hover { color: var(--ink); }
+.workspace-tab[aria-selected="true"] { border-bottom-width: 3px; }
+.plan-step-btn.active { background: color-mix(in srgb, var(--ac) 8%, var(--surface)); box-shadow: 0 0 0 3px var(--ring); }
+.plan-step-btn:hover { border-color: var(--ac); }
+.mode-toggle button.on, .yeast-segment input:checked + span, .oven-profile-segments input:checked + span { box-shadow: 0 2px 8px -3px color-mix(in srgb, var(--ac) 70%, transparent); }
+.plan-bar { border-radius: 12px; box-shadow: var(--shadow); backdrop-filter: blur(8px); background: color-mix(in srgb, var(--surface) 90%, transparent); }
+.ingredient-list dt, .summary-metrics dt { text-transform: uppercase; letter-spacing: .05em; font-size: .66rem; font-weight: 600; }
+.ingredient-list > div { border-left: 3px solid color-mix(in srgb, var(--ac) 35%, var(--border)); border-radius: 2px; }
+.ingredient-list dd { font-size: 1.55rem; letter-spacing: -.02em; }
+.summary-strip { padding: .6rem .8rem; }
+.summary-metrics > div { border-left: 3px solid var(--border); }
+.summary-metrics dd { font-size: .92rem; }
+.summary-metrics dd.metric-primary { font-size: 1.02rem; }
+.strategy-card:hover .strategy-body { transform: translateY(-1px); box-shadow: var(--shadow); }
+.phase-card { border-radius: 12px; transition: border-color .15s, box-shadow .15s; }
+.phase-card:hover { border-color: color-mix(in srgb, var(--ac) 45%, var(--border)); box-shadow: var(--shadow); }
+.recipe-item, .suggest-list li, .flour-form, .diary-form fieldset { border-radius: 10px; }
+.diary-card { border-radius: var(--radius); transition: box-shadow .15s, transform .15s; }
+.diary-card:hover { box-shadow: 0 2px 4px rgba(60, 35, 10, .08), 0 12px 28px -12px rgba(60, 35, 10, .28); }
+.diary-cover, .diary-photos img { border-radius: 10px; }
+.live-timer { letter-spacing: -.03em; }
+.live-bar { height: .55rem; }
+.recipes-card > summary, details.recipes-card summary { list-style: none; display: flex; align-items: center; justify-content: space-between; }
+.recipes-card > summary::-webkit-details-marker { display: none; }
+.recipes-card > summary::after { content: "▸"; color: var(--mut); transition: transform .15s; }
+.recipes-card[open] > summary::after { transform: rotate(90deg); }
+.recipe-calibration { margin: .4rem 0 0; padding: .45rem .6rem; border-radius: 8px; background: var(--surface-2); color: var(--ink-2); font-size: .8rem; }
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { transition: none !important; animation: none !important; }
+}
 </style>
 <script src="/static/vendor/alpine-3.14.3.min.js" defer></script>
 <script src="/static/vendor/htmx-1.9.12.min.js"></script>

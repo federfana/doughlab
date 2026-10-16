@@ -1,6 +1,7 @@
 """Ricette salvate con versioning: ogni salvataggio con lo stesso nome è una nuova versione."""
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import asdict
 from typing import Any
 
@@ -20,6 +21,7 @@ from .planning import (
     parse_phase_form,
     preset_ctx,
 )
+from .services.calibration import Calibration, Trial, calibrate, trial_hours
 from .services.fermentation import DEFAULT_TARGET_WORK, YeastKind
 from .services.flour_blend import parse_rows
 from .services.ingredients import STYLE_LABELS, RecipeIngredients, RecipeStyle
@@ -139,6 +141,31 @@ async def load_recipe(recipe_id: int, version: int | None = None) -> dict[str, A
         return context
 
 
+def _target_work(version: RecipeVersion) -> float:
+    try:
+        return max(0.01, float(version.payload.get("target_work", DEFAULT_TARGET_WORK)))
+    except (TypeError, ValueError):
+        return DEFAULT_TARGET_WORK
+
+
+def _recipe_calibration(recipe: Recipe, rows: Sequence[Any]) -> Calibration | None:
+    """Scarto stima/reale delle prove collegate alla ricetta, rispetto al target della loro versione."""
+    if not recipe.versions:
+        return None
+    targets = {v.version: _target_work(v) for v in recipe.versions}
+    current = _target_work(recipe.versions[0])
+    trials: list[Trial] = []
+    for plan, started_at, ready_at in rows:
+        if not isinstance(plan, dict) or plan.get("recipe_id") != recipe.id:
+            continue
+        hours = trial_hours(plan, started_at, ready_at)
+        if hours is None:
+            continue
+        version = plan.get("recipe_version")
+        trials.append(Trial(hours[0], hours[1], targets.get(version, current) if isinstance(version, int) else current))
+    return calibrate(trials, current)
+
+
 async def panel_context(
     message: str | None = None,
     error: str | None = None,
@@ -151,9 +178,9 @@ async def panel_context(
                 select(Recipe).options(selectinload(Recipe.versions)).order_by(Recipe.name).limit(MAX_RECIPES)
             )
         ).all()
-        plans = (await session.scalars(select(DiaryEntry.plan))).all()
+        rows = (await session.execute(select(DiaryEntry.plan, DiaryEntry.started_at, DiaryEntry.ready_at))).all()
     trials: dict[int, int] = {}
-    for plan in plans:
+    for plan, _, _ in rows:
         recipe_id = plan.get("recipe_id") if isinstance(plan, dict) else None
         if isinstance(recipe_id, int):
             trials[recipe_id] = trials.get(recipe_id, 0) + 1
@@ -167,6 +194,7 @@ async def panel_context(
                 for v in recipe.versions
             ],
             "trials": trials.get(recipe.id, 0),
+            "calibration": _recipe_calibration(recipe, rows),
         }
         for recipe in recipes
     ]
@@ -213,6 +241,32 @@ async def save_recipe(request: Request) -> HTMLResponse:
         saved = {"id": recipe.id, "name": recipe.name, "version": version_no}
     verb = "salvata" if version_no == 1 else f"aggiornata (nuova versione v{version_no})"
     return await _panel(request, message=f"Ricetta «{name}» {verb}.", saved=saved)
+
+
+@router.post("/{recipe_id:int}/taratura", response_class=HTMLResponse)
+async def calibrate_recipe(request: Request, recipe_id: RowId) -> HTMLResponse:
+    """Nuova versione con il target del lievito consigliato dalle prove (il calcolo è rifatto qui)."""
+    async with SessionLocal() as session:
+        recipe = await session.get(Recipe, recipe_id, options=[selectinload(Recipe.versions)])
+        if recipe is None or not recipe.versions:
+            return await _panel(request, error="Ricetta non trovata.")
+        rows = (await session.execute(select(DiaryEntry.plan, DiaryEntry.started_at, DiaryEntry.ready_at))).all()
+        calibration = _recipe_calibration(recipe, rows)
+        if calibration is None or calibration.suggested_target is None:
+            return await _panel(request, error="Per ora le prove non indicano nessuna taratura.")
+        latest = recipe.versions[0]
+        recipe.versions.append(RecipeVersion(
+            version=latest.version + 1,
+            message=(f"Taratura lievito: target {calibration.current_target:g} → "
+                     f"{calibration.suggested_target:g} su {calibration.trials} prove"),
+            payload={**latest.payload, "target_work": calibration.suggested_target},
+        ))
+        await session.commit()
+        name, version = recipe.name, latest.version + 1
+    return await _panel(
+        request,
+        message=f"Ricetta «{name}» aggiornata alla v{version} con il lievito tarato. Riaprila per usarla.",
+    )
 
 
 @router.post("/{recipe_id:int}/elimina", response_class=HTMLResponse)

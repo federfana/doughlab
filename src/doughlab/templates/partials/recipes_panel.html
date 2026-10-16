@@ -28,6 +28,24 @@
         {% if item.trials %}<button type="button" class="btn-ghost" hx-get="/diario?recipe={{ item.id }}" hx-target="#diaryPanel" @click="activeTab = 'diary'">Prove</button>{% endif %}
         <button type="button" class="btn-ghost" hx-post="/ricette/{{ item.id }}/elimina" hx-confirm="Eliminare la ricetta «{{ item.name }}» con tutte le sue versioni? Le prove del diario restano.">Elimina</button>
       </div>
+      {% if item.calibration %}
+      {% set cal = item.calibration %}
+      <p class="hint recipe-calibration">
+        Stima e reale su {{ cal.trials }} {{ 'prova' if cal.trials == 1 else 'prove' }}: scarto medio {{ '+' if cal.mean_delta_h >= 0 else '−' }}{{ cal.mean_delta_h|abs|hours }}, reale pari al {{ (cal.mean_ratio * 100)|round|int }}% della stima.
+        {% if cal.suggested_target is not none %}
+        Con questi scarti il lievito andrebbe {{ 'aumentato' if cal.suggested_target > cal.current_target else 'ridotto' }} del {{ ((cal.suggested_target / cal.current_target - 1)|abs * 100)|round|int }}% (target {{ '%g'|format(cal.current_target) }} → {{ '%g'|format(cal.suggested_target) }}).
+        {% elif cal.trials < 2 %}
+        Con almeno 2 prove ti propongo una taratura del lievito.
+        {% else %}
+        Il lievito è già in linea con le prove.
+        {% endif %}
+      </p>
+      {% if cal.suggested_target is not none %}
+      <div class="diary-actions">
+        <button type="button" class="btn-ghost" hx-post="/ricette/{{ item.id }}/taratura" hx-confirm="Creare una nuova versione di «{{ item.name }}» con il lievito tarato sulle prove?">Applica come nuova versione</button>
+      </div>
+      {% endif %}
+      {% endif %}
       {% if item.versions|length > 1 %}
       <details class="recipe-versions">
         <summary>Versioni</summary>

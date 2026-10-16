@@ -9,10 +9,12 @@ def main() -> None:
 
     import uvicorn
 
+    from .config import settings
+
     uvicorn.run(
         "doughlab.main:app",
-        host="0.0.0.0",
-        port=8000,
+        host=settings.host,
+        port=settings.port,
         reload=True,
         reload_dirs=[str(Path(__file__).parent)],  # senza, anche tests/ riavvia il server
     )

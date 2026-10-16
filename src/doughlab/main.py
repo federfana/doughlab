@@ -20,6 +20,7 @@ from .planning import (
     generated_phase_dicts,
     preset_ctx,
 )
+from .serve import CA_CERT
 from .services.fermentation import YeastKind
 from .services.presets import PRESETS, PRESETS_BY_KEY
 from .services.scheduler import PHASE_LABELS, PhaseKind
@@ -117,6 +118,18 @@ async def folded_phases(request: Request) -> HTMLResponse:
     ctx = common_ctx()
     ctx["phases"] = folded_phase_dicts({k: str(v) for k, v in form.items()})
     return templates.TemplateResponse(request, "partials/phase_cards.html", ctx)
+
+
+@app.get("/ca.crt")
+async def local_ca() -> Response:
+    """Certificato della CA locale, da installare sul telefono per usare l'app in HTTPS."""
+    if not CA_CERT.exists():
+        return Response(status_code=404)
+    return Response(
+        CA_CERT.read_bytes(),
+        media_type="application/x-x509-ca-cert",
+        headers={"Content-Disposition": 'attachment; filename="doughlab-ca.crt"'},
+    )
 
 
 @app.post("/diario/da-piano", response_class=HTMLResponse)

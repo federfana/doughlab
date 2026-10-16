@@ -19,6 +19,10 @@ class Settings(BaseSettings):
 
     db_url: str = Field(default=f"sqlite+aiosqlite:///{DATA_DIR / 'doughlab.db'}")
 
+    host: str = "0.0.0.0"
+    port: int = 8000
+    https_port: int = 8443
+
     default_ambient_c: float = 22.0
     default_fridge_c: float = 4.0
 
