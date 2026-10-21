@@ -1,6 +1,7 @@
 """Strategie di lievitazione: scorciatoie (diretta, frigo...) che diventano le fasi del piano."""
 from __future__ import annotations
 
+import math
 from collections.abc import Callable
 from dataclasses import dataclass, replace
 
@@ -33,6 +34,8 @@ class Strategy:
     proof_h: float
     # Panetti formati prima del frigo (maturazione "solo frigo") invece della massa.
     balls_in_fridge: bool = False
+    # Temperatura consigliata dell'impasto a fine impasto: più bassa se matura a lungo in frigo.
+    dough_c: float = 24.0
 
     @property
     def total_h(self) -> float:
@@ -47,21 +50,34 @@ STRATEGIES: tuple[Strategy, ...] = (
     Strategy("direct_8", "Diretta 8 h", "Tutto a temperatura ambiente, in giornata.",
              bulk_h=2.0, fridge_h=0.0, shape_h=0.5, proof_h=5.5),
     Strategy("fridge_24", "Frigo + ambiente 24 h", "Massa in frigo, appretto dei panetti a temperatura ambiente.",
-             bulk_h=2.0, fridge_h=17.5, shape_h=0.5, proof_h=4.0),
+             bulk_h=2.0, fridge_h=17.5, shape_h=0.5, proof_h=4.0, dough_c=21.0),
     Strategy("fridge_only_24", "Solo frigo 24 h", "Panetti formati subito e maturati in frigo, appretto breve.",
-             bulk_h=1.0, fridge_h=20.5, shape_h=0.5, proof_h=2.0, balls_in_fridge=True),
+             bulk_h=1.0, fridge_h=20.5, shape_h=0.5, proof_h=2.0, balls_in_fridge=True, dough_c=21.0),
     Strategy("fridge_48", "Frigo + ambiente 48 h", "Maturazione lunga della massa in frigo, più sapore e digeribilità.",
-             bulk_h=2.0, fridge_h=42.0, shape_h=0.5, proof_h=3.5),
+             bulk_h=2.0, fridge_h=42.0, shape_h=0.5, proof_h=3.5, dough_c=20.0),
     Strategy("fridge_only_48", "Solo frigo 48 h", "Panetti in frigo per due giorni, appretto breve.",
-             bulk_h=1.0, fridge_h=44.5, shape_h=0.5, proof_h=2.0, balls_in_fridge=True),
+             bulk_h=1.0, fridge_h=44.5, shape_h=0.5, proof_h=2.0, balls_in_fridge=True, dough_c=20.0),
     Strategy("long_72", "Lunga 72 h", "Tre giorni di frigo: per impasti molto idratati, come la teglia.",
-             bulk_h=1.0, fridge_h=66.0, shape_h=0.5, proof_h=4.5),
+             bulk_h=1.0, fridge_h=66.0, shape_h=0.5, proof_h=4.5, dough_c=20.0),
 )
 STRATEGIES_BY_KEY = {s.key: s for s in STRATEGIES}
 
 
 def strategy_for(key: str) -> Strategy:
     return STRATEGIES_BY_KEY.get(key, STRATEGIES_BY_KEY[DEFAULT_STRATEGY])
+
+
+# Più acqua nell'impasto = impasto più molle e più veloce a lievitare: si parte più freddi.
+HYDRATION_REF = 0.65
+COOLER_PER_5_PCT_C = 1.0
+MAX_COOLER_C = 3.0
+MIN_DOUGH_C = 18.0
+
+
+def suggested_dough_c(key: str, hydration: float) -> float:
+    """T° impasto consigliata: quella della strategia, 1 °C più fredda ogni 5 punti di idratazione sopra il 65%."""
+    cooler = min(MAX_COOLER_C, max(0.0, (hydration - HYDRATION_REF) * 100 / 5 * COOLER_PER_5_PCT_C))
+    return max(MIN_DOUGH_C, math.floor((strategy_for(key).dough_c - cooler) * 2 + 0.5) / 2)
 
 
 def _bulk_phases(make: Callable[..., PlanPhase], bulk_h: float, folds: bool) -> list[PlanPhase]:

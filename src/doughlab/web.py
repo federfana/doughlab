@@ -23,7 +23,7 @@ from .services.thermal import (
     Container,
     Environment,
 )
-from .services.water import FRICTION_C
+from .services.water import FRICTION_RISE_C
 
 STATIC_DIR = Path(__file__).parent / "static"
 TEMPLATES_DIR = Path(__file__).parent / "templates"
@@ -72,7 +72,7 @@ def common_ctx() -> dict[str, Any]:
         ],
         "styles": [(s.value, STYLE_LABELS[s]) for s in RecipeStyle],
         "strategies": STRATEGIES,
-        "kneading_options": [(key, label, FRICTION_C[key]) for key, label in KNEADING_LABELS.items()],
+        "kneading_options": [(key, label, FRICTION_RISE_C[key]) for key, label in KNEADING_LABELS.items()],
         "presets": [
             {
                 "key": p.key,

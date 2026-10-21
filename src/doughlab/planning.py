@@ -30,10 +30,11 @@ from .services.strategies import (
     OPEN_HOURS,
     POOLISH_HOURS,
     build_phases,
+    suggested_dough_c,
     with_folds,
 )
 from .services.thermal import Container, Environment, parse_container, parse_environment
-from .services.water import DEFAULT_FLOUR_C, DEFAULT_KNEADING, FRICTION_C, water_temperature
+from .services.water import DEFAULT_FLOUR_C, DEFAULT_KNEADING, FRICTION_RISE_C, water_temperature
 
 # Gli stessi limiti degli input HTML: il server non si fida del client.
 MAX_PHASES = 30
@@ -163,10 +164,12 @@ def phase_dicts(phases: list[PlanPhase]) -> list[dict[str, Any]]:
 
 def guided_settings(preset: Preset | None = None) -> dict[str, Any]:
     """Valori iniziali della modalità guidata: strategia di lievitazione e temperature."""
+    strategy = preset.strategy if preset else "fridge_24"
     return {
         "mode": "guided",
         "mode_forced": False,
-        "strategy": preset.strategy if preset else "fridge_24",
+        "strategy": strategy,
+        "initial_dough_c": suggested_dough_c(strategy, preset.ingredients.hydration_pct if preset else 0.62),
         "room_c": DEFAULT_ROOM_C,
         "fridge_c": DEFAULT_FRIDGE_C,
     }
@@ -292,7 +295,7 @@ def compute_plan_and_ingredients(data: dict[str, str]) -> dict[str, Any]:
 
     mix = next((p for p in phases if p.kind == PhaseKind.MIX), phases[0])
     kneading = data.get("kneading", "")
-    if kneading not in FRICTION_C:
+    if kneading not in FRICTION_RISE_C:
         kneading = DEFAULT_KNEADING
     flour_c = number(data, "flour_c", DEFAULT_FLOUR_C, 0, 40)
     preferment_phase = next((p for p in phases if p.kind == PhaseKind.PREFERMENT), None)

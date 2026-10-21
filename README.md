@@ -30,7 +30,7 @@ Laboratorio digitale per impasti pizza/pane. Prevede **quando** l'impasto è dav
 
 - **Formula**: numero e peso dei panetti, idratazione, sale e tipo di lievito (fresco, secco attivo, madre) danno le grammature; la scelta del prefermento (nessuno, biga, poolish) sta nella formula e la *Ricetta finale* si divide in 1. prefermento, 2. impasto finale e totali. Olio, zucchero e prefermento stanno nei parametri avanzati.
 - **Pianificatore a passi (Guidata / Esperto)** (pulsante *Azzera* per ripartire dalla ricetta base): in Guidata si vedono solo scelte semplici (prefermento nessuno/biga/poolish con valori standard, olio e zucchero della ricetta base, strategia di lievitazione); in Esperto compaiono anche i valori del prefermento, olio e zucchero e l'editor delle fasi. il piano si compila in 4 passi (*Impasto*, *Formula*, *Lievitazione*, *Piano*) con una barra riepilogo sempre visibile (panetti, idratazione, lievito, pronto per). In modalità **Guidata** (predefinita, ricordata nel browser) scegli una strategia di lievitazione (diretta 8 h, frigo + ambiente 24 h, solo frigo 24 h, 48 h, solo frigo 48 h, lunga 72 h) e le temperature reali di cucina e frigo (sempre modificabili): le fasi le genera DoughLab. In modalità **Esperto** compare l'editor delle fasi: cambiando la *Condizione* di una fase la temperatura si imposta da sola (cucina e frigo indicati nel piano, 22 e 4 °C di base; cella 18 °C) e una maturazione prende il nome dalla condizione (in frigo, in cella, a temperatura ambiente). Passando a Esperto le fasi generate restano modificabili; tornando a Guidata, se le hai modificate, viene chiesta conferma. Le ricette salvate prima della modalità guidata si aprono in Esperto.
-- **Infornata a ritroso e temperatura dell'acqua** (passo *Lievitazione*): *Partenza* si sceglie come *Inizio impasto* oppure *Infornata*; con l'infornata DoughLab calcola quando iniziare sottraendo la durata delle fasi (avvisa se l'orario è già passato) e la scelta è ricordata nel browser. Con T° impasto desiderata, T° della farina, ambiente (la cucina in guidata, la fase di impasto in esperto) e come impasti (a mano +1,5 °C, planetaria +6,5, impastatrice +9) calcola la **temperatura dell'acqua** (3 × impasto − (ambiente + farina + attrito); con un prefermento a 4 fattori) con un consiglio (tiepida, fredda, ghiaccio). L'acqua consigliata resta tra 0 e 35 °C: se la formula ne chiede di più (cucina e farina molto fredde) o di meno, dice a che temperatura uscirà l'impasto e il piano usa quella. Compare anche nelle grammature e nel Diario, che precompila «Come impasti».
+- **Infornata a ritroso e temperatura dell'acqua** (passo *Lievitazione*): *Partenza* si sceglie come *Inizio impasto* oppure *Infornata*; con l'infornata DoughLab calcola quando iniziare sottraendo la durata delle fasi (avvisa se l'orario è già passato) e la scelta è ricordata nel browser. Con T° impasto desiderata, T° della farina, ambiente (la cucina in guidata, la fase di impasto in esperto) e come impasti (a mano +1 °C, planetaria +4,5, impastatrice +5: di quanto l'impastare scalda l'impasto) calcola la **temperatura dell'acqua** (N × impasto − (ambiente + farina + N × riscaldamento); N = 3, o 4 con un prefermento) con un consiglio (tiepida, fredda, ghiaccio). In guidata la T° impasto desiderata si propone dalla strategia (24 °C per la diretta, 21 per frigo 24 h, 20 per 48-72 h), 1 °C più fredda ogni 5 punti di idratazione sopra il 65% (minimo 18 °C), finché non la cambi tu. L'acqua consigliata resta tra 0 e 35 °C: se la formula ne chiede di più (cucina e farina molto fredde) o di meno, dice a che temperatura uscirà l'impasto e il piano usa quella. Compare anche nelle grammature e nel Diario, che precompila «Come impasti».
 - **Idratazione e farina**: scorciatoie (58-80%) e, accanto al campo, l'intervallo consigliato per la farina scelta con il pulsante *Usa X%*.
 - **Fasi e temperature**: la sequenza di fasi (TA/TC, contenitore) genera la curva termica e la maturità. La **dose di lievito non si inserisce**: è calcolata dal piano.
 - **Ricette base**: 5 preset caricabili con un click, con un orientamento sulla farina. Per la teglia c'è un piccolo calcolatore: *lato × lato ÷ 2* = grammi di impasto (30 × 40 cm ≈ 600 g) e un pulsante per usarlo come peso del panetto.
@@ -417,8 +417,8 @@ La logica: dato peso_panetto×n_panetti = peso_totale, si imposta `denominatore 
 
 | Simbolo | Tipo | Scopo |
 |---|---|---|
-| `FRICTION_C` | dict | calore dell'impastatrice: `hand` 1,5, `planetary` 6,5, `mixer` 9 °C (stesse chiavi di `KNEADING_LABELS`) |
-| `water_temperature(target, ambient, flour, kneading, preferment_c=None)` | funzione | $3 \times T_{impasto} - (T_{amb} + T_{farina} + attrito)$, a 4 fattori con un prefermento; restituisce `WaterAdvice` (temperatura, formula, consiglio, livello `ok`/`cold`/`hot`) |
+| `FRICTION_RISE_C` | dict | di quanto impastare scalda l'impasto: `hand` 1, `planetary` 4,5, `mixer` 5 °C (stesse chiavi di `KNEADING_LABELS`); nella formula il fattore di attrito è N volte questo valore |
+| `water_temperature(target, ambient, flour, kneading, preferment_c=None)` | funzione | $N \times T_{impasto} - (T_{amb} + T_{farina} + N \times \Delta T_{attrito})$ con $N$ = 3 (4 con un prefermento); restituisce `WaterAdvice` (temperatura, formula, consiglio, livello `ok`/`cold`/`hot`) |
 
 `planning.py`: `local_datetime`, `hours_before_bake` (ore fino all'infornata) e, con `anchor=bake` e `bake_at` validi, `start_at = bake_at − ore`; il pacchetto restituito ha `water`, `anchor`, `plan_start_at`, `plan_oven_at`, `start_in_past`.
 
@@ -573,7 +573,7 @@ Nota UX: nel form le percentuali sono inserite in formato umano (`62`, `2.8`) e 
 
 ## Testing
 
-197 test (al 2026-10-16). Lanciali con `uv run pytest`.
+200 test (al 2026-10-16). Lanciali con `uv run pytest`.
 
 ### [tests/test_thermal.py](tests/test_thermal.py)
 
@@ -854,7 +854,7 @@ Nota UX: nel form le percentuali sono inserite in formato umano (`62`, `2.8`) e 
 - PWA installabile
 - UI con palette rivista + dark mode (auto + toggle), verificata da 320 px a desktop
 - Input del form validati lato server
-- 197 test unitari verdi
+- 200 test unitari verdi
 
 ### ✅ Fase 2 (fatta)
 - Ricette salvate con versioning, riapribili e collegate alle prove del Diario

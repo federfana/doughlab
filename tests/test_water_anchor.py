@@ -8,7 +8,7 @@ import pytest
 from doughlab.planning import compute_plan_and_ingredients, hours_before_bake
 from doughlab.services.backup import KNEADING_LABELS
 from doughlab.services.scheduler import PhaseKind, PlanPhase
-from doughlab.services.water import FRICTION_C, water_temperature
+from doughlab.services.water import FRICTION_RISE_C, water_temperature
 
 from .test_diary import run_with_db
 from .test_recipes import _save_data
@@ -16,17 +16,17 @@ from .test_strategies import _guided
 
 
 def test_water_follows_the_three_factor_formula_and_friction() -> None:
-    assert water_temperature(24, 22, 20, "hand").temperature_c == pytest.approx(28.5)
-    assert water_temperature(24, 22, 20, "planetary").temperature_c == pytest.approx(23.5)
-    assert water_temperature(24, 22, 20, "mixer").temperature_c == pytest.approx(21.0)
-    assert water_temperature(24, 22, 20, "unknown").temperature_c == pytest.approx(28.5)
-    assert water_temperature(24, 22, 20, "hand").formula == "3 × 24 − (22 + 20 + 1.5)"
+    assert water_temperature(24, 22, 20, "hand").temperature_c == pytest.approx(27.0)
+    assert water_temperature(24, 22, 20, "planetary").temperature_c == pytest.approx(16.5)
+    assert water_temperature(24, 22, 20, "mixer").temperature_c == pytest.approx(15.0)
+    assert water_temperature(24, 22, 20, "unknown").temperature_c == pytest.approx(27.0)
+    assert water_temperature(24, 22, 20, "hand").formula == "3 × 24 − (22 + 20 + 3)"
 
 
 def test_a_preferment_adds_its_temperature_and_a_fourth_factor() -> None:
     advice = water_temperature(24, 22, 20, "hand", preferment_c=18)
 
-    assert advice.temperature_c == pytest.approx(4 * 24 - (22 + 20 + 18 + 1.5))
+    assert advice.temperature_c == pytest.approx(4 * 24 - (22 + 20 + 18 + 4))
     assert advice.formula.startswith("4 × 24")
 
 
@@ -34,20 +34,20 @@ def test_hot_summer_asks_for_cold_water_and_ice_when_it_is_not_enough() -> None:
     summer = water_temperature(24, 30, 28, "hand")
     brutal = water_temperature(24, 34, 32, "mixer")
 
-    assert summer.temperature_c == pytest.approx(12.5) and summer.level == "ok"
+    assert summer.temperature_c == pytest.approx(11.0) and summer.level == "ok"
     assert summer.dough_c == pytest.approx(24)
     assert brutal.level == "cold" and "ghiaccio" in brutal.message
-    assert brutal.temperature_c == 0 and brutal.wanted_c == pytest.approx(-3)
-    assert brutal.dough_c == pytest.approx(25)
+    assert brutal.temperature_c == 0 and brutal.wanted_c == pytest.approx(-9)
+    assert brutal.dough_c == pytest.approx(27)
 
 
 def test_water_is_capped_at_35_degrees_and_the_resulting_dough_temperature_is_reported() -> None:
     winter = water_temperature(24, 12, 15, "hand")
 
-    assert winter.wanted_c == pytest.approx(43.5)
+    assert winter.wanted_c == pytest.approx(42.0)
     assert winter.temperature_c == 35 and winter.level == "hot"
-    assert winter.dough_c == pytest.approx(21.2)
-    assert "43,5" in winter.message and "35" in winter.message and "21,2" in winter.message
+    assert winter.dough_c == pytest.approx(21.7)
+    assert "42,0" in winter.message and "35" in winter.message and "21,7" in winter.message
     assert water_temperature(24, 16, 14, "hand").temperature_c == 35
 
 
@@ -60,7 +60,7 @@ def test_plan_uses_the_dough_temperature_that_the_capped_water_gives() -> None:
 
 
 def test_planner_and_diary_use_the_same_kneading_keys() -> None:
-    assert set(FRICTION_C) == set(KNEADING_LABELS)
+    assert set(FRICTION_RISE_C) == set(KNEADING_LABELS)
 
 
 def test_hours_before_bake_stops_at_a_bake_phase() -> None:
@@ -107,7 +107,7 @@ def test_plan_exposes_water_and_a_hot_kitchen_cools_it() -> None:
     cool = compute_plan_and_ingredients(_guided(room_c="22", flour_c="20", kneading="hand"))
     hot = compute_plan_and_ingredients(_guided(room_c="30", flour_c="26", kneading="planetary"))
 
-    assert cool["water"].temperature_c == pytest.approx(28.5)
+    assert cool["water"].temperature_c == pytest.approx(27.0)
     assert hot["water"].temperature_c < cool["water"].temperature_c
     assert hot["plan_snapshot"]["kneading"] == "planetary" and hot["plan_snapshot"]["water_c"] == hot["water"].temperature_c
 
@@ -117,13 +117,13 @@ def test_plan_response_and_page_carry_the_new_fields(tmp_path, monkeypatch) -> N
         text = (await client.post("/plan", data=_guided(anchor="bake", bake_at="2031-05-05T20:30"))).text
         assert 'id="startInfo" hx-swap-oob="innerHTML"' in text and "devi iniziare" in text
         assert 'id="waterInfo" class="water-info ok"' in text and "Temperatura dell'acqua" in text
-        assert "a 28,5 °C" in text
+        assert "a 27,0 °C" in text
 
         page = (await client.get("/")).text
         for field in ('name="anchor"', 'name="bake_at"', 'name="flour_c"', 'name="kneading"'):
             assert field in page
         assert page.count('<option value="') >= len(KNEADING_LABELS)
-        assert "A mano (+1,5 °C)" in page and "Planetaria (+6,5 °C)" in page
+        assert "A mano (+1 °C)" in page and "Planetaria (+4,5 °C)" in page
 
     run_with_db(tmp_path, monkeypatch, check)
 

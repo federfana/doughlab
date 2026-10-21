@@ -7,7 +7,13 @@ from sqlalchemy import select
 from doughlab.models import RecipeVersion
 from doughlab.planning import compute_plan_and_ingredients
 from doughlab.services.scheduler import PhaseKind
-from doughlab.services.strategies import STRATEGIES, build_phases, strategy_for, with_folds
+from doughlab.services.strategies import (
+    STRATEGIES,
+    build_phases,
+    strategy_for,
+    suggested_dough_c,
+    with_folds,
+)
 from doughlab.services.thermal import Container, Environment
 
 from .test_diary import run_with_db
@@ -208,3 +214,22 @@ def test_changing_kneading_in_expert_mode_updates_the_phase_cards(tmp_path, monk
         assert hand.count('class="phase-card"') == mixer.count('class="phase-card"') + 6
 
     run_with_db(tmp_path, monkeypatch, check)
+
+
+def test_long_cold_strategies_suggest_a_cooler_dough_and_it_is_the_planner_default() -> None:
+    from doughlab.planning import guided_settings
+    from doughlab.services.presets import PRESETS_BY_KEY
+
+    assert strategy_for("direct_8").dough_c == 24
+    assert all(strategy_for(k).dough_c <= 21 for k in ("fridge_24", "fridge_only_24", "fridge_48", "long_72"))
+    assert guided_settings(PRESETS_BY_KEY["napoletana"])["initial_dough_c"] == 24
+    teglia = PRESETS_BY_KEY["teglia"]
+    assert guided_settings(teglia)["initial_dough_c"] == suggested_dough_c("fridge_24", teglia.ingredients.hydration_pct)
+
+
+def test_higher_hydration_asks_for_a_colder_dough_within_limits() -> None:
+    assert suggested_dough_c("fridge_24", 0.60) == 21 and suggested_dough_c("fridge_24", 0.65) == 21
+    assert suggested_dough_c("fridge_24", 0.70) == 20
+    assert suggested_dough_c("fridge_24", 0.75) == 19
+    assert suggested_dough_c("direct_8", 0.80) == 21
+    assert suggested_dough_c("long_72", 1.0) == 18

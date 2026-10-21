@@ -150,7 +150,7 @@
         <label class="field">
           <span class="lab">Idratazione %</span>
           <span class="number-stepper">
-            <input type="number" name="hydration_pct" value="{{ '%.1f'|format(recipe.ingredients.hydration_pct * 100) }}" step="any" min="40" max="120">
+            <input type="number" name="hydration_pct" value="{{ '%.1f'|format(recipe.ingredients.hydration_pct * 100) }}" step="any" min="40" max="120" @input="suggestDoughTemp()">
             <span class="number-stepper-controls">
               <button type="button" aria-label="Aumenta idratazione di 1 punto" title="Aumenta di 1" onclick="adjustPercent(this, 1)">↑</button>
               <button type="button" aria-label="Riduci idratazione di 1 punto" title="Riduci di 1" onclick="adjustPercent(this, -1)">↓</button>
@@ -276,7 +276,7 @@
           </label>
           <label class="field">
             <span class="lab">T° impasto desiderata (°C)</span>
-            <input type="number" name="initial_dough_c" value="{{ recipe.initial_dough_c }}" step="any" min="0" max="40" inputmode="decimal">
+            <input type="number" name="initial_dough_c" value="{{ '%g'|format(recipe.initial_dough_c) }}" step="any" min="0" max="40" inputmode="decimal" @input="doughTouched = true">
           </label>
           <label class="field">
             <span class="lab">T° della farina (°C)</span>
@@ -285,11 +285,12 @@
           <label class="field">
             <span class="lab">Come impasti</span>
             <select name="kneading" @change="refoldPhases()">
-              {% for key, label, friction in kneading_options %}<option value="{{ key }}" {% if recipe.kneading == key %}selected{% endif %}>{{ label }} (+{{ friction|string|replace('.', ',') }} °C)</option>{% endfor %}
+              {% for key, label, friction in kneading_options %}<option value="{{ key }}" {% if recipe.kneading == key %}selected{% endif %}>{{ label }} (+{{ '%g'|format(friction)|replace('.', ',') }} °C)</option>{% endfor %}
             </select>
           </label>
         </div>
         <p class="hint" style="margin:.3rem 0 0">A mano o in planetaria il piano aggiunge le pieghe di rinforzo durante la puntata (in Esperto puoi poi spostarle o modificarle).</p>
+        <p class="hint" style="margin:.3rem 0 0">T° impasto consigliata: 24 °C per la diretta, 20-21 °C per le maturazioni lunghe in frigo, e 1 °C più fredda ogni 5 punti di idratazione sopra il 65% (acqua più fredda per impasti più molli). Si aggiorna da sola scegliendo strategia e idratazione, finché non la cambi tu. Il numero tra parentesi è di quanto l'impastare scalda l'impasto.</p>
         <div id="startInfo" class="start-info" aria-live="polite"></div>
         <div id="waterInfo" class="water-info" aria-live="polite"></div>
       </section>
@@ -304,7 +305,7 @@
         <div class="strategy-grid" role="radiogroup" aria-label="Strategia di lievitazione">
           {% for s in strategies %}
           <label class="strategy-card">
-            <input type="radio" name="strategy" value="{{ s.key }}" {% if recipe.strategy == s.key %}checked{% endif %}>
+            <input type="radio" name="strategy" data-dough-c="{{ '%g'|format(s.dough_c) }}" @change="suggestDoughTemp()" value="{{ s.key }}" {% if recipe.strategy == s.key %}checked{% endif %}>
             <span class="strategy-body">
               <strong>{{ s.label }}</strong>
               <small>{{ s.description }}</small>
@@ -676,6 +677,8 @@ function plannerUI(initialOvenProfile, initialMode, modeForced) {
     mode: initialMode,
     // Fasi toccate a mano: passando a «Guidata» verrebbero sostituite, quindi si chiede conferma.
     phasesEdited: modeForced && initialMode === 'expert',
+    // Con una ricetta salvata o una T° toccata a mano, cambiare strategia non la sostituisce.
+    doughTouched: modeForced,
     live: null,
     now: Date.now(),
     init() {
@@ -718,6 +721,16 @@ function plannerUI(initialOvenProfile, initialMode, modeForced) {
       this.mode = next;
       localStorage.setItem(MODE_KEY, next);
       this.$nextTick(() => htmx.trigger('#planForm', 'change'));
+    },
+    // In guidata la T° impasto si propone da strategia e idratazione (come `suggested_dough_c`), se non l'hai scelta tu.
+    suggestDoughTemp() {
+      if (this.doughTouched || this.mode !== 'guided') return;
+      const form = document.getElementById('planForm');
+      const radio = form.querySelector('input[name=strategy]:checked');
+      const hydration = Number(form.elements.hydration_pct.value);
+      if (!radio || !Number.isFinite(hydration)) return;
+      const cooler = Math.min(3, Math.max(0, (hydration - 65) / 5));
+      form.elements.initial_dough_c.value = String(Math.max(18, Math.floor((Number(radio.dataset.doughC) - cooler) * 2 + 0.5) / 2));
     },
     // In Esperto le fasi sono tue: cambiando come impasti si aggiungono o tolgono solo le pieghe.
     async refoldPhases() {

@@ -3,8 +3,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-# Calore ceduto dall'impastatrice all'impasto, in °C (a mano si scalda appena).
-FRICTION_C = {"hand": 1.5, "planetary": 6.5, "mixer": 9.0}
+# Di quanto l'impastare scalda l'impasto, in °C (di solito a mano si scalda appena, in planetaria qualche grado).
+FRICTION_RISE_C = {"hand": 1.0, "planetary": 4.5, "mixer": 5.0}
 DEFAULT_KNEADING = "hand"
 DEFAULT_FLOUR_C = 20.0
 
@@ -35,20 +35,25 @@ def water_temperature(
     kneading: str,
     preferment_c: float | None = None,
 ) -> WaterAdvice:
-    """3 × T impasto − (T ambiente + T farina + attrito); con un prefermento si somma anche la sua T e si moltiplica per 4.
+    """N × T impasto − (T ambiente + T farina [+ T prefermento] + fattore di attrito).
+
+    N è il numero di temperature che si mediano (ambiente, farina, acqua ed eventuale prefermento): il
+    fattore di attrito è N volte l'aumento di temperatura dovuto all'impasto, perché la formula lavora
+    sulla somma e non sulla media.
 
     Se la formula chiede un'acqua oltre 35 °C (o sotto 0) si consiglia il limite e si dice a che
     temperatura uscirà l'impasto.
     """
-    friction = FRICTION_C.get(kneading, FRICTION_C[DEFAULT_KNEADING])
-    others = [ambient_c, flour_c, friction]
+    rise = FRICTION_RISE_C.get(kneading, FRICTION_RISE_C[DEFAULT_KNEADING])
+    others = [ambient_c, flour_c]
     if preferment_c is not None:
-        others.insert(2, preferment_c)
-    factors = len(others)
-    wanted = round(factors * target_c - sum(others), 1)
+        others.append(preferment_c)
+    factors = len(others) + 1
+    friction = round(rise * factors, 1)
+    wanted = round(factors * target_c - sum(others) - friction, 1)
     value = min(MAX_WATER_C, max(MIN_WATER_C, wanted))
-    dough = round((value + sum(others)) / factors, 1)
-    formula = f"{factors} × {target_c:g} − ({' + '.join(f'{x:g}' for x in others)})"
+    dough = round((value + sum(others) + friction) / factors, 1)
+    formula = f"{factors} × {target_c:g} − ({' + '.join(f'{x:g}' for x in [*others, friction])})"
     if wanted > MAX_WATER_C:
         level = "hot"
         message = (
