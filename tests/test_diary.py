@@ -430,3 +430,20 @@ def test_process_steps_show_the_end_date_only_when_it_is_another_day() -> None:
     process = form_from_plan({"phases": phases})["data"]["process"].splitlines()
 
     assert process == ["Puntata: 2 h (03/10 11:00 - 13:00)", "Frigo: 18 h (03/10 13:00 - 04/10 07:00)"]
+
+
+def test_ingredients_list_total_flour_and_each_flour_of_a_blend() -> None:
+    from doughlab.diary import form_from_plan
+
+    snapshot = {
+        "ingredients": {"flour_g": 500, "water_g": 325, "salt_g": 14, "yeast_g": 1},
+        "flours": [
+            {"id": 1, "brand": "Caputo", "name": "Pizzeria", "pct": 60},
+            {"id": 2, "brand": "Molino", "name": "Integrale", "pct": 40},
+        ],
+    }
+    lines = form_from_plan(snapshot)["data"]["ingredients"].splitlines()
+    assert lines[:3] == ["Farina 500 g", "  · Caputo Pizzeria 300 g (60%)", "  · Molino Integrale 200 g (40%)"]
+
+    single = {**snapshot, "flours": snapshot["flours"][:1]}
+    assert form_from_plan(single)["data"]["ingredients"].splitlines()[:2] == ["Farina 500 g", "Acqua 325 g"]

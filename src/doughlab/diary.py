@@ -148,6 +148,20 @@ def _hours(value: Any) -> float:
     return float(value) if isinstance(value, (int, float)) else 0.0
 
 
+def _flour_component_lines(flours: Any, total_g: float) -> list[str]:
+    """Una riga per farina (peso e percentuale) quando la miscela ne ha più di una."""
+    if not isinstance(flours, list) or len(flours) < 2:
+        return []
+    lines: list[str] = []
+    for item in flours:
+        if not isinstance(item, dict):
+            continue
+        pct = _hours(item.get("pct"))
+        label = " ".join(str(item.get(key) or "") for key in ("brand", "name")).strip() or "Farina"
+        lines.append(f"  · {label} {total_g * pct / 100:.0f} g ({pct:g}%)")
+    return lines
+
+
 def form_from_plan(snapshot: dict[str, Any]) -> dict[str, Any]:
     """Modulo nuovo precompilato con quanto previsto dal piano (tutto resta modificabile)."""
     values = _blank_values()
@@ -198,6 +212,7 @@ def form_from_plan(snapshot: dict[str, Any]) -> dict[str, Any]:
     water_note = f" a {water_c:.1f} °C".replace(".", ",") if isinstance(water_c, (int, float)) else ""
     lines = [
         f"Farina {_hours(weights.get('flour_g')):.0f} g",
+        *_flour_component_lines(snapshot.get("flours"), _hours(weights.get("flour_g"))),
         f"Acqua {_hours(weights.get('water_g')):.0f} g{water_note}",
         f"Sale {_hours(weights.get('salt_g')):.1f} g",
         f"Lievito {_hours(weights.get('yeast_g')):.2f} g",
