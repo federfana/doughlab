@@ -1,5 +1,5 @@
 // Service worker minimale: shell cache per aprire l'app offline.
-const CACHE = 'doughlab-v4';
+const CACHE = 'doughlab-v6';
 const CORE = [
   '/',
   '/static/manifest.webmanifest',

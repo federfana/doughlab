@@ -37,7 +37,7 @@ Laboratorio digitale per impasti pizza/pane. Prevede **quando** l'impasto è dav
 - **Suggerimenti di cottura**: in sola lettura, per forno domestico o elettrico con cielo e platea indipendenti. Non influenzano la maturazione.
 - **Diario**: ogni prova ha nome, data, formula, forno, come si impasta (a mano, planetaria, impastatrice), voto a stelle (mezze stelle: tocca la metà sinistra di una stella; ritocca lo stesso valore per toglierlo), note, "da cambiare" e fino a 5 foto. Nel modulo puoi scegliere una **farina o una miscela dell'archivio** (una riga; il pulsante *+ farina* ne aggiunge fino a 3, con percentuali ripartite in parti uguali): compila Farina, W e Proteine (medie pesate), che restano modificabili. Può nascere da un piano (pulsante *Salva questa prova nel diario*, che precompila ingredienti, fasi e forno) e, con gli orari reali, mostra la partenza e il pronto stimati, quelli reali e lo scarto tra le DURATE (non tra le date: se il piano partiva un altro giorno il confronto resta valido).
 - **Ricette salvate**: formula, fasi, lievito e forno si salvano con un nome (*Le mie ricette*); salvare di nuovo con lo stesso nome crea una nuova versione, e ogni versione si può riaprire. Le prove del diario nate da una ricetta salvata restano collegate e si filtrano per ricetta.
-- **In corso (Live Bake)**: *Avvia in cucina* segue le fasi in tempo reale con timer, avanzamento manuale, ±15 min, controlli per fase, temperatura misurata, avviso a fine fase e schermo acceso. Lo stato resta nel browser (sopravvive a ricarica e chiusura) e a fine impasto precompila il diario con gli orari reali.
+- **In corso (Live Bake)**: *Avvia in cucina* segue le fasi in tempo reale con timer, avanzamento manuale, ±15 min, controlli per fase, temperatura misurata, avviso a fine fase e schermo acceso. Lo stato resta nel browser (sopravvive a ricarica e chiusura) e viene copiato anche sul server (si riprende se Safari pulisce i dati o da un altro dispositivo). A fine impasto precompila il diario con gli orari reali. Il pulsante *Aggiungi i promemoria al Calendario* scarica un `.ics` con un avviso alla fine di ogni fase, che suona anche a schermo spento.
 - **Ricerca nel Diario** per nome, tipo, note, forno.
 - **Farine**: un archivio con W, P/L, proteine e idratazione consigliata, già carico con le farine di Agricola Piano, Caputo, Casillo, Le Farine Magiche, Vigevano, Molino Cipolla (dati dichiarati dai produttori), altre dai siti dei produttori (Caputo Nuvola Super, Le 5 Stagioni, Molino Quaglia Petra, Garofalo, Polselli; dove la scheda non riporta W e P/L restano vuoti, e quelle senza W non entrano nei consigli) e alcune categorie generiche. Nel passo *Formula* il piano **consiglia fino a 3 farine** (marca e tipo) per stile, ore di maturazione, idratazione e metodo (diretto/indiretto), con il motivo e un pulsante *Usa*. Nel piano scegli una farina (una riga; *+ farina* ne aggiunge fino a 3 per una miscela, percentuali in parti uguali che puoi correggere): vedi W, P/L e proteine medi, i grammi per farina e l'**idratazione consigliata** (dal produttore, oppure stimata dalla forza W) confrontata con la tua, con un pulsante per adottarla. Ogni farina dice se è indicata per impasti **diretti o indiretti** (come sulle schede di Agricola Piano) e il piano avvisa se una farina "solo diretta" incontra un prefermento, o viceversa. La miscela passa a Diario (farina, W, proteine) e ricette salvate.
 - **Dispensa (magazzino farine)**: nel tab *Farine* scrivi i grammi che hai di ogni farina (*Imposta*, oppure *Aggiungi* quando compri un sacco nuovo, *Togli* per toglierla); le farine in dispensa compaiono in cima nell'elenco e nel menu di scelta del piano. Al passo 2 i consigli sono limitati a quelle: se hai segnato almeno una farina in dispensa, vedi solo quelle (con i grammi che hai e un avviso se non bastano per l'impasto); se nessuna è adatta, un messaggio e le altre, in un elenco separato. Senza dispensa registrata i consigli restano su tutto l'archivio. Salvando nel Diario una prova nata da un piano, la casella *Scala la farina usata dalla dispensa* (spuntata di default) sottrae i grammi usati dalle farine che hai registrato, in proporzione alla miscela e mai sotto zero; modificare o importare una prova non scala nulla.
@@ -143,6 +143,7 @@ doughlab/
 │   ├── recipes.py                 # router ricette salvate con versioning
 │   ├── flours.py                  # router farine, seed, miscela del piano
 │   ├── diary.py                   # router del Diario: CRUD, foto, ricerca, import/export
+│   ├── live.py                    # impasto in corso: copia sul server e promemoria .ics
 │   ├── services/
 │   │   ├── thermal.py             # modello di Newton (τ per profilo)
 │   │   ├── fermentation.py        # modello Q10 del lievito
@@ -152,8 +153,11 @@ doughlab/
 │   │   ├── water.py               # temperatura dell'acqua dalla formula del pizzaiolo
 │   │   ├── fields.py              # lettura difensiva di numeri, testi, date
 │   │   ├── flour_blend.py         # medie pesate della miscela e idratazione consigliata
+│   │   ├── diary_form.py          # logica del modulo del Diario (precompilazione da un piano, lettura, vista)
+│   │   ├── live_state.py          # controllo dello stato dell'impasto in corso e file .ics
 │   │   ├── db_backup.py           # copia giornaliera del database con rotazione
-│   │   ├── flour_seed.py          # farine predefinite con fonte
+│   │   ├── flour_seed.py          # carica e controlla seed_data/flour_seeds.json (farine predefinite)
+│   │   ├── flour_links.py         # controllo dei link alle schede dei produttori
 │   │   ├── pantry.py              # dispensa: formato dei grammi e consumo di un impasto
 │   │   ├── flour_suggest.py       # farine consigliate per stile, ore, idratazione e metodo
 │   │   ├── images.py              # controllo del tipo di immagine dai primi byte
@@ -161,7 +165,7 @@ doughlab/
 │   │   ├── calibration.py         # scarto stima/reale per ricetta e target del lievito consigliato
 │   │   └── scheduler.py           # orchestra tutto in un PlanResult
 │   ├── templates/
-│   │   ├── base.html              # layout, CSS con variabili, tema chiaro/scuro
+│   │   ├── base.html              # layout, intestazione, tema chiaro/scuro (lo stile è in static/app.css)
 │   │   ├── planner.html           # tab Pianifica + In corso + Diario + Farine (HTMX, Alpine)
 │   │   └── partials/
 │   │       ├── plan_result.html   # fragment di /plan: ingredienti, riepilogo, grafico, timeline, barra e consigli (OOB)
@@ -173,9 +177,10 @@ doughlab/
 │   │       ├── diary_form.html    # modulo di una prova (con foto)
 │   │       └── diary_entry.html   # scheda di una prova
 │   └── static/
+│       ├── app.css                # tutta la grafica: variabili, componenti, navigazione, tema scuro
 │       ├── manifest.webmanifest   # PWA
 │       ├── sw.js                  # service worker (precache shell + librerie)
-│       ├── vendor/                # Alpine, HTMX, Chart.js (versioni fissate)
+│       ├── vendor/                # Alpine, HTMX, Chart.js (versioni fissate) e font Fraunces (OFL)
 │       └── icons/                 # icone PWA
 └── tests/
     ├── test_thermal.py            # proprietà di Newton
@@ -187,7 +192,10 @@ doughlab/
     ├── test_diary.py              # rotte del Diario su SQLite temporaneo
     ├── test_recipes.py            # ricette salvate, versioni, collegamento al Diario
     ├── test_flours.py             # farine, miscele, idratazione, rotte
+    ├── test_flour_seed_data.py    # file dei dati delle farine, correzioni, verifica dei link
     ├── test_pantry.py             # dispensa: scorta, consigli limitati, consumo dalle prove
+    ├── test_live.py               # impasto in corso sul server, promemoria .ics
+    ├── test_ui.py                 # grafica: CSS versionato, font, navigazione, anello del timer
     └── test_main.py               # form, template, .ics
 ```
 
@@ -376,7 +384,7 @@ Cinque modelli ORM:
 - **`Recipe`**: metadati della ricetta (nome, stile, note).
 - **`RecipeVersion`**: ogni modifica è una nuova riga → **ricettario versionato**. Payload JSON contiene fasi/ingredienti/parametri, utile come MVP prima di normalizzare lo schema.
 - **`DiaryEntry`**: una prova del diario. Colonne per i campi del backup (nome, data, tipo, forno, farina, idratazione, ore frigo/ambiente, panetti, temperature, voto 0.5-5, ingredienti, procedimento, note, "da cambiare", etichette), più `started_at`/`ready_at` reali, `plan` (snapshot JSON del piano di origine, se c'è) ed `extra` (chiavi di backup sconosciute, restituite nell'export). `external_id` (uuid o id del backup) rende l'importazione ripetibile.
-- **`Flour`**: una farina (produttore, nome, tipo, `stock_g` (grammi in dispensa: vuoto = non la tieni, 0 = finita), `w`, `pl`, `protein`, `hydration_min/max`, `hydration_note`, `method` (diretto / indiretto / entrambi / vuoto), `method_note`, uso, note, `source_url`, `builtin`). Unica per coppia produttore+nome. Alla prima apertura (tabella vuota) viene caricata da `services/flour_seed.py`; poi le tue modifiche e cancellazioni restano tue, e *Ripristina predefinite* aggiunge solo quelle mancanti. Una volta per versione dell'archivio (`SEED_VERSION`, oggi 6, salvata in `app_settings`) `sync_builtin_seeds` toglie le predefinite ritirate (`SEED_REMOVED`), aggiunge le nuove e riempie i dati mancanti (W, P/L, proteine, idratazione, tipo, uso) delle predefinite, senza sovrascrivere valori presenti né rimettere le farine che hai eliminato. Ad ogni avvio corregge anche le farine della versione 2 rimaste con i dati provvisori (`DRAFT_NOTE`, `SEED_CORRECTIONS`), solo se non le hai modificate.
+- **`Flour`**: una farina (produttore, nome, tipo, `stock_g` (grammi in dispensa: vuoto = non la tieni, 0 = finita), `w`, `pl`, `protein`, `hydration_min/max`, `hydration_note`, `method` (diretto / indiretto / entrambi / vuoto), `method_note`, uso, note, `source_url`, `verified` (quando i dati sono stati confrontati con la scheda del produttore), `builtin`). Unica per coppia produttore+nome. Alla prima apertura (tabella vuota) viene caricata da `seed_data/flour_seeds.json` (letto e controllato da `services/flour_seed.py`); poi le tue modifiche e cancellazioni restano tue, e *Ripristina predefinite* aggiunge solo quelle mancanti. Una volta per versione dell'archivio (`SEED_VERSION`, oggi 7, salvata in `app_settings`) `sync_builtin_seeds` toglie le predefinite ritirate (`SEED_REMOVED`), aggiunge le nuove e riempie i dati mancanti (W, P/L, proteine, idratazione, tipo, uso) delle predefinite, senza sovrascrivere valori presenti né rimettere le farine che hai eliminato. Le correzioni ai dati di una farina già presente (es. W o P/L trovati dopo) sono nel file con `revised` e `was` (i valori di prima): `sync_builtin_seeds` le applica solo se quei campi sono ancora quelli di prima, cioè se non li hai modificati. Ad ogni avvio corregge anche le farine della versione 2 rimaste con i dati provvisori (`DRAFT_NOTE`, `SEED_CORRECTIONS`), solo se non le hai modificate.
 - **`DiaryPhoto`**: fino a 5 foto per voce (`main`, `extra1`..`extra4`), binario `deferred` (si legge solo quando serve una foto o l'export), con didascalia e inquadratura.
 
 > `Recipe` e `RecipeVersion` esistono ma non sono ancora usati: arriveranno con la persistenza ricette (fase 2). La vecchia tabella `bakes` non viene più usata (era vuota) e non viene eliminata dal database.
@@ -536,11 +544,27 @@ Router `/farine` (risposte HTML di `partials/flours_panel.html`).
 
 `blend_context(data, hydration)` legge `flour_id_N`/`flour_pct_N` dal form del piano (max 3, percentuali normalizzate a 100) e restituisce la miscela; `snapshot_extras` aggiunge allo snapshot `flours`, `flour_label`, `flour_w`, `flour_protein`, che il Diario usa per precompilare farina, W e proteine.
 
+### [seed_data/flour_seeds.json](src/doughlab/seed_data/flour_seeds.json)
+
+Le farine predefinite, una per riga, con produttore, nome, tipo, W, P/L, proteine, idratazione, impasto, uso, note, `source_url` (pagina del produttore) e `verified` (data del confronto con la scheda). Si aggiorna senza toccare il codice: modifica il file e alza `version`. Per una farina nuova metti `since` uguale alla nuova versione; per correggerne una esistente aggiungi `revised` e `was`; per ritirarla, il suo nome in `removed`. Il formato è controllato all'avvio (nomi duplicati, campi sconosciuti, `revised` senza `was`). Dove il produttore non pubblica W o P/L restano vuoti, e quelle senza W non entrano nei consigli.
+
+`uv run python -m doughlab.services.flour_links` controlla che tutti i link alle schede rispondano e segnala quelli spostati: da lanciare ogni tanto, non parte da solo.
+
 ### [services/flour_blend.py](src/doughlab/services/flour_blend.py)
 
 Funzioni pure. W, P/L e proteine della miscela sono **medie pesate** sulle sole farine che hanno il dato (per la W è una stima: non è davvero lineare). L'idratazione consigliata è la media pesata degli intervalli del produttore; se manca, `estimate_hydration(w)` la ricava dalla forza (W 240 → 58-62%, 290 → 63-68%, 340 → 66-72%, oltre 380 → 70-78%, coerente con le schede dei produttori ma pur sempre una regola empirica non tarata). `basis` dice se l'indicazione è del produttore, stimata o mista; `hydration_position` confronta con la tua idratazione (mezzo punto di tolleranza).
 
 Dati predefiniti: dove il produttore scrive "oltre il 65%" o "fino all'80%", gli estremi numerici sono una nostra interpretazione e le sue parole stanno in `hydration_note`; gli intervalli di W stanno in `notes` e `w` è il valore centrale. Le ceneri (il residuo minerale dopo la combustione, indice di quanto la farina è raffinata) non sono gestite.
+
+### [live.py](src/doughlab/live.py)
+
+Il browser tiene lo stato dell'impasto in corso in `localStorage` (funziona anche offline) e lo copia sul server in background: così non si perde se Safari pulisce i dati, e si riprende da un altro dispositivo (al ritorno nell'app, alla ricarica e ogni 30 s a pagina visibile). Una sola riga in `live_session`, compresa nella copia automatica del database. Vince la scrittura più recente (`savedAt`, ms): chi è rimasto indietro riceve `409` con lo stato del server e lo adotta. Chiudere o salvare nel Diario scrive una «lapide» (`state: null`), così una copia vecchia non risorge. Lo stato è controllato (`services/live_state.py`: tipi, intervalli, max 60 fasi, 100 KB).
+
+| Metodo | Path | Scopo |
+|---|---|---|
+| `GET` | `/live` | `{savedAt, state}` (stato `null` = nessun impasto) |
+| `PUT` | `/live` | salva `{savedAt, state}`; `409` se sul server c'è già qualcosa di più recente, `400`/`413` se non valido |
+| `GET` | `/live/calendar.ics` | promemoria per il Calendario: un evento con allarme alla fine di ogni fase rimasta (UID stabili: riscaricarlo aggiorna senza duplicare); `404` se non c'è nulla da ricordare. È il pulsante *Aggiungi i promemoria al Calendario* in *In corso* |
 
 ### [diary.py](src/doughlab/diary.py)
 
@@ -555,6 +579,8 @@ Router `/diario`. Tutte le rotte restituiscono il pannello `partials/diary_panel
 | `POST` | `/diario/importa` | importa un backup JSON (max 100 MB) e mostra il resoconto; è il pulsante *Importa backup* nella barra del Diario (accanto a *Esporta backup*; sceglie il file e importa subito) |
 | `GET` | `/diario/export.json` | scarica il backup completo con le foto |
 
+La logica senza database né FastAPI (valori dei campi, `form_from_plan`, lettura del form, vista di una prova) sta in `services/diary_form.py`; qui restano rotte, accesso al database, foto e backup.
+
 Sicurezza e robustezza: il tipo dell'immagine è deciso dai primi byte (solo JPEG/PNG/WebP, max 12 MB), i testi hanno lunghezza massima, i numeri vengono validati e limitati (nessun `inf`/`NaN`), tutto passa dall'autoescape di Jinja. Se `ready_at` precede `started_at` il modulo resta aperto con l'errore in evidenza e i valori digitati.
 
 ### [services/backup.py](src/doughlab/services/backup.py)
@@ -563,7 +589,7 @@ Sicurezza e robustezza: il tipo dell'immagine è deciso dai primi byte (solo JPE
 
 ### [templates/](src/doughlab/templates/)
 
-- **`base.html`**: layout minimale con variabili CSS semantiche (`--bg`, `--surface`, `--ac`…), dark mode automatica (preferenza di sistema) + toggle manuale persistente in `localStorage`. Alpine.js, HTMX e Chart.js sono serviti da `static/vendor/`. Niente Node, niente build step. Il testo secondario (`--mut`) rispetta il contrasto AA in entrambi i temi.
+- **`base.html`**: layout e intestazione (logo SVG, interruttore del tema); lo stile sta in `static/app.css`, collegato con `?v=<data di modifica>` così, dopo un aggiornamento, il service worker (che tiene in cache gli asset statici) non serve mai il CSS vecchio. Variabili CSS semantiche (`--bg`, `--surface`, `--ac`…), dark mode automatica (preferenza di sistema) + toggle manuale persistente in `localStorage`. Alpine.js, HTMX e Chart.js sono serviti da `static/vendor/`. Niente Node, niente build step. Il testo secondario (`--mut`) rispetta il contrasto AA in entrambi i temi.
 - **`planner.html`**: il piano è un solo form HTMX diviso in 4 passi (`step` in `plannerUI`, sezioni mostrate o nascoste con `x-show`: tutti i campi restano nel form e il server calcola come prima); `mode` guidata/esperto è un campo nascosto, ricordato in `localStorage['dl-mode']` (una ricetta salvata la impone). Una tab bar nella stessa pagina separa **Pianifica**, **In corso**, **Diario** e **Farine**. La scheda Piano contiene input base, ricetta, fasi e suggerimenti di cottura in sola lettura, selezionabili per forno domestico o elettrico con cielo e platea. I parametri reali si annotano nel Diario e non influenzano la maturazione. `compressPhotoInput` riduce le foto a 1600 px (JPEG) nel browser prima del caricamento.
   **Live Bake** (tab *In corso*, tutto lato client in `plannerUI`): *Avvia in cucina* legge il piano da `#liveData` e salva lo stato in `localStorage['dl-live']` (orari reali di inizio fase, minuti aggiunti/tolti, controlli spuntati, T° misurata). La fase corrente è l'ultima con un orario reale; il timer conta alla scadenza prevista e, se superata, va in negativo. Alla scadenza scattano vibrazione e notifica (solo se la pagina è aperta), e la Wake Lock API tiene acceso lo schermo. Il "pronto" reale è l'inizio della prima fase di cottura (o la fine dell'ultima fase). *Salva nel diario* chiama `/diario/da-piano` con l'orario di partenza reale, quindi compila `started_at`, `ready_at` e `dough_temp`.
 - **`partials/plan_result.html`**: HTMX aggiorna ingredienti e riepilogo in `#result`, grafico e timeline in `#detailsResult`, consigli su farina e idratazione in `#flourAdvice` (passo Formula) e la barra riepilogo in `#planBar`, e offre il pulsante per salvare la prova nel Diario. Il grafico ha altezza responsive fissa (`.chart-wrap`), nasconde i titoli degli assi sotto i 560 px, legge i colori dalle variabili CSS e si ridisegna al cambio tema; l'asse X è il tempo trascorso in ore.
@@ -575,15 +601,18 @@ Nota UX: nel form le percentuali sono inserite in formato umano (`62`, `2.8`) e 
 
 ### [static/](src/doughlab/static/)
 
+- **`app.css`**: la grafica, «banco del panettiere»: toni di farina e brace (`--bg`, `--surface`, `--ac` brace, `--ac-2` crosta dorata), angoli morbidi (`--radius` 22px, pulsanti a pillola), grana di carta appena percettibile, titoli e numeri grandi in Fraunces. Sopra i 1000px i passi 1-3 del piano mettono le schede in due colonne bilanciate (`.plan-cols`; `.plan-wide` le fa occupare tutta la riga), il Diario affianca le prove e l'elenco farine ha due colonne. Le 4 aree (Pianifica, In corso, Diario, Farine) sono una barra fluttante in basso con icone su schermi stretti (con `safe-area` per iPhone) e un gruppo di pillole in alto sopra gli 820px. Il pianificatore ha un binario a 4 passi che si riempie, i segmenti (lievito, modalità, forno) hanno un solo stile, e *In corso* mostra il timer dentro un anello di avanzamento (`--p`, in %). Tutti i colori passano dalle variabili: il tema scuro cambia solo i valori in `html.dark`. Rispetta `prefers-reduced-motion`.
+- **`vendor/fonts/`**: Fraunces (variabile, solo latino, ~36 KB), licenza SIL OFL in `Fraunces-OFL.txt`. Servito in locale: l'app resta usabile offline.
+
 - **`manifest.webmanifest`**: nome, colori, icone 192/512 → "installabile" come PWA.
 - **`sw.js`**: service worker minimale, cache-first solo per `/static/*` (le richieste dinamiche di HTMX, foto ed export non passano mai dalla cache, altrimenti diario e ricette risulterebbero vecchi), network-first per le pagine HTML. Precarica pagina iniziale, manifest e le tre librerie di `static/vendor/` (versioni fissate nel nome del file; cambiando versione si aggiorna anche `CACHE` in `sw.js`) e salva l'ultima pagina vista. Offline l'app si apre ed è interattiva; calcolo del piano, diario e ricette richiedono comunque il server.
-- **`icons/*.png`**: placeholder generati con Python puro (zlib). Da sostituire con grafica vera.
+- **`icons/*.png`**: icone PWA 192/512 dal logo (pizza stilizzata crema su brace), generate con Chrome da riga di comando; il logo sta dentro la zona sicura, quindi vanno bene anche come icone «maskable».
 
 ---
 
 ## Testing
 
-219 test (al 2026-11-05). Lanciali con `uv run pytest`.
+238 test (al 2026-11-05). Lanciali con `uv run pytest`.
 
 ### [tests/test_thermal.py](tests/test_thermal.py)
 
@@ -711,6 +740,40 @@ Nota UX: nel form le percentuali sono inserite in formato umano (`62`, `2.8`) e 
 | `test_missing_columns_are_added_with_defaults_and_old_rows_survive` | le colonne nuove vengono aggiunte con default e le righe esistenti restano |
 | `test_nothing_to_add_returns_empty_set` | senza differenze non cambia nulla |
 | `test_new_not_null_column_without_a_simple_default_is_refused` | una colonna `NOT NULL` senza default semplice viene rifiutata con un errore chiaro |
+
+### [tests/test_live.py](tests/test_live.py)
+
+| Test | Proprietà verificata |
+|---|---|
+| `test_clean_live_state_keeps_the_known_fields_and_rejects_nonsense` | si tengono solo i campi noti; NaN, tipi sbagliati e troppe fasi vengono rifiutati |
+| `test_phase_ends_follow_the_current_phase_and_the_adjustments` | le fini previste partono dalla fase attuale e contano ±min |
+| `test_reminders_have_one_alarm_per_remaining_phase_with_stable_ids` | un evento con allarme per fase rimasta, UID stabili, righe ≤ 75 byte, fasi senza durata saltate |
+| `test_live_state_is_stored_on_the_server_and_older_writes_lose` | il server conserva lo stato; una scrittura più vecchia riceve 409 |
+| `test_closing_leaves_a_tombstone_so_an_old_copy_cannot_come_back` | chiudere lascia la lapide: una copia vecchia non risorge |
+| `test_live_endpoint_rejects_bad_requests` | richieste malformate → 400, troppo grandi → 413, niente scritto |
+| `test_calendar_download_uses_the_server_copy` | `/live/calendar.ics` usa lo stato del server; 404 se non c'è nulla |
+| `test_page_syncs_live_state_and_offers_the_calendar` | la pagina contiene la sincronizzazione e il pulsante del Calendario |
+
+### [tests/test_flour_seed_data.py](tests/test_flour_seed_data.py)
+
+| Test | Proprietà verificata |
+|---|---|
+| `test_loader_rejects_malformed_flours` | il file dei dati rifiuta farine senza nome, duplicate, con campi sconosciuti o con `revised` senza `was` |
+| `test_every_revision_is_not_newer_than_the_archive_and_changes_something` | ogni correzione ha una versione valida e cambia davvero qualcosa |
+| `test_verified_dates_are_valid_and_shown_in_italian` | date `AAAA-MM-GG` / `AAAA-MM` valide per ogni farina di marca, mostrate in italiano |
+| `test_sync_corrects_untouched_flours_and_keeps_the_ones_you_edited` | le correzioni arrivano alle farine non toccate e non sovrascrivono le tue modifiche |
+| `test_flours_panel_shows_when_the_data_was_checked` | il pannello mostra la data di verifica |
+| `test_link_check_reports_broken_and_moved_pages_but_not_reordered_parameters` | il controllo dei link segnala irraggiungibili e spostati, non i parametri riordinati |
+
+### [tests/test_ui.py](tests/test_ui.py)
+
+| Test | Proprietà verificata |
+|---|---|
+| `test_page_links_a_versioned_stylesheet_instead_of_inline_css` | la pagina collega `app.css?v=…` e non ha CSS in linea; il font è precaricato |
+| `test_stylesheet_and_local_font_are_served` | CSS e font (WOFF2) sono serviti; la licenza OFL è nel repository |
+| `test_the_four_areas_have_an_icon_and_a_label` | ogni area della barra ha icona e etichetta |
+| `test_live_timer_is_a_progress_ring_and_the_old_bar_is_gone` | il timer è dentro l'anello di avanzamento |
+| `test_stylesheet_covers_every_class_used_by_the_templates` | nessuna classe dei template resta senza stile (salvo quelle solo-script) |
 
 ### [tests/test_pantry.py](tests/test_pantry.py)
 
@@ -869,7 +932,7 @@ Nota UX: nel form le percentuali sono inserite in formato umano (`62`, `2.8`) e 
 - **Import style**: ordinati da ruff (regola `I`); si importa SEMPRE con nomi relativi dentro `doughlab/`.
 - **Dataclass vs Pydantic**: Pydantic solo ai confini (settings, schema API). Dentro i servizi, `dataclass` semplici per minimo overhead.
 - **Numpy ovunque**: le curve termiche/fermentazione viaggiano come `np.ndarray`. Nel template, `.tolist()` per Chart.js.
-- **Nessun bundler**: HTMX, Alpine.js e Chart.js copiati in `static/vendor/`, CSS scritto a mano con variabili. Niente Node, niente webpack, niente step di build.
+- **Nessun bundler**: HTMX, Alpine.js e Chart.js copiati in `static/vendor/`, CSS scritto a mano (`static/app.css`) con variabili. Niente Node, niente webpack, niente step di build.
 - **Niente lazy-load SQLAlchemy in async**: `expire_on_commit=False`.
 - **Documentazione**: questo README va tenuto aggiornato ad ogni cambio di API o aggiunta di modulo. Niente file `.md` paralleli per feature singole.
 

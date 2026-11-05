@@ -99,7 +99,7 @@ def test_added_flours_carry_producer_data_and_no_third_party_note() -> None:
         assert "MakeMyPizza" not in seed["notes"] + seed["source_url"]
         assert seed["source_url"].startswith("https://") and seed["notes"]
     # Dove il produttore non esprime W e P/L, restano vuoti invece di essere inventati.
-    assert added[("Le 5 Stagioni", "Superiore")].get("w") is None
+    assert added[("Molino Quaglia", "Petra 3")].get("w") is None
     assert added[("Molino Quaglia", "Petra 3")].get("pl") is None
 
 
@@ -214,7 +214,7 @@ def test_sync_corrects_untouched_draft_flours_and_leaves_edited_ones(tmp_path, m
             names = set(await session.scalars(select(Flour.name)))
             assert "Pizza Napoletana" not in names and "Pizza Napoletana Rossa" in names
             fixed = await session.scalar(select(Flour).where(Flour.name == "Pizza Napoletana Rossa"))
-            assert fixed is not None and fixed.w is None and fixed.pl is None and fixed.protein == 13
+            assert fixed is not None and fixed.w == 310 and fixed.pl == 0.6 and fixed.protein == 13
             assert "MakeMyPizza" not in fixed.notes + fixed.source_url and fixed.source_url.startswith("https://le5stagioni")
             mine = await session.scalar(select(Flour).where(Flour.name == "Petra 5037 Speciale Pizza"))
             assert mine is not None and mine.notes == "la mia nota" and mine.w == 320
@@ -256,7 +256,7 @@ def test_planner_page_has_a_reset_and_mode_dependent_controls(tmp_path, monkeypa
         assert "resetPlan()" in page and 'id="flourSuggest"' in page
         assert "Guidata: scegli strategia" in page and "Esperto: controlli tu" in page
         assert "kind !== 'none' && mode === 'expert'" in page
-        assert '<details class="panel" x-show="mode === \'expert\'"' in page
+        assert '<details class="panel plan-wide" x-show="mode === \'expert\'"' in page
 
     run_with_db(tmp_path, monkeypatch, check)
 

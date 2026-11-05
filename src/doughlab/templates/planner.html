@@ -21,10 +21,10 @@
   </header>
 
   <div class="workspace-tabs" role="tablist" aria-label="Aree DoughLab">
-    <button id="tab-planner" class="workspace-tab" type="button" role="tab" aria-controls="panel-planner" :aria-selected="activeTab === 'planner'" :tabindex="activeTab === 'planner' ? 0 : -1" x-ref="plannerTab" @click="focusTab('planner')" @keydown.right.prevent="focusTab('live')">Pianifica</button>
-    <button id="tab-live" class="workspace-tab" type="button" role="tab" aria-controls="panel-live" :aria-selected="activeTab === 'live'" :tabindex="activeTab === 'live' ? 0 : -1" x-ref="liveTab" @click="focusTab('live')" @keydown.left.prevent="focusTab('planner')" @keydown.right.prevent="focusTab('diary')">In corso<span class="live-dot" x-show="live && !liveDone()" x-cloak role="img" aria-label="impasto in corso"></span></button>
-    <button id="tab-diary" class="workspace-tab" type="button" role="tab" aria-controls="panel-diary" :aria-selected="activeTab === 'diary'" :tabindex="activeTab === 'diary' ? 0 : -1" x-ref="diaryTab" @click="focusTab('diary')" @keydown.left.prevent="focusTab('live')" @keydown.right.prevent="focusTab('flours')">Diario</button>
-    <button id="tab-flours" class="workspace-tab" type="button" role="tab" aria-controls="panel-flours" :aria-selected="activeTab === 'flours'" :tabindex="activeTab === 'flours' ? 0 : -1" x-ref="floursTab" @click="focusTab('flours')" @keydown.left.prevent="focusTab('diary')">Farine</button>
+    <button id="tab-planner" class="workspace-tab" type="button" role="tab" aria-controls="panel-planner" :aria-selected="activeTab === 'planner'" :tabindex="activeTab === 'planner' ? 0 : -1" x-ref="plannerTab" @click="focusTab('planner')" @keydown.right.prevent="focusTab('live')"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="3.5"/><path d="M3.5 10h17M8 3v4M16 3v4M8.5 14.5h3"/></svg><span>Pianifica</span></button>
+    <button id="tab-live" class="workspace-tab" type="button" role="tab" aria-controls="panel-live" :aria-selected="activeTab === 'live'" :tabindex="activeTab === 'live' ? 0 : -1" x-ref="liveTab" @click="focusTab('live')" @keydown.left.prevent="focusTab('planner')" @keydown.right.prevent="focusTab('diary')"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="13.5" r="7.5"/><path d="M12 9.5v4.5l3 1.8M9.5 3h5"/></svg><span>In corso</span><span class="live-dot" x-show="live && !liveDone()" x-cloak role="img" aria-label="impasto in corso"></span></button>
+    <button id="tab-diary" class="workspace-tab" type="button" role="tab" aria-controls="panel-diary" :aria-selected="activeTab === 'diary'" :tabindex="activeTab === 'diary' ? 0 : -1" x-ref="diaryTab" @click="focusTab('diary')" @keydown.left.prevent="focusTab('live')" @keydown.right.prevent="focusTab('flours')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4.5A1.5 1.5 0 0 1 6.5 3H19v15.5H6.5A1.5 1.5 0 0 0 5 20V4.5Z"/><path d="M5 20a1.5 1.5 0 0 0 1.5 1.5H19M9 7.5h6"/></svg><span>Diario</span></button>
+    <button id="tab-flours" class="workspace-tab" type="button" role="tab" aria-controls="panel-flours" :aria-selected="activeTab === 'flours'" :tabindex="activeTab === 'flours' ? 0 : -1" x-ref="floursTab" @click="focusTab('flours')" @keydown.left.prevent="focusTab('diary')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3h8l-1.2 3.2c2.4 1.6 3.7 4.4 3.7 7.3 0 4-2.6 7-6.5 7s-6.5-3-6.5-7c0-2.9 1.3-5.7 3.7-7.3L8 3Z"/><path d="M9.2 6.2h5.6M9.5 13.5c1.5-1 3.5-1 5 0"/></svg><span>Farine</span></button>
   </div>
 
   <section id="panel-planner" class="workspace-panel space-y" role="tabpanel" aria-labelledby="tab-planner" x-show="activeTab === 'planner'" x-cloak>
@@ -63,7 +63,7 @@
     <div id="planBar" class="plan-bar" aria-live="polite"></div>
 
     {# 1. Impasto: stile e quantità #}
-    <div class="plan-step space-y" x-show="step === 1">
+    <div class="plan-step plan-cols space-y" x-show="step === 1">
       <section class="card" style="padding: 1rem">
         <div class="preset-layout">
           <label class="field">
@@ -119,7 +119,7 @@
     </div>
 
     {# 2. Formula: farina, idratazione, sale, lievito, prefermento #}
-    <div class="plan-step space-y" x-show="step === 2" x-cloak>
+    <div class="plan-step plan-cols space-y" x-show="step === 2" x-cloak>
       {# Farina o miscela: W, proteine e idratazione consigliata nel risultato #}
       {% set flour_rows = recipe.flour_rows|default([]) %}
       <section class="card" style="padding: 1rem" x-data="{ rows: {{ [flour_rows|length, 1]|max }} }" @flour-reset.window="rows = 1">
@@ -225,7 +225,7 @@
         </div>
       </section>
       {% if recipe.ingredients.oil_pct or recipe.ingredients.sugar_pct %}<p class="hint" x-show="mode === 'guided'" x-cloak>Olio e zucchero sono quelli della ricetta base. Per cambiarli passa a «Esperto».</p>{% endif %}
-      <details class="panel" x-show="mode === 'expert'" x-cloak>
+      <details class="panel plan-wide" x-show="mode === 'expert'" x-cloak>
         <summary>Parametri avanzati</summary>
         <div class="panel-body" style="display:grid; gap:.8rem; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr))">
           <label class="field">
@@ -254,9 +254,9 @@
     </div>
 
     {# 3. Lievitazione: partenza e strategia (guidata) o fasi (esperto) #}
-    <div class="plan-step space-y" x-show="step === 3" x-cloak>
+    <div class="plan-step plan-cols space-y" x-show="step === 3" x-cloak>
       {# Partenza: da quando inizi o a che ora vuoi infornare; temperatura dell'acqua #}
-      <section class="card" style="padding: 1rem">
+      <section class="card" :class="{ 'plan-wide': mode === 'expert' }" style="padding: 1rem">
         <div class="plan-anchor-head">
           <div class="lab-row">Partenza</div>
           <div class="mode-toggle" role="group" aria-label="Da dove parti">
@@ -326,7 +326,7 @@
         </div>
         <p class="hint">Imposta le temperature reali (in estate la cucina può essere a 28-30 °C): il lievito consigliato si adatta. Per modificare le singole fasi passa a «Esperto».</p>
       </section>
-      <section class="card" style="padding: 1rem" x-show="mode === 'expert'" x-cloak>
+      <section class="card plan-wide" style="padding: 1rem" x-show="mode === 'expert'" x-cloak>
         <div class="section-heading">
           <div>
             <h2>Fasi e temperature</h2>
@@ -417,9 +417,12 @@
         <section class="card live-now" x-show="!liveDone()">
           <p class="hint"><span x-text="live.name"></span> · fase <span x-text="liveIndex() + 1"></span> di <span x-text="live.phases.length"></span></p>
           <h2 x-text="live.phases[liveIndex()].label"></h2>
-          <p class="live-timer" :class="{ late: liveRemaining() < 0 }" x-text="(liveRemaining() < 0 ? '+' : '') + countdown(liveRemaining())" aria-live="off"></p>
-          <p class="hint" x-text="liveRemaining() < 0 ? 'oltre il tempo previsto: passa alla prossima fase quando sei pronto' : 'alla fine prevista, alle ' + clock(liveEnd(liveIndex()))"></p>
-          <div class="live-bar"><span :style="`width:${liveProgress() * 100}%`"></span></div>
+          <div class="live-ring" :style="`--p:${Math.min(100, liveProgress() * 100)}`">
+            <div class="live-ring-inner">
+              <p class="live-timer" :class="{ late: liveRemaining() < 0 }" x-text="(liveRemaining() < 0 ? '+' : '') + countdown(liveRemaining())" aria-live="off"></p>
+              <p class="hint" x-text="liveRemaining() < 0 ? 'oltre il tempo previsto: passa alla prossima fase quando sei pronto' : 'alla fine prevista, alle ' + clock(liveEnd(liveIndex()))"></p>
+            </div>
+          </div>
           <p class="hint" x-show="liveEta() !== null">Pronto stimato: <strong x-text="clockDay(liveEta())"></strong></p>
           <p class="hint" x-show="live.phases[liveIndex() + 1]">Dopo: <span x-text="live.phases[liveIndex() + 1]?.label"></span> (<span x-text="live.phases[liveIndex() + 1] ? duration(liveDuration(liveIndex() + 1)) : ''"></span>)</p>
           <div class="diary-actions" style="margin-top:.8rem">
@@ -428,6 +431,10 @@
             <button type="button" class="btn-ghost" @click="liveShift(15)">+15 min</button>
             <button type="button" class="btn-ghost" @click="liveBack()" :disabled="live.actual.length <= 1">Indietro</button>
           </div>
+          <p class="hint" style="margin:.8rem 0 0">
+            <button type="button" class="btn-ghost" @click="liveCalendar()">Aggiungi i promemoria al Calendario</button>
+          </p>
+          <p class="hint" x-show="liveSyncError" x-cloak>Copia sul server non riuscita: l'impasto resta salvato sul telefono e si riprova da solo.</p>
         </section>
 
         <section class="card" style="padding:1rem" x-show="!liveDone()">
@@ -647,6 +654,7 @@ async function compressPhotoInput(input) {
 }
 
 const LIVE_KEY = 'dl-live';
+const LIVE_AT_KEY = 'dl-live-at';
 const MODE_KEY = 'dl-mode';
 const ANCHOR_KEY = 'dl-anchor';
 const LIVE_CHECKS = {
@@ -680,6 +688,9 @@ function plannerUI(initialOvenProfile, initialMode, modeForced) {
     // Con una ricetta salvata o una T° toccata a mano, cambiare strategia non la sostituisce.
     doughTouched: modeForced,
     live: null,
+    liveSavedAt: 0,
+    liveDirty: false,
+    liveSyncError: false,
     now: Date.now(),
     init() {
       if (!modeForced) this.mode = localStorage.getItem(MODE_KEY) === 'expert' ? 'expert' : 'guided';
@@ -691,8 +702,15 @@ function plannerUI(initialOvenProfile, initialMode, modeForced) {
           this.wakeLock();
         }
       } catch (error) { /* stato locale illeggibile: si riparte da zero */ }
+      this.liveSavedAt = Number(localStorage.getItem(LIVE_AT_KEY)) || (this.live ? this.live.actual[this.live.actual.length - 1] : 0);
+      // Lo stato sta anche sul server: se il browser è stato ripulito o l'impasto è stato avviato da un altro dispositivo, si riprende da lì.
+      this.livePull();
       setInterval(() => { this.now = Date.now(); this.liveTick(); }, 1000);
-      document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') this.wakeLock(); });
+      setInterval(() => { if (document.visibilityState === 'visible') this.livePull(); }, 30000);
+      window.addEventListener('online', () => this.livePull());
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') { this.wakeLock(); this.livePull(); }
+      });
     },
     setAnchor(next) {
       this.anchor = next;
@@ -741,12 +759,60 @@ function plannerUI(initialOvenProfile, initialMode, modeForced) {
       htmx.trigger('#planForm', 'change');
     },
     focusTab(tab) {
+      if (this.activeTab !== tab) window.scrollTo({ top: 0, behavior: 'instant' });
       this.activeTab = tab;
-      this.$nextTick(() => this.$refs[tab + 'Tab'].focus());
+      this.$nextTick(() => this.$refs[tab + 'Tab'].focus({ preventScroll: true }));
     },
     persist() {
+      this.liveSavedAt = Date.now();
       if (this.live) localStorage.setItem(LIVE_KEY, JSON.stringify(this.live));
       else localStorage.removeItem(LIVE_KEY);
+      localStorage.setItem(LIVE_AT_KEY, String(this.liveSavedAt));
+      this.liveDirty = true;
+      clearTimeout(this._syncTimer);
+      this._syncTimer = setTimeout(() => this.livePush(), 400);
+    },
+    // Copia sul server (in background, senza bloccare nulla): se manca la rete si riprova al prossimo giro.
+    async livePush() {
+      if (!this.liveDirty) return;
+      const sentAt = this.liveSavedAt;
+      try {
+        const response = await fetch('/live', {
+          method: 'PUT', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ savedAt: sentAt, state: this.live }),
+        });
+        if (response.status === 409) this.liveAdopt(await response.json());
+        if (response.ok || response.status === 409 || response.status === 400 || response.status === 413) {
+          if (this.liveSavedAt === sentAt || response.status === 409) this.liveDirty = false;
+        }
+        this.liveSyncError = !(response.ok || response.status === 409);
+      } catch (error) { this.liveSyncError = true; }
+    },
+    async livePull() {
+      await this.livePush();
+      try {
+        const response = await fetch('/live', { cache: 'no-store' });
+        if (!response.ok) return;
+        const remote = await response.json();
+        if (remote.savedAt > this.liveSavedAt) this.liveAdopt(remote);
+        else if (remote.savedAt < this.liveSavedAt) { this.liveDirty = true; await this.livePush(); }
+        this.liveSyncError = false;
+      } catch (error) { this.liveSyncError = true; }
+    },
+    liveAdopt(remote) {
+      const state = remote.state;
+      const valid = state && Array.isArray(state.phases) && state.phases.length && Array.isArray(state.actual) && state.actual.length;
+      this.live = valid ? state : null;
+      this.liveSavedAt = remote.savedAt;
+      if (this.live) localStorage.setItem(LIVE_KEY, JSON.stringify(this.live)); else localStorage.removeItem(LIVE_KEY);
+      localStorage.setItem(LIVE_AT_KEY, String(this.liveSavedAt));
+      if (this.live && !this.liveDone()) this.wakeLock(); else this.releaseLock();
+    },
+    async liveCalendar() {
+      this.liveDirty = true;
+      await this.livePush();
+      if (this.liveSyncError) { alert('Non riesco a raggiungere il server: riprova quando sei collegato.'); return; }
+      window.location.href = '/live/calendar.ics';
     },
     liveStart() {
       if (this.live && !confirm('Sostituire l\'impasto già in corso o concluso e non ancora salvato?')) return;
@@ -762,6 +828,7 @@ function plannerUI(initialOvenProfile, initialMode, modeForced) {
       };
       this.persist();
       this.activeTab = 'live';
+      window.scrollTo({ top: 0, behavior: 'instant' });
       if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission().catch(() => {});
       this.wakeLock();
     },
@@ -861,6 +928,7 @@ function plannerUI(initialOvenProfile, initialMode, modeForced) {
         this.live = null;
         this.persist();
         this.activeTab = 'diary';
+        window.scrollTo({ top: 0, behavior: 'instant' });
       });
     },
     clock(ms) { return new Date(ms).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }); },

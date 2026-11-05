@@ -5,8 +5,8 @@ import argparse
 import asyncio
 import contextlib
 import os
-import re
 import plistlib
+import re
 import shutil
 import signal
 import socket

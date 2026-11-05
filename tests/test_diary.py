@@ -30,6 +30,7 @@ def run_with_db(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, check: Check) -
         monkeypatch.setattr("doughlab.diary.SessionLocal", sessions)
         monkeypatch.setattr("doughlab.recipes.SessionLocal", sessions)
         monkeypatch.setattr("doughlab.flours.SessionLocal", sessions)
+        monkeypatch.setattr("doughlab.live.SessionLocal", sessions)
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             await check(client, sessions)
         await engine.dispose()
@@ -421,7 +422,7 @@ def test_diary_form_lets_you_pick_flours_from_the_archive(tmp_path, monkeypatch)
 
 
 def test_process_steps_show_the_end_date_only_when_it_is_another_day() -> None:
-    from doughlab.diary import form_from_plan
+    from doughlab.services.diary_form import form_from_plan
 
     phases = [
         {"label": "Puntata", "hours": 2, "start_at": "2026-10-03T11:00:00", "end_at": "2026-10-03T13:00:00"},
@@ -433,7 +434,7 @@ def test_process_steps_show_the_end_date_only_when_it_is_another_day() -> None:
 
 
 def test_ingredients_list_total_flour_and_each_flour_of_a_blend() -> None:
-    from doughlab.diary import form_from_plan
+    from doughlab.services.diary_form import form_from_plan
 
     snapshot = {
         "ingredients": {"flour_g": 500, "water_g": 325, "salt_g": 14, "yeast_g": 1},

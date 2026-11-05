@@ -177,7 +177,7 @@ def test_planner_shows_primary_inputs_and_hides_manual_yeast_dose() -> None:
     assert 'id="detailsResult"' in rendered
     assert rendered.count('<input type="radio" name="yeast_kind"') == 3
     assert '<select name="yeast_kind"' not in rendered
-    assert rendered.index('name="yeast_kind"') < rendered.index('<details class="panel"')
+    assert rendered.index('name="yeast_kind"') < rendered.index('<details class="panel plan-wide"')
     assert rendered.count('role="tab"') == 4
     assert rendered.index('id="panel-planner"') < rendered.index('id="panel-live"') < rendered.index('id="panel-diary"') < rendered.index('id="panel-flours"')
     assert 'id="panel-diary"' in rendered

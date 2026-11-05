@@ -20,7 +20,15 @@ from .services.flour_blend import (
     method_warnings,
     parse_rows,
 )
-from .services.flour_seed import DRAFT_NOTE, FLOUR_SEEDS, SEED_CORRECTIONS, SEED_REMOVED, SEED_SINCE, SEED_VERSION
+from .services.flour_seed import (
+    DRAFT_NOTE,
+    FLOUR_SEEDS,
+    SEED_CORRECTIONS,
+    SEED_REMOVED,
+    SEED_REVISIONS,
+    SEED_SINCE,
+    SEED_VERSION,
+)
 from .services.flour_suggest import suggest_flours
 from .services.pantry import MAX_STOCK_G, format_grams, plan_consumption
 from .web import RowId, common_ctx, templates
@@ -39,11 +47,43 @@ NUMBER_LIMITS = {
 
 SEED_VERSION_KEY = "flour_seed_version"
 # Campi che la sincronizzazione riempie nelle predefinite quando nel database mancano.
-FILL_FIELDS = ("kind", "w", "pl", "protein", "hydration_min", "hydration_max", "hydration_note", "use")
+FILL_FIELDS = ("kind", "w", "pl", "protein", "hydration_min", "hydration_max", "hydration_note", "use", "verified")
 
 
 _NUMBER_COLUMNS = ("w", "pl", "protein", "hydration_min", "hydration_max")
-_TEXT_COLUMNS = ("name", "kind", "hydration_note", "method", "method_note", "use", "notes", "source_url")
+_TEXT_COLUMNS = ("name", "kind", "hydration_note", "method", "method_note", "use", "notes", "source_url", "verified")
+
+
+def _same(current: Any, previous: Any) -> bool:
+    """Uguali, considerando vuoto e None la stessa cosa."""
+    if current in (None, "") and previous in (None, ""):
+        return True
+    return bool(current == previous)
+
+
+def _apply_revision(flour: Flour, seed: dict[str, Any], was: dict[str, Any]) -> None:
+    """Porta ai valori nuovi i campi corretti, solo se sono ancora quelli precedenti (non toccati da te)."""
+    if not all(_same(getattr(flour, field), old) for field, old in was.items()):
+        return
+    for field in was:
+        value = seed.get(field)
+        setattr(flour, field, (value or "") if field in _TEXT_COLUMNS else value)
+
+
+_MONTHS = ("gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno", "luglio", "agosto", "settembre",
+           "ottobre", "novembre", "dicembre")
+
+
+def format_verified(value: str) -> str:
+    """`2026-11-05` -> `il 5 novembre 2026`; `2026-10` -> `a ottobre 2026`; non valido -> vuoto."""
+    parts = value.split("-")
+    try:
+        year, month = int(parts[0]), int(parts[1])
+        day = int(parts[2]) if len(parts) > 2 else 0
+        name = _MONTHS[month - 1]
+    except (ValueError, IndexError):
+        return ""
+    return f"il {day} {name} {year}" if day else f"a {name} {year}"
 
 
 def _apply_seed(flour: Flour, seed: dict[str, Any]) -> None:
@@ -104,6 +144,9 @@ async def sync_builtin_seeds() -> int:
                         session.add(Flour(builtin=True, **seed))
                         added += 1
                 elif flour.builtin:
+                    revision = SEED_REVISIONS.get((seed["brand"], seed["name"]))
+                    if revision and stored < revision[0]:
+                        _apply_revision(flour, seed, revision[1])
                     for field in FILL_FIELDS:
                         if field in seed and getattr(flour, field) in (None, ""):
                             setattr(flour, field, seed[field])
@@ -169,6 +212,7 @@ def _item(flour: Flour) -> dict[str, Any]:
         "notes": flour.notes,
         "source_url": flour.source_url if flour.source_url.startswith("https://") else "",
         "builtin": flour.builtin,
+        "verified_text": format_verified(flour.verified or ""),
         "stock_g": flour.stock_g,
         "stock_text": format_grams(flour.stock_g) if flour.stock_g is not None else "",
     }

@@ -12,7 +12,7 @@ from fastapi.responses import HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from ics import Calendar, Event
 
-from . import diary, flours, recipes
+from . import diary, flours, live, recipes
 from .config import settings
 from .db import init_db
 from .planning import (
@@ -24,6 +24,7 @@ from .planning import (
 )
 from .serve import CA_CERT
 from .services.db_backup import backup_database, backup_loop, sqlite_path
+from .services.diary_form import form_from_plan
 from .services.fermentation import YeastKind
 from .services.presets import PRESETS, PRESETS_BY_KEY
 from .services.scheduler import PHASE_LABELS, PhaseKind
@@ -58,6 +59,7 @@ app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 app.include_router(diary.router)
 app.include_router(recipes.router)
 app.include_router(flours.router)
+app.include_router(live.router)
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -155,7 +157,7 @@ async def diary_from_plan(request: Request) -> HTMLResponse:
     data = {k: str(v) for k, v in form.items()}
     snapshot = (await _plan_bundle(data))["plan_snapshot"]
     ctx = common_ctx()
-    ctx.update(await diary.panel_context(form=diary.form_from_plan(snapshot)))
+    ctx.update(await diary.panel_context(form=form_from_plan(snapshot)))
     return templates.TemplateResponse(request, "partials/diary_panel.html", ctx)
 
 

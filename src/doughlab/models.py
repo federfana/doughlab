@@ -7,6 +7,7 @@ from typing import Any
 
 from sqlalchemy import (
     JSON,
+    BigInteger,
     Date,
     DateTime,
     Float,
@@ -24,6 +25,18 @@ from .db import Base
 
 def utcnow() -> datetime:
     return datetime.now(UTC).replace(tzinfo=None)
+
+
+class LiveSession(Base):
+    """L'impasto in corso (una sola riga): così sopravvive a un browser ripulito e passa da un dispositivo all'altro."""
+
+    __tablename__ = "live_session"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    # None = chiuso o salvato nel diario: la riga resta come «lapide» e impedisce a una copia vecchia di risorgere.
+    state: Mapped[dict[str, Any] | None] = mapped_column(JSON, default=None)
+    # Millisecondi (ora del dispositivo che ha scritto): vince la scrittura più recente.
+    saved_at: Mapped[int] = mapped_column(BigInteger, default=0)
 
 
 class AppSetting(Base):
@@ -88,6 +101,8 @@ class Flour(Base):
     use: Mapped[str] = mapped_column(String(200), default="")
     notes: Mapped[str] = mapped_column(Text, default="")
     source_url: Mapped[str] = mapped_column(String(300), default="")
+    # Quando i dati sono stati confrontati con la scheda del produttore: AAAA-MM-GG o AAAA-MM.
+    verified: Mapped[str] = mapped_column(String(10), default="")
     # Grammi in dispensa: None = non la tengo in casa, 0 = finita.
     stock_g: Mapped[float | None] = mapped_column(Float, default=None)
     builtin: Mapped[bool] = mapped_column(default=False)

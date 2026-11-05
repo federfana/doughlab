@@ -81,6 +81,7 @@
           {% if flour.method or flour.method_note %}<p class="flour-numbers">Impasto: {% if flour.method %}{{ flour.method }}{% endif %}{% if flour.method_note %} <span class="hint">«{{ flour.method_note }}»</span>{% endif %}</p>{% endif %}
           {% if flour.use %}<p class="hint" style="margin:.2rem 0 0">{{ flour.use }}</p>{% endif %}
           {% if flour.notes %}<p class="hint" style="margin:.2rem 0 0">{{ flour.notes }}</p>{% endif %}
+          {% if flour.verified_text %}<p class="hint" style="margin:.2rem 0 0">Dati confrontati con la scheda del produttore {{ flour.verified_text }}.</p>{% endif %}
           {{ stock_controls(flour, 'l') }}
           <div class="diary-actions" style="margin-top:.4rem">
             <button type="button" class="btn-ghost" hx-get="/farine/{{ flour.id }}/modifica">Modifica</button>
@@ -95,6 +96,6 @@
     <p class="hint">{{ 'Nessuna farina corrisponde alla ricerca.' if flours_query else 'Nessuna farina: aggiungine una o ripristina le predefinite.' }}</p>
     {% endfor %}
   </div>
-  <p class="hint">Dati dichiarati dai produttori (ottobre 2026): variano da partita a partita, fa fede l'etichetta del sacco.</p>
+  <p class="hint">Dati dichiarati dai produttori (verificati tra ottobre e novembre 2026): variano da partita a partita, fa fede l'etichetta del sacco.</p>
   {% if flours_oob %}<select id="flourOptionsSource" hx-swap-oob="true" hidden aria-hidden="true" tabindex="-1">{% include "partials/flour_optgroups.html" %}</select>{% endif %}
 </div>
