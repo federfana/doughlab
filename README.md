@@ -177,6 +177,7 @@ doughlab/
 │   │       ├── diary_form.html    # modulo di una prova (con foto)
 │   │       └── diary_entry.html   # scheda di una prova
 │   └── static/
+│       ├── steppers.js            # frecce ± fuori dal campo per ogni input numerico
 │       ├── app.css                # tutta la grafica: variabili, componenti, navigazione, tema scuro
 │       ├── manifest.webmanifest   # PWA
 │       ├── sw.js                  # service worker (precache shell + librerie)
@@ -582,6 +583,8 @@ Router `/diario`. Tutte le rotte restituiscono il pannello `partials/diary_panel
 
 La logica senza database né FastAPI (valori dei campi, `form_from_plan`, lettura del form, vista di una prova) sta in `services/diary_form.py`; qui restano rotte, accesso al database, foto e backup.
 
+Con un prefermento, il campo *Ingredienti* di una prova nata da un piano ha la stessa struttura del piano: `1. BIGA (18 h di maturazione)` con farina, acqua e lievito e il peso da usare, poi `2. IMPASTO FINALE` (biga tutta, farina, acqua con temperatura, sale, ecc.) e `TOTALI`; il campo *Prefermento* diventa «Biga 30% (idratazione 44%)». Senza prefermento resta l'elenco semplice.
+
 Sicurezza e robustezza: il tipo dell'immagine è deciso dai primi byte (solo JPEG/PNG/WebP, max 12 MB), i testi hanno lunghezza massima, i numeri vengono validati e limitati (nessun `inf`/`NaN`), tutto passa dall'autoescape di Jinja. Se `ready_at` precede `started_at` il modulo resta aperto con l'errore in evidenza e i valori digitati.
 
 ### [services/backup.py](src/doughlab/services/backup.py)
@@ -598,11 +601,12 @@ Sicurezza e robustezza: il tipo dell'immagine è deciso dai primi byte (solo JPE
 - **`partials/recipes_panel.html`**: salvataggio con nome, elenco ricette con versioni, prove collegate; sta fuori da `#planForm` per non innescare ricalcoli.
 - **`partials/diary_panel.html`, `diary_form.html`, `diary_entry.html`**: barra (nuova prova, esporta, importa), modulo a sezioni (prova, impasto, cottura, note, foto) ed elenco di schede con miniatura, voto a stelle (`starRating()` in `planner.html`, valore nel campo nascosto `rating`; sulla scheda `.stars-static` riempito via `--fill`), dati chiave e confronto stima/reale.
 
-Nota UX: nel form le percentuali sono inserite in formato umano (`62`, `2.5`) e convertite server-side in frazioni per i calcoli. I decimali si possono digitare liberamente: i campi numerici usano `step="any"` perché un valore non multiplo dello step rende il form non valido e HTMX non ricalcola. Le le frecce (n° panetti ±1, peso panetto ±5 g, idratazione ±1, sale ±0,5, olio e zucchero ±1) sono pulsanti custom (`adjustPercent`) accanto al campo, non dentro: sull'iPhone i campi numerici non hanno frecce proprie. Il sale parte da 2,5%. La durata di ogni fase si digita in **ore e minuti** (due campi; il campo nascosto `phase_hours_N` porta al server ore decimali, quindi l'API non cambia) e ovunque viene mostrata come `1 h 30 min`, `45 min` o `1 min 15 s` con i filtri Jinja `hours` e `minutes` (`format_hours`/`format_minutes` in `services/fields.py`): niente più `0.5 h` o `1.25 min`. Il lievito non è un input: la percentuale suggerita dall'app determina anche i grammi mostrati. Giorni e mesi nel risultato sono localizzati in italiano.
+Nota UX: nel form le percentuali sono inserite in formato umano (`62`, `2.5`) e convertite server-side in frazioni per i calcoli. I decimali si possono digitare liberamente: i campi numerici usano `step="any"` perché un valore non multiplo dello step rende il form non valido e HTMX non ricalcola. Le le frecce di ogni campo numerico sono pulsanti custom accanto al campo, non dentro: sull'iPhone i campi numerici non hanno frecce proprie. Quelle di panetti (±1), peso (±5 g), idratazione (±1), sale (±0,5), olio e zucchero (±1) e prefermento (farina ±5, idratazione ±1, lievito ±5) sono nel template (`adjustPercent`); tutte le altre (percentuali delle farine ±5, temperature ±1, durate delle fasi ore ±1 e minuti ±5, e i campi del Diario e delle Farine) le aggiunge `static/steppers.js`, che avvolge ogni `input[type=number]` senza frecce, anche quelli creati dopo (HTMX, schede delle fasi). Il passo di ogni campo è nella tabella `BY_NAME` di quel file; un campo nuovo senza voce usa `data-increment`, `step` oppure 1. I campi con direttive di Alpine creati da Alpine (la temperatura misurata in «In corso») hanno le frecce già nel markup. Le frecce spariscono insieme a un campo nascosto. Il sale parte da 2,5%.  La durata di ogni fase si digita in **ore e minuti** (due campi; il campo nascosto `phase_hours_N` porta al server ore decimali, quindi l'API non cambia) e ovunque viene mostrata come `1 h 30 min`, `45 min` o `1 min 15 s` con i filtri Jinja `hours` e `minutes` (`format_hours`/`format_minutes` in `services/fields.py`): niente più `0.5 h` o `1.25 min`. Il lievito non è un input: la percentuale suggerita dall'app determina anche i grammi mostrati. Giorni e mesi nel risultato sono localizzati in italiano.
 
 ### [static/](src/doughlab/static/)
 
 - **`app.css`**: la grafica, «banco del panettiere»: toni di farina e brace (`--bg`, `--surface`, `--ac` brace, `--ac-2` crosta dorata), angoli morbidi (`--radius` 22px, pulsanti a pillola), grana di carta appena percettibile, titoli e numeri grandi in Fraunces. Sopra i 1000px i passi 1-3 del piano mettono le schede in due colonne bilanciate (`.plan-cols`; `.plan-wide` le fa occupare tutta la riga), il Diario affianca le prove e l'elenco farine ha due colonne. Le 4 aree (Pianifica, In corso, Diario, Farine) sono una barra fluttante in basso con icone su schermi stretti (con `safe-area` per iPhone) e un gruppo di pillole in alto sopra gli 820px. Il pianificatore ha un binario a 4 passi che si riempie, i segmenti (lievito, modalità, forno) hanno un solo stile, e *In corso* mostra il timer dentro un anello di avanzamento (`--p`, in %). Tutti i colori passano dalle variabili: il tema scuro cambia solo i valori in `html.dark`. Rispetta `prefers-reduced-motion`.
+- **`steppers.js`**: frecce ± accanto a ogni campo numerico (vedi la nota UX sopra). Si aggancia a `htmx:load` (contenuto appena inserito, prima di Alpine) e a un `MutationObserver` per i campi senza direttive di Alpine; caricato in fondo a `base.html` con `?v=<data di modifica>`.
 - **`vendor/fonts/`**: Fraunces (variabile, solo latino, ~36 KB), licenza SIL OFL in `Fraunces-OFL.txt`. Servito in locale: l'app resta usabile offline.
 
 - **`manifest.webmanifest`**: nome, colori, icone 192/512 → "installabile" come PWA.
@@ -613,7 +617,7 @@ Nota UX: nel form le percentuali sono inserite in formato umano (`62`, `2.5`) e 
 
 ## Testing
 
-245 test (al 2026-11-05). Lanciali con `uv run pytest`.
+249 test (al 2026-11-05). Lanciali con `uv run pytest`.
 
 ### [tests/test_thermal.py](tests/test_thermal.py)
 
@@ -722,6 +726,9 @@ Nota UX: nel form le percentuali sono inserite in formato umano (`62`, `2.5`) e 
 | `test_export_then_import_into_empty_diary_is_lossless` | export e reimport in un diario vuoto non perdono nulla |
 | `test_import_rejects_non_backup_files` | file non validi o assenti danno un messaggio |
 | `test_plan_prefills_new_diary_entry` | il piano precompila la voce e viene conservato |
+| `test_diary_ingredients_show_the_preferment_and_the_final_dough_separately` | con un prefermento il Diario salva «1. BIGA» (farina, acqua, lievito, peso) e «2. IMPASTO FINALE» (biga, farina, acqua, sale…), poi i totali: come nel piano |
+| `test_diary_ingredients_call_a_wet_preferment_poolish_and_keep_the_plain_format_without_one` | idratazione alta = Poolish; senza prefermento resta l'elenco semplice |
+| `test_diary_ingredients_work_for_plans_saved_before_the_preferment_details_existed` | i piani salvati prima (senza idratazione del prefermento) funzionano comunque |
 | `test_process_steps_show_the_end_date_only_when_it_is_another_day` | nel processo precompilato la fine mostra la data solo se cambia giorno |
 | `test_kneading_method_is_saved_shown_and_survives_export_import` | metodo di impasto salvato, mostrato come etichetta, valori non validi scartati, nel backup sotto `doughlab.kneading` |
 | `test_import_is_a_toolbar_button_next_to_export` | l'importazione è un pulsante nella barra, accanto a Esporta, non più un riquadro |
@@ -773,6 +780,7 @@ Nota UX: nel form le percentuali sono inserite in formato umano (`62`, `2.5`) e 
 | `test_page_links_a_versioned_stylesheet_instead_of_inline_css` | la pagina collega `app.css?v=…` e non ha CSS in linea; il font è precaricato |
 | `test_stylesheet_and_local_font_are_served` | CSS e font (WOFF2) sono serviti; la licenza OFL è nel repository |
 | `test_the_four_areas_have_an_icon_and_a_label` | ogni area della barra ha icona e etichetta |
+| `test_stepper_script_is_loaded_and_knows_the_step_of_every_named_number_field` | lo script è caricato e ogni campo numerico con nome ha un passo |
 | `test_every_stepper_has_its_arrows_outside_the_field_and_salt_defaults_to_2_5` | panetti, peso, idratazione, sale, olio e zucchero hanno le frecce fuori dal campo; sale predefinito 2,5 |
 | `test_live_timer_is_a_progress_ring_and_the_old_bar_is_gone` | il timer è dentro l'anello di avanzamento |
 | `test_planner_warns_and_retries_when_the_plan_cannot_be_computed` | se il calcolo del piano non arriva compare un avviso e si ritenta da solo |

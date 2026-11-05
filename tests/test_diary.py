@@ -448,3 +448,53 @@ def test_ingredients_list_total_flour_and_each_flour_of_a_blend() -> None:
 
     single = {**snapshot, "flours": snapshot["flours"][:1]}
     assert form_from_plan(single)["data"]["ingredients"].splitlines()[:2] == ["Farina 500 g", "Acqua 325 g"]
+
+
+def _snapshot(**extra: str) -> dict:
+    from doughlab.planning import compute_plan_and_ingredients
+
+    from .test_main import _form
+
+    data = {**_form(62), "mode": "guided", "strategy": "fridge_24", "yeast_kind": "dry", "salt_pct": "2.5", **extra}
+    return compute_plan_and_ingredients(data)["plan_snapshot"]
+
+
+def test_diary_ingredients_show_the_preferment_and_the_final_dough_separately() -> None:
+    from doughlab.services.diary_form import form_from_plan
+
+    snapshot = _snapshot(preferment_pct="30", preferment_hydration_pct="44", preferment_yeast_pct="100")
+    form = form_from_plan(snapshot)["data"]
+    text = form["ingredients"]
+    weights = snapshot["ingredients"]
+
+    assert text.index("1. BIGA (18 h di maturazione)") < text.index("2. IMPASTO FINALE") < text.index("TOTALI:")
+    assert f"- Farina {weights['preferment_flour_g']:.0f} g (30% del totale)" in text
+    assert "- Acqua " in text and "(44%)" in text and "Lievito di birra secco attivo" in text
+    assert f"- Biga (tutta) {sum(weights[k] for k in ('preferment_flour_g', 'preferment_water_g', 'preferment_yeast_g')):.0f} g" in text
+    assert f"- Farina {weights['final_dough_flour_g']:.0f} g" in text and "- Sale " in text and "(2.5%)" in text
+    assert "4 × 250 g" in text and "(62.0%)" in text
+    assert form["preferment"] == "Biga 30% (idratazione 44%)"
+
+
+def test_diary_ingredients_call_a_wet_preferment_poolish_and_keep_the_plain_format_without_one() -> None:
+    from doughlab.services.diary_form import form_from_plan
+
+    poolish = form_from_plan(_snapshot(preferment_pct="30", preferment_hydration_pct="100"))["data"]
+    assert "1. POOLISH (12 h di maturazione)" in poolish["ingredients"] and "- Poolish (tutta)" in poolish["ingredients"]
+
+    plain = form_from_plan(_snapshot())["data"]["ingredients"]
+    assert plain.splitlines()[0].startswith("Farina ") and "BIGA" not in plain and "TOTALI" not in plain
+    assert [line.split(" ")[0] for line in plain.splitlines()[:4]] == ["Farina", "Acqua", "Sale", "Lievito"]
+
+
+def test_diary_ingredients_work_for_plans_saved_before_the_preferment_details_existed() -> None:
+    from doughlab.services.diary_form import form_from_plan
+
+    snapshot = _snapshot(preferment_pct="30", preferment_hydration_pct="44")
+    for key in ("preferment_hydration_pct", "yeast_label"):
+        snapshot.pop(key)
+
+    form = form_from_plan(snapshot)["data"]
+
+    assert "1. BIGA" in form["ingredients"] and "- Lievito " in form["ingredients"]
+    assert form["preferment"] == "Biga 30% (idratazione 44%)"  # l'idratazione si ricava da acqua e farina

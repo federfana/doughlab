@@ -63,6 +63,7 @@ def common_ctx() -> dict[str, Any]:
     return {
         "app_name": settings.app_name,
         "css_version": int((STATIC_DIR / "app.css").stat().st_mtime),
+        "js_version": int((STATIC_DIR / "steppers.js").stat().st_mtime),
         "yeast_kinds": [
             (k.value, YEAST_SHORT_LABELS[k], YEAST_PARAMS[k].label) for k in YeastKind
         ],

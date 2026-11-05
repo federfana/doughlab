@@ -93,11 +93,37 @@ def test_every_stepper_has_its_arrows_outside_the_field_and_salt_defaults_to_2_5
         page = (await client.get("/")).text
         steppers = re.findall(r'<span class="number-stepper">\s*(<input[^>]*>)\s*<span class="number-stepper-controls">', page)
 
-        names = {re.search(r'name="(\w+)"', tag).group(1) for tag in steppers}  # type: ignore[union-attr]
-        assert {"n_panetti", "panetto_g", "hydration_pct", "salt_pct", "oil_pct", "sugar_pct"} <= names
+        names = {m.group(1) for tag in steppers if (m := re.search(r'name="(\w+)"', tag))}
+        assert {"n_panetti", "panetto_g", "hydration_pct", "salt_pct", "oil_pct", "sugar_pct",
+                "preferment_pct", "preferment_hydration_pct", "preferment_yeast_pct"} <= names
         assert page.count('class="number-stepper-controls"') == len(steppers)  # frecce sempre fuori dal campo
         assert re.search(r'name="salt_pct" value="2\.5"', page)
         assert "adjustPercent(this, 0.5)" in page and "adjustPercent(this, -0.5)" in page
         assert re.search(r'name="n_panetti"[^>]*step="any"', page)
 
     run_with_db(tmp_path, monkeypatch, check)
+
+
+def test_stepper_script_is_loaded_and_knows_the_step_of_every_named_number_field(tmp_path, monkeypatch) -> None:
+    async def check(client: AsyncClient, sessions: async_sessionmaker) -> None:
+        page = (await client.get("/")).text
+        script = await client.get("/static/steppers.js")
+
+        assert re.search(r'<script src="/static/steppers\.js\?v=\d+"></script>', page)
+        assert script.status_code == 200 and "htmx:load" in script.text and "MutationObserver" in script.text
+
+    run_with_db(tmp_path, monkeypatch, check)
+
+    js = (STATIC / "steppers.js").read_text()
+    known = set(re.findall(r"\b(\w+): [\d.]+[,}]?", js.split("BY_NAME = {")[1].split("};")[0]))
+    prefixes = ("flour_pct_", "phase_ambient_")  # nomi con indice: li riconosce stepFor
+    server_side = {"n_panetti", "panetto_g", "hydration_pct", "salt_pct", "oil_pct", "sugar_pct"}
+    for path in (STATIC.parent / "templates").rglob("*.html"):
+        for tag in re.findall(r'<input type="number"[^>]*>', path.read_text()):
+            found = re.search(r'name="(\w+?)(?:_?\{\{[^}]*\}\}|_IDX)?"', tag)
+            if found is None:
+                continue  # senza nome: lo riconosce l'etichetta o la classe (durate, lati della teglia)
+            name = found.group(1)
+            assert name in known | server_side or any(name.startswith(p.rstrip("_")) for p in prefixes), (
+                f"{path.name}: il campo numerico «{name}» non ha un passo in steppers.js"
+            )

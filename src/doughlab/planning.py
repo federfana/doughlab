@@ -363,6 +363,8 @@ def compute_plan_and_ingredients(data: dict[str, str]) -> dict[str, Any]:
         "hydration_pct": ingredients.hydration_pct,
         "salt_pct": ingredients.salt_pct,
         "preferment_pct": ingredients.preferment_pct,
+        "preferment_hydration_pct": ingredients.preferment_hydration_pct,
+        "yeast_label": YEAST_PARAMS[yeast_kind].label,
         "baking": baking,
         "phases": [
             {

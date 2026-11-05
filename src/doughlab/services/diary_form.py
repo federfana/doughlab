@@ -27,6 +27,7 @@ from .fields import (
     parse_int,
 )
 from .presets import PRESETS_BY_KEY
+from .strategies import preferment_defaults
 
 SLOT_LABELS = (
     ("main", "Principale"),
@@ -132,10 +133,88 @@ def flour_component_lines(flours: Any, total_g: float) -> list[str]:
     return lines
 
 
+def _preferment_hydration(snapshot: dict[str, Any]) -> float:
+    """Idratazione del prefermento (frazione): dal piano, oppure da acqua e farina per i piani salvati prima."""
+    saved = hours(snapshot.get("preferment_hydration_pct"))
+    if saved > 0:
+        return saved
+    weights = snapshot.get("ingredients") or {}
+    flour = hours(weights.get("preferment_flour_g"))
+    return hours(weights.get("preferment_water_g")) / flour if flour > 0 else 1.0
+
+
+def _grams(value: Any, digits: int = 0) -> str:
+    return f"{hours(value):.{digits}f} g"
+
+
+def _lines(title: str, rows: list[str], result: str) -> list[str]:
+    return [title, *(f"- {row}" for row in rows), f"= {result}"]
+
+
+def ingredients_text(snapshot: dict[str, Any]) -> str:
+    """Ricetta come nel piano: con un prefermento, prima il prefermento e poi l'impasto finale, poi i totali."""
+    weights: dict[str, Any] = snapshot.get("ingredients") or {}
+    water_c = snapshot.get("water_c")
+    water_note = f" a {water_c:.1f} °C".replace(".", ",") if isinstance(water_c, (int, float)) else ""
+    yeast = str(snapshot.get("yeast_label") or "Lievito")
+    flour_total = hours(weights.get("flour_g"))
+    extras = []
+    if hours(weights.get("oil_g")) > 0:
+        extras.append(f"Olio {_grams(weights['oil_g'], 1)}")
+    if hours(weights.get("sugar_g")) > 0:
+        extras.append(f"Zucchero {_grams(weights['sugar_g'], 1)}")
+
+    if hours(weights.get("preferment_flour_g")) <= 0:
+        lines = [
+            f"Farina {_grams(flour_total)}",
+            *flour_component_lines(snapshot.get("flours"), flour_total),
+            f"Acqua {_grams(weights.get('water_g'))}{water_note}",
+            f"Sale {_grams(weights.get('salt_g'), 1)}",
+            f"Lievito {_grams(weights.get('yeast_g'), 2)}",
+            *extras,
+        ]
+        return "\n".join(lines)
+
+    pref_hydration = _preferment_hydration(snapshot)
+    name = preferment_defaults(pref_hydration)[0]
+    phase = next((p for p in snapshot.get("phases") or [] if isinstance(p, dict) and p.get("kind") == "preferment"), None)
+    matures = f" ({format_hours(hours(phase.get('hours')))} di maturazione)" if phase else ""
+    pref_total = sum(hours(weights.get(k)) for k in ("preferment_flour_g", "preferment_water_g", "preferment_yeast_g"))
+    pref_pct = hours(snapshot.get("preferment_pct")) * 100
+    first = _lines(
+        f"1. {name.upper()}{matures}",
+        [
+            f"Farina {_grams(weights.get('preferment_flour_g'))} ({pref_pct:.0f}% del totale)",
+            f"Acqua {_grams(weights.get('preferment_water_g'))} ({pref_hydration * 100:.0f}%)",
+            f"{yeast} {_grams(weights.get('preferment_yeast_g'), 2)}",
+        ],
+        f"{name} da usare: {_grams(pref_total)}",
+    )
+    final_rows = [
+        f"{name} (tutta) {_grams(pref_total)}",
+        f"Farina {_grams(weights.get('final_dough_flour_g'))}",
+        f"Acqua {_grams(weights.get('final_dough_water_g'))}{water_note}",
+        f"Sale {_grams(weights.get('salt_g'), 1)} ({hours(snapshot.get('salt_pct')) * 100:g}%)",
+    ]
+    if hours(weights.get("final_dough_yeast_g")) >= 0.005:
+        final_rows.append(f"{yeast} {_grams(weights.get('final_dough_yeast_g'), 2)}")
+    final_rows += extras
+    second = _lines("2. IMPASTO FINALE", final_rows, f"Impasto finale: {_grams(weights.get('total_g'))}")
+    hydration = hours(snapshot.get("hydration_pct")) * 100
+    totals = (
+        f"TOTALI: farina {_grams(flour_total)} · acqua {_grams(weights.get('water_g'))} ({hydration:.1f}%) · "
+        f"impasto {_grams(weights.get('total_g'))}"
+    )
+    count, each = snapshot.get("n_panetti"), snapshot.get("panetto_g")
+    if isinstance(count, (int, float)) and isinstance(each, (int, float)):
+        totals += f" · {count:g} × {each:.0f} g"
+    blend = flour_component_lines(snapshot.get("flours"), flour_total)
+    return "\n".join([*first, "", *second, "", totals, *(["Miscela di farine sul totale:", *blend] if blend else [])])
+
+
 def form_from_plan(snapshot: dict[str, Any]) -> dict[str, Any]:
     """Modulo nuovo precompilato con quanto previsto dal piano (tutto resta modificabile)."""
     values = blank_values()
-    weights: dict[str, Any] = snapshot.get("ingredients") or {}
     baking: dict[str, Any] = snapshot.get("baking") or {}
     phases: list[dict[str, Any]] = snapshot.get("phases") or []
     preset = PRESETS_BY_KEY.get(str(snapshot.get("preset_key", "")))
@@ -156,7 +235,11 @@ def form_from_plan(snapshot: dict[str, Any]) -> dict[str, Any]:
     values["dough_ball_weight"] = format_number(snapshot.get("panetto_g"))
     values["dough_ball_count"] = format_number(snapshot.get("n_panetti"))
     if hours(snapshot.get("preferment_pct")) > 0:
-        values["preferment"] = f"{hours(snapshot['preferment_pct']) * 100:g}%"
+        pref_hydration = _preferment_hydration(snapshot)
+        values["preferment"] = (
+            f"{preferment_defaults(pref_hydration)[0]} {hours(snapshot['preferment_pct']) * 100:g}% "
+            f"(idratazione {pref_hydration * 100:g}%)"
+        )
 
     cold = sum(hours(p.get("hours")) for p in phases if str(p.get("environment")).startswith("fridge"))
     room = sum(
@@ -178,26 +261,7 @@ def form_from_plan(snapshot: dict[str, Any]) -> dict[str, Any]:
     if baking.get("bake_minutes") is not None:
         values["bake_time"] = format_minutes(float(baking["bake_minutes"]))
 
-    water_c = snapshot.get("water_c")
-    water_note = f" a {water_c:.1f} °C".replace(".", ",") if isinstance(water_c, (int, float)) else ""
-    lines = [
-        f"Farina {hours(weights.get('flour_g')):.0f} g",
-        *flour_component_lines(snapshot.get("flours"), hours(weights.get("flour_g"))),
-        f"Acqua {hours(weights.get('water_g')):.0f} g{water_note}",
-        f"Sale {hours(weights.get('salt_g')):.1f} g",
-        f"Lievito {hours(weights.get('yeast_g')):.2f} g",
-    ]
-    if hours(weights.get("oil_g")) > 0:
-        lines.append(f"Olio {hours(weights['oil_g']):.1f} g")
-    if hours(weights.get("sugar_g")) > 0:
-        lines.append(f"Zucchero {hours(weights['sugar_g']):.1f} g")
-    if hours(weights.get("preferment_flour_g")) > 0:
-        lines.append(
-            f"Prefermento: farina {hours(weights['preferment_flour_g']):.0f} g, "
-            f"acqua {hours(weights.get('preferment_water_g')):.0f} g, "
-            f"lievito {hours(weights.get('preferment_yeast_g')):.2f} g"
-        )
-    values["ingredients"] = "\n".join(lines)
+    values["ingredients"] = ingredients_text(snapshot)
 
     steps: list[str] = []
     for phase in phases:
