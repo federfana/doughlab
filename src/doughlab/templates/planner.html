@@ -103,7 +103,13 @@
         <div class="dough-input-grid plan-pair">
       <label class="field">
         <span class="lab">N° panetti</span>
-        <input type="number" name="n_panetti" value="{{ recipe.ingredients.n_panetti }}" min="1" max="200">
+        <span class="number-stepper">
+          <input type="number" name="n_panetti" value="{{ recipe.ingredients.n_panetti }}" min="1" max="200" step="any" inputmode="numeric" onkeydown="if (event.key === 'ArrowUp' || event.key === 'ArrowDown') { event.preventDefault(); adjustPercent(this, event.key === 'ArrowUp' ? 1 : -1); }">
+          <span class="number-stepper-controls">
+            <button type="button" aria-label="Aumenta il numero di panetti di 1" title="Aumenta di 1" onclick="adjustPercent(this, 1)">↑</button>
+            <button type="button" aria-label="Riduci il numero di panetti di 1" title="Riduci di 1" onclick="adjustPercent(this, -1)">↓</button>
+          </span>
+        </span>
       </label>
       <label class="field">
         <span class="lab">Peso panetto (g)</span>
@@ -171,10 +177,10 @@
       <label class="field">
         <span class="lab">Sale %</span>
         <span class="number-stepper">
-          <input type="number" name="salt_pct" value="{{ '%.2f'|format(recipe.ingredients.salt_pct * 100) }}" step="any" min="0" max="10">
+          <input type="number" name="salt_pct" value="{{ '%g'|format((recipe.ingredients.salt_pct * 100)|round(2)) }}" step="any" min="0" max="10" onkeydown="if (event.key === 'ArrowUp' || event.key === 'ArrowDown') { event.preventDefault(); adjustPercent(this, event.key === 'ArrowUp' ? 0.5 : -0.5); }">
           <span class="number-stepper-controls">
-            <button type="button" aria-label="Aumenta sale di 1 punto" title="Aumenta di 1" onclick="adjustPercent(this, 1)">↑</button>
-            <button type="button" aria-label="Riduci sale di 1 punto" title="Riduci di 1" onclick="adjustPercent(this, -1)">↓</button>
+            <button type="button" aria-label="Aumenta sale di 0,5 punti" title="Aumenta di 0,5" onclick="adjustPercent(this, 0.5)">↑</button>
+            <button type="button" aria-label="Riduci sale di 0,5 punti" title="Riduci di 0,5" onclick="adjustPercent(this, -0.5)">↓</button>
           </span>
         </span>
       </label>
@@ -198,7 +204,7 @@
         <div class="yeast-segments" role="group" aria-label="Tipo di prefermento">
           {% for v, label in [('none', 'Diretto'), ('biga', 'Biga'), ('poolish', 'Poolish')] %}
           <label class="yeast-segment">
-            <input type="radio" name="preferment_kind" value="{{ v }}" x-model="kind" @change="setPreferment($el.form, '{{ v }}')" {% if pref_kind == v %}checked{% endif %}>
+            <input type="radio" name="preferment_kind" value="{{ v }}" x-model="kind" @change="setPreferment($el.form, '{{ v }}'); refreshPreferment()" {% if pref_kind == v %}checked{% endif %}>
             <span>{{ label }}</span>
           </label>
           {% endfor %}
@@ -756,6 +762,14 @@ function plannerUI(initialOvenProfile, initialMode, modeForced) {
       if (this.mode !== 'expert') return;
       const values = Object.fromEntries(new FormData(document.getElementById('planForm')));
       await htmx.ajax('POST', '/fasi/pieghe', { target: '#phases', swap: 'innerHTML', values });
+      this.reindex();
+      htmx.trigger('#planForm', 'change');
+    },
+    // In Esperto il prefermento ha la sua fase (Biga/Poolish) in testa al piano: la aggiunge, la cambia o la toglie.
+    async refreshPreferment() {
+      if (this.mode !== 'expert') return;
+      const values = Object.fromEntries(new FormData(document.getElementById('planForm')));
+      await htmx.ajax('POST', '/fasi/prefermento', { target: '#phases', swap: 'innerHTML', values });
       this.reindex();
       htmx.trigger('#planForm', 'change');
     },

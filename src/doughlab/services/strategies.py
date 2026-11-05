@@ -132,6 +132,44 @@ def with_folds(phases: list[PlanPhase], enabled: bool) -> list[PlanPhase]:
     return result
 
 
+PREFERMENT_LABELS = {"Biga", "Poolish", "Prefermento"}
+
+
+def preferment_defaults(hydration: float) -> tuple[str, float]:
+    """Nome e ore standard del prefermento secondo l'idratazione (frazione): fino al 65% è una biga."""
+    return ("Biga", BIGA_HOURS) if hydration <= 0.65 else ("Poolish", POOLISH_HOURS)
+
+
+def with_preferment(
+    phases: list[PlanPhase], preferment_pct: float, hydration: float, *, retarget: bool = False
+) -> list[PlanPhase]:
+    """Allinea la fase del prefermento alla formula, senza toccare le altre fasi.
+
+    Con un prefermento e nessuna fase `PREFERMENT` ne mette una in testa (a temperatura ambiente, come la
+    puntata). Con `retarget` (cambio di prefermento nel modulo) cambia nome e ore solo se la fase è ancora
+    quella standard, e toglie la fase standard quando il prefermento sparisce: le fasi personalizzate restano.
+    """
+    label, hours = preferment_defaults(hydration)
+    standard = {("Biga", BIGA_HOURS), ("Poolish", POOLISH_HOURS)}
+    existing = [i for i, p in enumerate(phases) if p.kind == PhaseKind.PREFERMENT]
+    if preferment_pct <= 0:
+        if not retarget:
+            return list(phases)
+        return [p for p in phases
+                if not (p.kind == PhaseKind.PREFERMENT and (p.label, p.hours) in standard)]
+    if existing:
+        result = list(phases)
+        if retarget:
+            first = result[existing[0]]
+            if (first.label, first.hours) in standard:
+                result[existing[0]] = replace(first, label=label, hours=hours)
+        return result
+    mix = next((p for p in phases if p.kind == PhaseKind.MIX), None)
+    room_c = mix.ambient_c if mix is not None else 22.0
+    return [PlanPhase(kind=PhaseKind.PREFERMENT, label=label, hours=hours, ambient_c=room_c,
+                      container=Container.MASS_BOWL, environment=Environment.AMBIENT), *phases]
+
+
 def build_phases(
     key: str,
     room_c: float,

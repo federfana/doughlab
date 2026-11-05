@@ -497,6 +497,7 @@ L'app FastAPI. Route attuali:
 | `GET` | `/?recipe=<id>&version=<n>` | carica una ricetta salvata (ultima versione se `version` manca) |
 | `POST` | `/plan` | ritorna il **fragment HTML** `plan_result.html` (HTMX swap); con `mode=guided` le fasi vengono dalla strategia (`strategy`, `room_c`, `fridge_c`), con `mode=expert` (o senza `mode`) dai campi `phase_*` |
 | `POST` | `/fasi` | schede delle fasi generate dalla strategia scelta, per passare a Esperto |
+| `POST` | `/fasi/prefermento` | in Esperto: le fasi attuali con la fase Biga/Poolish aggiunta in testa (se scegli un prefermento), cambiata (biga ↔ poolish, solo se è ancora quella standard) o tolta (se torni a Diretto) |
 | `POST` | `/fasi/pieghe` | in Esperto: le fasi attuali con le pieghe di rinforzo aggiunte (a mano, planetaria) o tolte (impastatrice) |
 | `POST` | `/diario/da-piano` | apre il modulo del Diario precompilato con il piano corrente |
 | `POST` | `/plan.ics` | ritorna il piano come file `.ics` da aprire in Calendario (orari in ora locale del server) |
@@ -597,7 +598,7 @@ Sicurezza e robustezza: il tipo dell'immagine è deciso dai primi byte (solo JPE
 - **`partials/recipes_panel.html`**: salvataggio con nome, elenco ricette con versioni, prove collegate; sta fuori da `#planForm` per non innescare ricalcoli.
 - **`partials/diary_panel.html`, `diary_form.html`, `diary_entry.html`**: barra (nuova prova, esporta, importa), modulo a sezioni (prova, impasto, cottura, note, foto) ed elenco di schede con miniatura, voto a stelle (`starRating()` in `planner.html`, valore nel campo nascosto `rating`; sulla scheda `.stars-static` riempito via `--fill`), dati chiave e confronto stima/reale.
 
-Nota UX: nel form le percentuali sono inserite in formato umano (`62`, `2.8`) e convertite server-side in frazioni per i calcoli. I decimali si possono digitare liberamente: i campi numerici usano `step="any"` perché un valore non multiplo dello step rende il form non valido e HTMX non ricalcola. Le frecce di idratazione, sale, prefermento e peso panetto (±5 g) sono pulsanti custom (`adjustPercent`). La durata di ogni fase si digita in **ore e minuti** (due campi; il campo nascosto `phase_hours_N` porta al server ore decimali, quindi l'API non cambia) e ovunque viene mostrata come `1 h 30 min`, `45 min` o `1 min 15 s` con i filtri Jinja `hours` e `minutes` (`format_hours`/`format_minutes` in `services/fields.py`): niente più `0.5 h` o `1.25 min`. Il lievito non è un input: la percentuale suggerita dall'app determina anche i grammi mostrati. Giorni e mesi nel risultato sono localizzati in italiano.
+Nota UX: nel form le percentuali sono inserite in formato umano (`62`, `2.5`) e convertite server-side in frazioni per i calcoli. I decimali si possono digitare liberamente: i campi numerici usano `step="any"` perché un valore non multiplo dello step rende il form non valido e HTMX non ricalcola. Le le frecce (n° panetti ±1, peso panetto ±5 g, idratazione ±1, sale ±0,5, olio e zucchero ±1) sono pulsanti custom (`adjustPercent`) accanto al campo, non dentro: sull'iPhone i campi numerici non hanno frecce proprie. Il sale parte da 2,5%. La durata di ogni fase si digita in **ore e minuti** (due campi; il campo nascosto `phase_hours_N` porta al server ore decimali, quindi l'API non cambia) e ovunque viene mostrata come `1 h 30 min`, `45 min` o `1 min 15 s` con i filtri Jinja `hours` e `minutes` (`format_hours`/`format_minutes` in `services/fields.py`): niente più `0.5 h` o `1.25 min`. Il lievito non è un input: la percentuale suggerita dall'app determina anche i grammi mostrati. Giorni e mesi nel risultato sono localizzati in italiano.
 
 ### [static/](src/doughlab/static/)
 
@@ -612,7 +613,7 @@ Nota UX: nel form le percentuali sono inserite in formato umano (`62`, `2.8`) e 
 
 ## Testing
 
-241 test (al 2026-11-05). Lanciali con `uv run pytest`.
+245 test (al 2026-11-05). Lanciali con `uv run pytest`.
 
 ### [tests/test_thermal.py](tests/test_thermal.py)
 
@@ -772,6 +773,7 @@ Nota UX: nel form le percentuali sono inserite in formato umano (`62`, `2.8`) e 
 | `test_page_links_a_versioned_stylesheet_instead_of_inline_css` | la pagina collega `app.css?v=…` e non ha CSS in linea; il font è precaricato |
 | `test_stylesheet_and_local_font_are_served` | CSS e font (WOFF2) sono serviti; la licenza OFL è nel repository |
 | `test_the_four_areas_have_an_icon_and_a_label` | ogni area della barra ha icona e etichetta |
+| `test_every_stepper_has_its_arrows_outside_the_field_and_salt_defaults_to_2_5` | panetti, peso, idratazione, sale, olio e zucchero hanno le frecce fuori dal campo; sale predefinito 2,5 |
 | `test_live_timer_is_a_progress_ring_and_the_old_bar_is_gone` | il timer è dentro l'anello di avanzamento |
 | `test_planner_warns_and_retries_when_the_plan_cannot_be_computed` | se il calcolo del piano non arriva compare un avviso e si ritenta da solo |
 | `test_stylesheet_covers_every_class_used_by_the_templates` | nessuna classe dei template resta senza stile (salvo quelle solo-script) |
@@ -843,6 +845,9 @@ Nota UX: nel form le percentuali sono inserite in formato umano (`62`, `2.8`) e 
 | `test_guided_plan_adds_folds_by_hand_and_planetary_but_not_with_a_mixer` | il piano guidato inserisce le pieghe se si impasta a mano o in planetaria, non con l'impastatrice |
 | `test_with_folds_adds_them_to_the_first_bulk_and_takes_them_out_again` | `with_folds` aggiunge/toglie le pieghe senza cambiare la durata totale |
 | `test_changing_kneading_in_expert_mode_updates_the_phase_cards` | `/fasi/pieghe` restituisce le schede con o senza pieghe |
+| `test_expert_plan_with_a_preferment_starts_with_its_phase` | in Esperto un prefermento mette la sua fase (Biga 18 h, Poolish 12 h) in testa al piano e il suo tempo conta |
+| `test_with_preferment_adds_retargets_and_removes_only_the_standard_phase` | la fase si aggiunge una volta, si cambia e si toglie solo se standard; quelle modificate da te restano |
+| `test_preferment_phase_route_returns_the_cards_for_expert_mode` | `/fasi/prefermento` restituisce le schede con la Biga in testa |
 | `test_plan_response_carries_the_advice_and_the_summary_bar` | `/plan` aggiorna anche `#flourAdvice` e `#planBar` |
 | `test_saved_recipe_keeps_its_mode_and_old_recipes_open_in_expert` | la ricetta salvata ricorda modalità e strategia; quelle vecchie si aprono in Esperto |
 

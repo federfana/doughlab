@@ -233,3 +233,49 @@ def test_higher_hydration_asks_for_a_colder_dough_within_limits() -> None:
     assert suggested_dough_c("fridge_24", 0.75) == 19
     assert suggested_dough_c("direct_8", 0.80) == 21
     assert suggested_dough_c("long_72", 1.0) == 18
+
+
+def _expert_phases(**extra: str) -> dict[str, str]:
+    return {**_form(62), "mode": "expert", **extra}
+
+
+def _labels(data: dict[str, str]) -> list[str]:
+    return [p.phase.label for p in compute_plan_and_ingredients(data)["plan"].phases]
+
+
+def test_expert_plan_with_a_preferment_starts_with_its_phase() -> None:
+    biga = {"preferment_pct": "30", "preferment_hydration_pct": "44"}
+    poolish = {"preferment_pct": "30", "preferment_hydration_pct": "100"}
+
+    assert _labels(_expert_phases())[0] == "Impasto"
+    assert _labels(_expert_phases(**biga))[:2] == ["Biga", "Impasto"]
+    assert _labels(_expert_phases(**poolish))[:2] == ["Poolish", "Impasto"]
+    plan = compute_plan_and_ingredients(_expert_phases(**biga))["plan"]
+    assert plan.phases[0].phase.hours == 18 and plan.total_hours > 18  # il tempo del prefermento conta nel piano
+
+
+def test_with_preferment_adds_retargets_and_removes_only_the_standard_phase() -> None:
+    from doughlab.services.strategies import with_preferment
+
+    base = build_phases("direct", 22, 4)
+    biga = with_preferment(base, 0.3, 0.44)
+    assert [p.label for p in biga[:2]] == ["Biga", "Impasto"] and biga[0].hours == 18 and biga[0].ambient_c == 22
+    assert with_preferment(biga, 0.3, 0.44) == biga  # già presente: non si duplica
+
+    switched = with_preferment(biga, 0.3, 1.0, retarget=True)
+    assert (switched[0].label, switched[0].hours) == ("Poolish", 12)
+    assert with_preferment(biga, 0.0, 0.44, retarget=True) == base  # tolto: tornano le fasi di prima
+    assert with_preferment(biga, 0.0, 0.44) == biga  # senza `retarget` non si tocca nulla
+
+    mine = [p if p.kind != PhaseKind.PREFERMENT else p.__class__(**{**p.__dict__, "hours": 20.0}) for p in biga]
+    assert with_preferment(mine, 0.3, 1.0, retarget=True)[0].label == "Biga"  # fase già modificata: resta com'è
+    assert with_preferment(mine, 0.0, 1.0, retarget=True)[0].kind == PhaseKind.PREFERMENT
+
+
+def test_preferment_phase_route_returns_the_cards_for_expert_mode(tmp_path, monkeypatch) -> None:
+    async def check(client, sessions) -> None:
+        data = _expert_phases(preferment_pct="30", preferment_hydration_pct="44")
+        with_biga = (await client.post("/fasi/prefermento", data=data)).text
+        assert 'name="phase_label_0" value="Biga"' in with_biga and 'name="phase_label_1" value="Impasto"' in with_biga
+
+    run_with_db(tmp_path, monkeypatch, check)

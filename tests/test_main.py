@@ -167,7 +167,8 @@ def test_planner_shows_primary_inputs_and_hides_manual_yeast_dose() -> None:
     assert 'name="salt_pct"' in rendered
     assert 'step="any"' in rendered
     assert 'aria-label="Aumenta idratazione di 1 punto"' in rendered
-    assert 'aria-label="Riduci sale di 1 punto"' in rendered
+    assert 'aria-label="Riduci sale di 0,5 punti"' in rendered
+    assert 'aria-label="Aumenta il numero di panetti di 1"' in rendered
     assert (
         rendered.index('Ricetta base')
         < rendered.index('name="hydration_pct"')

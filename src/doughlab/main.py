@@ -20,6 +20,7 @@ from .planning import (
     default_recipe_ctx,
     folded_phase_dicts,
     generated_phase_dicts,
+    preferment_phase_dicts,
     preset_ctx,
 )
 from .serve import CA_CERT
@@ -135,6 +136,14 @@ async def folded_phases(request: Request) -> HTMLResponse:
     form = await request.form()
     ctx = common_ctx()
     ctx["phases"] = folded_phase_dicts({k: str(v) for k, v in form.items()})
+    return templates.TemplateResponse(request, "partials/phase_cards.html", ctx)
+
+
+@app.post("/fasi/prefermento", response_class=HTMLResponse)
+async def preferment_phases(request: Request) -> HTMLResponse:
+    form = await request.form()
+    ctx = common_ctx()
+    ctx["phases"] = preferment_phase_dicts({k: str(v) for k, v in form.items()})
     return templates.TemplateResponse(request, "partials/phase_cards.html", ctx)
 
 

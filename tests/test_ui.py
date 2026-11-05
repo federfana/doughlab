@@ -86,3 +86,18 @@ def test_planner_warns_and_retries_when_the_plan_cannot_be_computed(tmp_path, mo
         assert "htmx:sendError" in page and "htmx:afterOnLoad" in page and "requestPath === '/plan'" in page
 
     run_with_db(tmp_path, monkeypatch, check)
+
+
+def test_every_stepper_has_its_arrows_outside_the_field_and_salt_defaults_to_2_5(tmp_path, monkeypatch) -> None:
+    async def check(client: AsyncClient, sessions: async_sessionmaker) -> None:
+        page = (await client.get("/")).text
+        steppers = re.findall(r'<span class="number-stepper">\s*(<input[^>]*>)\s*<span class="number-stepper-controls">', page)
+
+        names = {re.search(r'name="(\w+)"', tag).group(1) for tag in steppers}  # type: ignore[union-attr]
+        assert {"n_panetti", "panetto_g", "hydration_pct", "salt_pct", "oil_pct", "sugar_pct"} <= names
+        assert page.count('class="number-stepper-controls"') == len(steppers)  # frecce sempre fuori dal campo
+        assert re.search(r'name="salt_pct" value="2\.5"', page)
+        assert "adjustPercent(this, 0.5)" in page and "adjustPercent(this, -0.5)" in page
+        assert re.search(r'name="n_panetti"[^>]*step="any"', page)
+
+    run_with_db(tmp_path, monkeypatch, check)

@@ -25,13 +25,13 @@ from .services.scheduler import (
     fermentation_activity_mask,
 )
 from .services.strategies import (
-    BIGA_HOURS,
     FOLD_KNEADING,
     OPEN_HOURS,
-    POOLISH_HOURS,
     build_phases,
+    preferment_defaults,
     suggested_dough_c,
     with_folds,
+    with_preferment,
 )
 from .services.thermal import Container, Environment, parse_container, parse_environment
 from .services.water import DEFAULT_FLOUR_C, DEFAULT_KNEADING, FRICTION_RISE_C, water_temperature
@@ -181,8 +181,7 @@ def guided_phases(
     """Fasi generate dalla strategia scelta (modalità guidata); le temperature restano dell'utente."""
     pref_hours, pref_label = 0.0, "Prefermento"
     if ingredients.preferment_pct > 0:
-        biga = ingredients.preferment_hydration_pct <= 0.65
-        pref_hours, pref_label = (BIGA_HOURS, "Biga") if biga else (POOLISH_HOURS, "Poolish")
+        pref_label, pref_hours = preferment_defaults(ingredients.preferment_hydration_pct)
     return build_phases(
         data.get("strategy", ""),
         number(data, "room_c", DEFAULT_ROOM_C, 5, 40),
@@ -204,6 +203,14 @@ def folded_phase_dicts(data: dict[str, str]) -> list[dict[str, Any]]:
     """Le fasi attuali (modalità Esperto) con le pieghe aggiunte o tolte secondo come si impasta."""
     folds = data.get("kneading", DEFAULT_KNEADING) in FOLD_KNEADING
     return phase_dicts(with_folds(parse_phase_form(data), folds))
+
+
+def preferment_phase_dicts(data: dict[str, str]) -> list[dict[str, Any]]:
+    """Le fasi attuali (modalità Esperto) con la fase del prefermento aggiunta, cambiata o tolta."""
+    ingredients = parse_ingredients(data)
+    return phase_dicts(with_preferment(
+        parse_phase_form(data), ingredients.preferment_pct, ingredients.preferment_hydration_pct, retarget=True
+    ))
 
 
 def default_recipe_ctx() -> dict[str, Any]:
@@ -282,7 +289,13 @@ def compute_plan_and_ingredients(data: dict[str, str]) -> dict[str, Any]:
 
     baking = baking_advice(preset, oven_profile)
 
-    phases = guided_phases(data, ingredients, preset) if data.get("mode") == "guided" else parse_phase_form(data)
+    if data.get("mode") == "guided":
+        phases = guided_phases(data, ingredients, preset)
+    else:
+        # In Esperto le fasi sono quelle delle schede; un prefermento senza la sua fase non avrebbe tempo.
+        phases = with_preferment(
+            parse_phase_form(data), ingredients.preferment_pct, ingredients.preferment_hydration_pct
+        )
     if not phases:
         phases = [PlanPhase(kind=PhaseKind.MIX, label="Impasto", hours=0.5, ambient_c=22,
                             container=Container.MASS_BOWL, environment=Environment.AMBIENT)]

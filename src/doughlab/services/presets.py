@@ -58,7 +58,7 @@ PRESETS: list[Preset] = [
         strategy="direct_8",
         label="Napoletana",
         style=RecipeStyle.NAPOLETANA,
-        description="Impasto diretto: 62% idratazione, 2.8% sale, puntata e appretto a temperatura ambiente.",
+        description="Impasto diretto: 62% idratazione, 2.5% sale, puntata e appretto a temperatura ambiente.",
         flour_hint="Farina per pizza di media forza, indicativamente 11,5-12,5% di proteine.",
         baking=BakingAdvice(
             mode="Forno domestico statico con pietra o acciaio",
@@ -75,7 +75,7 @@ PRESETS: list[Preset] = [
         ),
         ingredients=RecipeIngredients(
             panetto_g=250, n_panetti=4,
-            hydration_pct=0.62, salt_pct=0.028, yeast_pct=0.0015,
+            hydration_pct=0.62, salt_pct=0.025, yeast_pct=0.0015,
         ),
         yeast_kind=YeastKind.FRESH,
         target_work=DEFAULT_TARGET_WORK,
@@ -108,7 +108,7 @@ PRESETS: list[Preset] = [
         ),
         ingredients=RecipeIngredients(
             panetto_g=250, n_panetti=4,
-            hydration_pct=0.65, salt_pct=0.028, yeast_pct=0.001,
+            hydration_pct=0.65, salt_pct=0.025, yeast_pct=0.001,
         ),
         yeast_kind=YeastKind.FRESH,
         target_work=DEFAULT_TARGET_WORK,
