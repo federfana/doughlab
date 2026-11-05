@@ -1,6 +1,8 @@
 """FastAPI app di DoughLab."""
 from __future__ import annotations
 
+import asyncio
+import sqlite3
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any
@@ -21,6 +23,7 @@ from .planning import (
     preset_ctx,
 )
 from .serve import CA_CERT
+from .services.db_backup import backup_database, backup_loop, sqlite_path
 from .services.fermentation import YeastKind
 from .services.presets import PRESETS, PRESETS_BY_KEY
 from .services.scheduler import PHASE_LABELS, PhaseKind
@@ -30,12 +33,24 @@ from .web import STATIC_DIR, common_ctx, templates
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    # La copia parte prima di init_db: se una migrazione va storta c'è l'ultimo stato buono.
+    db_file = sqlite_path(settings.db_url)
+    if db_file is not None:
+        try:
+            await asyncio.to_thread(backup_database, db_file)
+        except (OSError, sqlite3.Error) as error:
+            print(f"Backup del database non riuscito: {error}")
     added = await init_db()
     await flours.seed_if_empty()
     await flours.sync_builtin_seeds()
     if ("flours", "method") in added:
         await flours.backfill_builtin_methods()
-    yield
+    refresher = asyncio.create_task(backup_loop(db_file)) if db_file is not None else None
+    try:
+        yield
+    finally:
+        if refresher is not None:
+            refresher.cancel()
 
 
 app = FastAPI(title=settings.app_name, lifespan=lifespan)

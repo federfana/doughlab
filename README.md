@@ -77,7 +77,11 @@ uv run doughlab-service uninstall  # toglie l'avvio automatico
 uv run doughlab-service run        # avvio manuale, in primo piano
 ```
 
-`install` crea `~/Library/LaunchAgents/it.doughlab.server.plist` (riavvia il server se si ferma) e scrive i log in `~/Library/Logs/DoughLab/server.log`. Se la porta 8000 è occupata (per esempio dal server di sviluppo) il servizio viene installato ma parte all'accesso successivo: ferma l'altro server e rilancia `install`. Mentre il servizio è acceso, per sviluppare usa un'altra porta: `DOUGHLAB_PORT=8001 uv run doughlab`. Il server resta fermo quando il Mac è in stop.
+`install` crea `~/Library/LaunchAgents/it.doughlab.server.plist` (riavvia il server se si ferma) e scrive i log in `~/Library/Logs/DoughLab/server.log`. Se la porta 8000 è occupata (per esempio dal server di sviluppo) il servizio viene installato ma parte all'accesso successivo: ferma l'altro server e rilancia `install`. Mentre il servizio è acceso, per sviluppare usa un'altra porta: `DOUGHLAB_PORT=8001 uv run doughlab`. Il server resta fermo quando il Mac è in stop: per evitarlo (con l'alimentatore collegato) installa con `uv run doughlab-service install --keep-awake`, che avvia il server sotto `caffeinate -i -s`. È facoltativo perché tiene il Mac sveglio per inattività; a coperchio chiuso il Mac va comunque in stop.
+
+**Il certificato HTTPS si tiene aggiornato da solo.** All'avvio e poi ogni minuto il servizio confronta il certificato con l'IP e il nome attuali del Mac: se l'IP è cambiato, il nome è cambiato o mancano meno di 60 giorni alla scadenza, lo rigenera (la CA resta la stessa, il telefono non va riconfigurato) e, se il server era già acceso, si riavvia (launchd lo rilancia). Senza rete non tocca nulla.
+
+**Backup automatico del database.** All'avvio e poi ogni 6 ore il server crea `data/backups/doughlab-AAAA-MM-GG.db` (una copia al giorno, coerente anche mentre l'app scrive; sono compresi diario, foto, ricette e farine) e tiene le ultime 14. Per ripristinare: ferma il servizio, sostituisci `data/doughlab.db` con la copia scelta e riavvia. L'export JSON del Diario resta utile per portare i dati su un'altra app.
 
 ## Accesso dal cellulare in LAN
 
@@ -111,7 +115,7 @@ Sull'iPhone (una volta sola), con l'IP del Mac (`ipconfig getifaddr en0`):
 3. Impostazioni → Generali → Info → *Impostazioni attendibilità certificati* → attiva «DoughLab (rete locale)».
 4. Apri `https://<IP-del-Mac>:8443` e aggiungi alla schermata Home.
 
-Se l'IP cambia (DHCP), riserva un indirizzo fisso al Mac nel router, oppure rigenera il certificato con `cert`. Gli indirizzi `<nome-del-Mac>.local` funzionano solo se il telefono risolve i nomi Bonjour: su alcune reti (router con isolamento, VPN, Private Relay) la pagina risulta «server non trovato» e conviene usare l'IP.
+Se l'IP cambia (DHCP), il servizio rigenera il certificato da solo; per non dover rigenerare, riserva comunque un indirizzo fisso al Mac nel router (nell'app Deco: *Prenotazione indirizzo*). Il comando `cert` resta per farlo a mano. Gli indirizzi `<nome-del-Mac>.local` funzionano solo se il telefono risolve i nomi Bonjour: su alcune reti (router con isolamento, VPN, Private Relay) la pagina risulta «server non trovato» e conviene usare l'IP.
 
 La chiave privata della CA (`data/certs/doughlab-ca.key`) non lascia il Mac: solo `doughlab-ca.crt` viene servito dall'app.
 
@@ -147,6 +151,7 @@ doughlab/
 │   │   ├── water.py               # temperatura dell'acqua dalla formula del pizzaiolo
 │   │   ├── fields.py              # lettura difensiva di numeri, testi, date
 │   │   ├── flour_blend.py         # medie pesate della miscela e idratazione consigliata
+│   │   ├── db_backup.py           # copia giornaliera del database con rotazione
 │   │   ├── flour_seed.py          # farine predefinite con fonte
 │   │   ├── flour_suggest.py       # farine consigliate per stile, ore, idratazione e metodo
 │   │   ├── images.py              # controllo del tipo di immagine dai primi byte
@@ -176,6 +181,7 @@ doughlab/
     ├── test_ingredients.py        # baker's percentage e prefermento
     ├── test_scheduler.py          # end-to-end del piano
     ├── test_backup.py             # parsing/export dei backup, immagini
+    ├── test_db_backup.py          # copia giornaliera del database
     ├── test_diary.py              # rotte del Diario su SQLite temporaneo
     ├── test_recipes.py            # ricette salvate, versioni, collegamento al Diario
     ├── test_flours.py             # farine, miscele, idratazione, rotte
@@ -573,7 +579,7 @@ Nota UX: nel form le percentuali sono inserite in formato umano (`62`, `2.8`) e 
 
 ## Testing
 
-200 test (al 2026-10-16). Lanciali con `uv run pytest`.
+210 test (al 2026-11-05). Lanciali con `uv run pytest`.
 
 ### [tests/test_thermal.py](tests/test_thermal.py)
 
@@ -817,12 +823,24 @@ Nota UX: nel form le percentuali sono inserite in formato umano (`62`, `2.8`) e 
 | `test_small_gaps_outliers_and_big_jumps_are_handled` | scarti sotto il 5% ignorati, errori di inserimento esclusi, passo massimo ×1.5 |
 | `test_recipe_panel_proposes_the_calibration_and_applying_it_adds_a_version` | il pannello propone la taratura e applicarla crea la v2 senza toccare il resto |
 
+### [tests/test_db_backup.py](tests/test_db_backup.py)
+
+| Test | Proprietà verificata |
+|---|---|
+| `test_sqlite_path_only_for_sqlite_files` | il backup parte solo per database SQLite su disco |
+| `test_backup_is_a_consistent_copy_made_once_per_day` | una copia al giorno, coerente con il database |
+| `test_backup_skips_a_missing_database_and_cleans_up_on_failure` | senza database non fa nulla; se fallisce non lascia file parziali |
+| `test_rotation_keeps_only_the_most_recent_backups` | restano solo le copie più recenti |
+
 ### [tests/test_serve.py](tests/test_serve.py)
 
 | Test | Proprietà verificata |
 |---|---|
 | `test_subject_alt_names_cover_localhost_hostname_and_lan_ip` | il certificato copre localhost, nome `.local` e IP |
 | `test_launch_agent_runs_the_service_at_login_and_keeps_it_alive` | l'agente launchd parte all'accesso e si riavvia |
+| `test_launch_agent_can_keep_the_mac_awake_only_when_asked` | `--keep-awake` avvolge il server in `caffeinate`, altrimenti no |
+| `test_cert_problem_detects_a_changed_ip_or_name_and_an_expiring_certificate` | rileva IP o nome cambiati e scadenza vicina (senza confondere `.5` con `.55`) |
+| `test_refresh_certs_regenerates_for_the_new_ip_but_not_without_a_network` | rigenera per il nuovo IP; senza rete non tocca il certificato |
 | `test_server_certificate_is_signed_by_the_local_ca_and_the_ca_is_reused` | il certificato si verifica con la CA, che viene riusata alla rigenerazione |
 | `test_ca_certificate_is_served_for_the_phone_only_when_it_exists` | `/ca.crt` risponde 404 senza CA e scarica il certificato quando c'è |
 

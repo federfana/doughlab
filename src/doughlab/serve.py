@@ -5,6 +5,7 @@ import argparse
 import asyncio
 import contextlib
 import os
+import re
 import plistlib
 import shutil
 import signal
@@ -32,6 +33,9 @@ LOG_FILE = Path.home() / "Library" / "Logs" / "DoughLab" / "server.log"
 # Apple rifiuta certificati server validi più di 825 giorni: margine per sicurezza.
 SERVER_CERT_DAYS = 800
 CA_DAYS = 3650
+# Il certificato si rigenera da solo quando manca meno di questo alla scadenza.
+CERT_RENEW_DAYS = 60
+NETWORK_CHECK_SECONDS = 60
 
 
 def local_ip() -> str:
@@ -105,6 +109,43 @@ def ensure_certs(cert_dir: Path = CERT_DIR, hostname: str | None = None, ip: str
     return ca_cert
 
 
+def cert_problem(cert: Path, hostname: str, ip: str, min_days: int = CERT_RENEW_DAYS) -> str | None:
+    """Perché il certificato non va più bene (IP o nome cambiati, in scadenza), oppure None."""
+    binary = shutil.which("openssl")
+    if binary is None or not cert.exists():
+        return None
+    shown = subprocess.run(
+        [binary, "x509", "-in", str(cert), "-noout", "-ext", "subjectAltName"], capture_output=True, text=True
+    )
+    if shown.returncode != 0:
+        return "non leggibile"
+    names = {part.strip().lower() for part in re.split(r"[,\n]", shown.stdout)}
+    if f"ip address:{ip}" not in names:
+        return f"l'IP del Mac è cambiato ({ip})"
+    if f"dns:{hostname}".lower() not in names:
+        return f"il nome del Mac è cambiato ({hostname})"
+    expiring = subprocess.run([binary, "x509", "-in", str(cert), "-noout", "-checkend", str(min_days * 86400)],
+                              capture_output=True)
+    return "in scadenza" if expiring.returncode != 0 else None
+
+
+def refresh_certs() -> str | None:
+    """Rigenera il certificato se non corrisponde più alla rete; restituisce il motivo, oppure None.
+
+    Senza rete (solo 127.0.0.1) non fa nulla: un certificato senza l'IP della LAN sarebbe peggiore.
+    """
+    if https_files() is None:
+        return None
+    ip = local_ip()
+    if ip == "127.0.0.1":
+        return None
+    hostname = local_hostname()
+    problem = cert_problem(SERVER_CERT, hostname, ip)
+    if problem:
+        ensure_certs(hostname=hostname, ip=ip)
+    return problem
+
+
 def https_files() -> tuple[Path, Path] | None:
     return (SERVER_CERT, SERVER_KEY) if SERVER_CERT.exists() and SERVER_KEY.exists() else None
 
@@ -137,26 +178,45 @@ async def _serve(host: str, port: int, https_port: int) -> None:
         for server in servers:
             server.should_exit = True
 
+    async def watch_network() -> None:
+        # Se la rete cambia mentre il server è acceso, si esce: launchd lo riavvia con il certificato nuovo.
+        while True:
+            await asyncio.sleep(NETWORK_CHECK_SECONDS)
+            problem = await asyncio.to_thread(refresh_certs)
+            if problem:
+                print(f"Certificato HTTPS rigenerato ({problem}): riavvio del server.")
+                stop()
+                return
+
+    watcher = asyncio.create_task(watch_network()) if certs else None
+
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGINT, signal.SIGTERM):
         loop.add_signal_handler(sig, stop)
     done, _ = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
     stop()
+    if watcher is not None:
+        watcher.cancel()
     await asyncio.gather(*tasks, return_exceptions=True)
     for task in done:
         task.result()
 
 
 def run() -> None:
+    problem = refresh_certs()
+    if problem:
+        print(f"Certificato HTTPS rigenerato ({problem}). Se il telefono non si collega, controlla l'indirizzo.")
     asyncio.run(_serve(settings.host, settings.port, settings.https_port))
 
 
 def launch_agent_plist(
-    python: str, project_dir: Path, log_file: Path, env: dict[str, str]
+    python: str, project_dir: Path, log_file: Path, env: dict[str, str], keep_awake: bool = False
 ) -> dict[str, Any]:
+    # caffeinate -i -s: il Mac non va in stop per inattività finché il server è acceso (-s solo con alimentatore).
+    awake = ["/usr/bin/caffeinate", "-i", "-s"] if keep_awake else []
     return {
         "Label": AGENT_LABEL,
-        "ProgramArguments": [python, "-m", "doughlab.serve", "run"],
+        "ProgramArguments": [*awake, python, "-m", "doughlab.serve", "run"],
         "WorkingDirectory": str(project_dir),
         "RunAtLoad": True,
         "KeepAlive": True,
@@ -181,12 +241,12 @@ def _port_busy(port: int) -> bool:
         return probe.connect_ex(("127.0.0.1", port)) == 0
 
 
-def install_agent() -> None:
+def install_agent(keep_awake: bool = False) -> None:
     env = {k: v for k, v in os.environ.items() if k.startswith("DOUGHLAB_")}
     LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
     AGENT_PLIST.parent.mkdir(parents=True, exist_ok=True)
     with AGENT_PLIST.open("wb") as handle:
-        plistlib.dump(launch_agent_plist(sys.executable, PROJECT_DIR, LOG_FILE, env), handle)
+        plistlib.dump(launch_agent_plist(sys.executable, PROJECT_DIR, LOG_FILE, env, keep_awake), handle)
     _launchctl("bootout", f"{_domain()}/{AGENT_LABEL}")
     if _port_busy(settings.port):
         print(f"Installato, ma la porta {settings.port} è occupata (server di sviluppo acceso?): "
@@ -195,7 +255,8 @@ def install_agent() -> None:
     result = _launchctl("bootstrap", _domain(), str(AGENT_PLIST))
     if result.returncode != 0:
         raise SystemExit(f"launchctl bootstrap non riuscito: {result.stderr.strip()}")
-    print(f"Server avviato (porta {settings.port}) e attivo a ogni accesso. Log: {LOG_FILE}")
+    awake = " Il Mac non andrà in stop per inattività (con alimentatore)." if keep_awake else ""
+    print(f"Server avviato (porta {settings.port}) e attivo a ogni accesso.{awake} Log: {LOG_FILE}")
 
 
 def uninstall_agent() -> None:
@@ -212,7 +273,12 @@ def cli(argv: Sequence[str] | None = None) -> None:
         help="run: avvia il server; cert: crea i certificati HTTPS; install/uninstall: avvio "
              "automatico all'accesso; restart: riavvia il servizio (dopo un aggiornamento)",
     )
-    command = parser.parse_args(argv).command
+    parser.add_argument(
+        "--keep-awake", action="store_true",
+        help="con install: impedisce lo stop del Mac per inattività finché il server è acceso (alimentatore collegato)",
+    )
+    args = parser.parse_args(argv)
+    command = args.command
     if command == "run":
         run()
     elif command == "cert":
@@ -222,7 +288,7 @@ def cli(argv: Sequence[str] | None = None) -> None:
         print(f"Oppure, dal telefono: http://{local_ip()}:{settings.port}/ca.crt")
         print(f"Poi apri: https://{local_ip()}:{settings.https_port} (o https://{local_hostname()}:{settings.https_port})")
     elif command == "install":
-        install_agent()
+        install_agent(args.keep_awake)
     elif command == "uninstall":
         uninstall_agent()
     elif command == "restart":
