@@ -80,7 +80,7 @@ uv run doughlab-service run        # avvio manuale, in primo piano
 
 `install` crea `~/Library/LaunchAgents/it.doughlab.server.plist` (riavvia il server se si ferma) e scrive i log in `~/Library/Logs/DoughLab/server.log`. Se la porta 8000 è occupata (per esempio dal server di sviluppo) il servizio viene installato ma parte all'accesso successivo: ferma l'altro server e rilancia `install`. Mentre il servizio è acceso, per sviluppare usa un'altra porta: `DOUGHLAB_PORT=8001 uv run doughlab`. Il server resta fermo quando il Mac è in stop: per evitarlo (con l'alimentatore collegato) installa con `uv run doughlab-service install --keep-awake`, che avvia il server sotto `caffeinate -i -s`. È facoltativo perché tiene il Mac sveglio per inattività; a coperchio chiuso il Mac va comunque in stop.
 
-**Il certificato HTTPS si tiene aggiornato da solo.** All'avvio e poi ogni minuto il servizio confronta il certificato con l'IP e il nome attuali del Mac: se l'IP è cambiato, il nome è cambiato o mancano meno di 60 giorni alla scadenza, lo rigenera (la CA resta la stessa, il telefono non va riconfigurato) e, se il server era già acceso, si riavvia (launchd lo rilancia). Senza rete non tocca nulla.
+**Il certificato HTTPS si tiene aggiornato da solo.** All'avvio e poi ogni minuto il servizio confronta il certificato con l'IP e il nome attuali del Mac: se l'IP è cambiato, il nome è cambiato o mancano meno di 60 giorni alla scadenza, lo rigenera (la CA resta la stessa, il telefono non va riconfigurato) e, se il server era già acceso, si riavvia (launchd lo rilancia). Senza rete non tocca nulla. Il controllo legge il certificato con `openssl x509 -text`, che funziona anche con il LibreSSL di macOS (quello che trova launchd: non conosce `-ext`); rigenera al massimo una volta ogni 10 minuti e, se dopo la rigenerazione il controllo continua a segnalare problemi, smette invece di riavviare in continuazione.
 
 **Backup automatico del database.** All'avvio e poi ogni 6 ore il server crea `data/backups/doughlab-AAAA-MM-GG.db` (una copia al giorno, coerente anche mentre l'app scrive; sono compresi diario, foto, ricette e farine) e tiene le ultime 14. Per ripristinare: ferma il servizio, sostituisci `data/doughlab.db` con la copia scelta e riavvia. L'export JSON del Diario resta utile per portare i dati su un'altra app.
 
@@ -612,7 +612,7 @@ Nota UX: nel form le percentuali sono inserite in formato umano (`62`, `2.8`) e 
 
 ## Testing
 
-238 test (al 2026-11-05). Lanciali con `uv run pytest`.
+241 test (al 2026-11-05). Lanciali con `uv run pytest`.
 
 ### [tests/test_thermal.py](tests/test_thermal.py)
 
@@ -773,6 +773,7 @@ Nota UX: nel form le percentuali sono inserite in formato umano (`62`, `2.8`) e 
 | `test_stylesheet_and_local_font_are_served` | CSS e font (WOFF2) sono serviti; la licenza OFL è nel repository |
 | `test_the_four_areas_have_an_icon_and_a_label` | ogni area della barra ha icona e etichetta |
 | `test_live_timer_is_a_progress_ring_and_the_old_bar_is_gone` | il timer è dentro l'anello di avanzamento |
+| `test_planner_warns_and_retries_when_the_plan_cannot_be_computed` | se il calcolo del piano non arriva compare un avviso e si ritenta da solo |
 | `test_stylesheet_covers_every_class_used_by_the_templates` | nessuna classe dei template resta senza stile (salvo quelle solo-script) |
 
 ### [tests/test_pantry.py](tests/test_pantry.py)
@@ -923,6 +924,8 @@ Nota UX: nel form le percentuali sono inserite in formato umano (`62`, `2.8`) e 
 | `test_cert_problem_detects_a_changed_ip_or_name_and_an_expiring_certificate` | rileva IP o nome cambiati e scadenza vicina (senza confondere `.5` con `.55`) |
 | `test_refresh_certs_regenerates_for_the_new_ip_but_not_without_a_network` | rigenera per il nuovo IP; senza rete non tocca il certificato |
 | `test_server_certificate_is_signed_by_the_local_ca_and_the_ca_is_reused` | il certificato si verifica con la CA, che viene riusata alla rigenerazione |
+| `test_cert_check_also_works_with_the_system_libressl_that_launchd_uses` | il controllo funziona con il LibreSSL di macOS (era la causa di un riavvio al minuto) |
+| `test_an_unusable_cert_check_never_causes_a_restart_loop` | se il controllo non è affidabile, una sola rigenerazione e nessun ciclo di riavvii |
 | `test_ca_certificate_is_served_for_the_phone_only_when_it_exists` | `/ca.crt` risponde 404 senza CA e scarica il certificato quando c'è |
 
 ## Convenzioni di sviluppo

@@ -12,6 +12,7 @@ import signal
 import socket
 import subprocess
 import sys
+import time
 from collections.abc import Iterator, Sequence
 from pathlib import Path
 from typing import Any
@@ -109,40 +110,66 @@ def ensure_certs(cert_dir: Path = CERT_DIR, hostname: str | None = None, ip: str
     return ca_cert
 
 
-def cert_problem(cert: Path, hostname: str, ip: str, min_days: int = CERT_RENEW_DAYS) -> str | None:
-    """Perché il certificato non va più bene (IP o nome cambiati, in scadenza), oppure None."""
-    binary = shutil.which("openssl")
+def _certificate_names(binary: str, cert: Path) -> set[str] | None:
+    """Nomi e indirizzi del certificato, in minuscolo (`dns:x`, `ip address:y`); None se non si riesce a leggerli.
+
+    Usa `-text`, valido sia con OpenSSL sia con il LibreSSL di macOS (quello che trova launchd, che non
+    conosce `-ext`).
+    """
+    shown = subprocess.run([binary, "x509", "-in", str(cert), "-noout", "-text"], capture_output=True, text=True)
+    if shown.returncode != 0:
+        return None
+    names = {f"{kind}:{value}".lower() for kind, value in re.findall(r"(DNS|IP Address):\s*([^,\s]+)", shown.stdout)}
+    return names or None
+
+
+def cert_problem(
+    cert: Path, hostname: str, ip: str, min_days: int = CERT_RENEW_DAYS, binary: str | None = None
+) -> str | None:
+    """Perché il certificato non va più bene (IP o nome cambiati, in scadenza, illeggibile), oppure None."""
+    binary = binary or shutil.which("openssl")
     if binary is None or not cert.exists():
         return None
-    shown = subprocess.run(
-        [binary, "x509", "-in", str(cert), "-noout", "-ext", "subjectAltName"], capture_output=True, text=True
-    )
-    if shown.returncode != 0:
+    names = _certificate_names(binary, cert)
+    if names is None:
         return "non leggibile"
-    names = {part.strip().lower() for part in re.split(r"[,\n]", shown.stdout)}
     if f"ip address:{ip}" not in names:
         return f"l'IP del Mac è cambiato ({ip})"
     if f"dns:{hostname}".lower() not in names:
         return f"il nome del Mac è cambiato ({hostname})"
     expiring = subprocess.run([binary, "x509", "-in", str(cert), "-noout", "-checkend", str(min_days * 86400)],
                               capture_output=True)
-    return "in scadenza" if expiring.returncode != 0 else None
+    if expiring.returncode not in (0, 1):  # 1 = in scadenza; altro = errore dello strumento, non del certificato
+        return None
+    return "in scadenza" if expiring.returncode == 1 else None
+
+
+REFRESH_COOLDOWN_SECONDS = 600
+_last_refresh = 0.0
 
 
 def refresh_certs() -> str | None:
     """Rigenera il certificato se non corrisponde più alla rete; restituisce il motivo, oppure None.
 
     Senza rete (solo 127.0.0.1) non fa nulla: un certificato senza l'IP della LAN sarebbe peggiore.
+    Due protezioni contro i cicli di riavvio: al massimo una rigenerazione ogni 10 minuti, e se dopo
+    la rigenerazione il controllo continua a dare problemi (strumento non adatto) non se ne parla più.
     """
+    global _last_refresh
     if https_files() is None:
         return None
     ip = local_ip()
-    if ip == "127.0.0.1":
+    if ip == "127.0.0.1" or time.monotonic() - _last_refresh < REFRESH_COOLDOWN_SECONDS:
         return None
     hostname = local_hostname()
     problem = cert_problem(SERVER_CERT, hostname, ip)
-    if problem:
-        ensure_certs(hostname=hostname, ip=ip)
+    if not problem:
+        return None
+    _last_refresh = time.monotonic()
+    ensure_certs(hostname=hostname, ip=ip)
+    if cert_problem(SERVER_CERT, hostname, ip):
+        print(f"Certificato HTTPS rigenerato ({problem}), ma il controllo non lo conferma: lo lascio così.")
+        return None
     return problem
 
 

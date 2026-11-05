@@ -59,6 +59,7 @@ def test_refresh_certs_regenerates_for_the_new_ip_but_not_without_a_network(tmp_
     monkeypatch.setattr(serve, "SERVER_CERT", tmp_path / "server.crt")
     monkeypatch.setattr(serve, "SERVER_KEY", tmp_path / "server.key")
     monkeypatch.setattr(serve, "local_hostname", lambda: "pizza.local")
+    monkeypatch.setattr(serve, "_last_refresh", 0.0)
     original = serve.ensure_certs
     monkeypatch.setattr(serve, "ensure_certs", lambda hostname=None, ip=None: original(tmp_path, hostname, ip))
     original(tmp_path, hostname="pizza.local", ip="192.168.1.55")
@@ -69,6 +70,7 @@ def test_refresh_certs_regenerates_for_the_new_ip_but_not_without_a_network(tmp_
     assert serve.refresh_certs() is None
     monkeypatch.setattr(serve, "local_ip", lambda: "192.168.68.72")
     assert "IP" in (serve.refresh_certs() or "")
+    monkeypatch.setattr(serve, "_last_refresh", 0.0)
     assert serve.refresh_certs() is None  # ora il certificato corrisponde
     assert serve.cert_problem(tmp_path / "server.crt", "pizza.local", "192.168.68.72") is None
 
@@ -110,3 +112,31 @@ def test_extra_hostnames_are_added_once() -> None:
     names = serve.subject_alt_names("pizza.local", "192.168.1.9", "mac.home", "PIZZA.local", "")
 
     assert names == "DNS:localhost,DNS:pizza.local,IP:127.0.0.1,DNS:mac.home,IP:192.168.1.9"
+
+
+@pytest.mark.skipif(not Path("/usr/bin/openssl").exists(), reason="niente LibreSSL di sistema")
+def test_cert_check_also_works_with_the_system_libressl_that_launchd_uses(tmp_path: Path) -> None:
+    # Con launchd il PATH trova /usr/bin/openssl (LibreSSL), che non conosce `-ext`: era il motivo di un riavvio al minuto.
+    serve.ensure_certs(tmp_path, hostname="pizza.local", ip="192.168.1.55")
+    cert, libre = tmp_path / "server.crt", "/usr/bin/openssl"
+
+    assert serve.cert_problem(cert, "pizza.local", "192.168.1.55", binary=libre) is None
+    assert "IP" in (serve.cert_problem(cert, "pizza.local", "192.168.1.5", binary=libre) or "")
+    assert serve.cert_problem(cert, "pizza.local", "192.168.1.55", min_days=900, binary=libre) == "in scadenza"
+
+
+def test_an_unusable_cert_check_never_causes_a_restart_loop(tmp_path: Path, monkeypatch) -> None:
+    (tmp_path / "server.crt").write_text("x")
+    (tmp_path / "server.key").write_text("x")
+    regenerated: list[int] = []
+    monkeypatch.setattr(serve, "SERVER_CERT", tmp_path / "server.crt")
+    monkeypatch.setattr(serve, "SERVER_KEY", tmp_path / "server.key")
+    monkeypatch.setattr(serve, "local_ip", lambda: "192.168.1.55")
+    monkeypatch.setattr(serve, "local_hostname", lambda: "pizza.local")
+    monkeypatch.setattr(serve, "cert_problem", lambda *args, **kwargs: "non leggibile")  # lo strumento non riesce mai
+    monkeypatch.setattr(serve, "ensure_certs", lambda **kwargs: regenerated.append(1))
+    monkeypatch.setattr(serve, "_last_refresh", 0.0)
+
+    assert serve.refresh_certs() is None  # rigenerato, ma il controllo non conferma: niente riavvio
+    assert serve.refresh_certs() is None
+    assert regenerated == [1]  # e nei 10 minuti successivi non riprova

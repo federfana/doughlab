@@ -61,6 +61,7 @@
       ? 'Guidata: scegli strategia e temperature, DoughLab costruisce le fasi e usa valori standard.'
       : 'Esperto: controlli tu fasi, durate, prefermento, olio e zucchero.'"></p>
     <div id="planBar" class="plan-bar" aria-live="polite"></div>
+    <p id="planStale" class="diary-status error" role="alert" hidden>Non riesco a raggiungere il server: il piano che vedi potrebbe non essere aggiornato. Riprovo da solo.</p>
 
     {# 1. Impasto: stile e quantità #}
     <div class="plan-step plan-cols space-y" x-show="step === 1">
@@ -1041,6 +1042,26 @@ function plannerUI(initialOvenProfile, initialMode, modeForced) {
   };
 }
 window.addEventListener('load', () => document.getElementById('planForm').requestSubmit());
+
+// Se il calcolo del piano non arriva (server riavviato, Wi-Fi assente), non lasciare il risultato vecchio come se fosse buono.
+(function planConnection() {
+  let timer = null;
+  const isPlan = event => event.detail?.pathInfo?.requestPath === '/plan';
+  const banner = () => document.getElementById('planStale');
+  const failed = event => {
+    if (!isPlan(event)) return;
+    banner().hidden = false;
+    clearTimeout(timer);
+    timer = setTimeout(() => htmx.trigger('#planForm', 'change'), 4000);
+  };
+  ['htmx:sendError', 'htmx:responseError', 'htmx:timeout'].forEach(name => document.body.addEventListener(name, failed));
+  document.body.addEventListener('htmx:afterOnLoad', event => {
+    if (!isPlan(event) || event.detail.xhr.status >= 400) return;
+    banner().hidden = true;
+    clearTimeout(timer);
+  });
+  htmx.config.timeout = 20000;
+})();
 
 // Dopo una modifica nel tab Farine rigenera gli elenchi del piano, tenendo la scelta se esiste ancora.
 document.body.addEventListener('htmx:oobAfterSwap', event => {

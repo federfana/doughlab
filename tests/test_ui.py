@@ -76,3 +76,13 @@ def test_stylesheet_covers_every_class_used_by_the_templates() -> None:
                 if cls in HOOK_CLASSES | STATE_CLASSES:
                     continue
                 assert cls in known, f"{path.name}: la classe «{cls}» non ha stile in app.css"
+
+
+def test_planner_warns_and_retries_when_the_plan_cannot_be_computed(tmp_path, monkeypatch) -> None:
+    async def check(client: AsyncClient, sessions: async_sessionmaker) -> None:
+        page = (await client.get("/")).text
+
+        assert 'id="planStale"' in page and "Riprovo da solo" in page
+        assert "htmx:sendError" in page and "htmx:afterOnLoad" in page and "requestPath === '/plan'" in page
+
+    run_with_db(tmp_path, monkeypatch, check)
