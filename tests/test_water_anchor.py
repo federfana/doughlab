@@ -30,15 +30,23 @@ def test_a_preferment_adds_its_temperature_and_a_fourth_factor() -> None:
     assert advice.formula.startswith("4 × 24")
 
 
-def test_hot_summer_asks_for_cold_water_and_ice_when_it_is_not_enough() -> None:
+def test_hot_summer_asks_for_cold_water_but_never_below_fridge_temperature() -> None:
     summer = water_temperature(24, 30, 28, "hand")
     brutal = water_temperature(24, 34, 32, "mixer")
 
     assert summer.temperature_c == pytest.approx(11.0) and summer.level == "ok"
     assert summer.dough_c == pytest.approx(24)
-    assert brutal.level == "cold" and "ghiaccio" in brutal.message
-    assert brutal.temperature_c == 0 and brutal.wanted_c == pytest.approx(-9)
-    assert brutal.dough_c == pytest.approx(27)
+    assert brutal.level == "cold" and "4" in brutal.message
+    assert brutal.temperature_c == 4 and brutal.wanted_c == pytest.approx(-9)
+    assert brutal.dough_c == pytest.approx((4 + 34 + 32 + 15) / 3, abs=0.05)
+
+
+def test_planetary_biga_with_a_cool_target_does_not_ask_for_two_degree_water() -> None:
+    advice = water_temperature(21, 22, 20, "planetary", preferment_c=22)
+
+    assert advice.wanted_c == pytest.approx(2.0)
+    assert advice.temperature_c == 4 and advice.level == "cold"
+    assert advice.dough_c == pytest.approx((4 + 22 + 20 + 22 + 18) / 4)
 
 
 def test_water_is_capped_at_35_degrees_and_the_resulting_dough_temperature_is_reported() -> None:

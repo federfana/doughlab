@@ -9,9 +9,10 @@ DEFAULT_KNEADING = "hand"
 DEFAULT_FLOUR_C = 20.0
 
 
-# Oltre questi limiti l'acqua non è consigliabile: il lievito e il glutine soffrono sopra i 35 °C.
+# Oltre questi limiti l'acqua non è consigliabile: il lievito e il glutine soffrono sopra i 35 °C, e sotto
+# i 4 °C (acqua del frigorifero) in casa si dovrebbe lavorare con il ghiaccio.
 MAX_WATER_C = 35.0
-MIN_WATER_C = 0.0
+MIN_WATER_C = 4.0
 
 
 @dataclass(frozen=True)
@@ -19,7 +20,7 @@ class WaterAdvice:
     temperature_c: float  # quella da usare, entro i limiti
     formula: str
     message: str
-    level: str  # "ok", "cold" (serve ghiaccio) o "hot" (la formula chiedeva troppo)
+    level: str  # "ok", "cold" (la formula chiedeva meno del minimo) o "hot" (chiedeva troppo)
     dough_c: float  # temperatura dell'impasto che si ottiene con quell'acqua
     wanted_c: float  # quella chiesta dalla formula, anche fuori dai limiti
 
@@ -41,7 +42,7 @@ def water_temperature(
     fattore di attrito è N volte l'aumento di temperatura dovuto all'impasto, perché la formula lavora
     sulla somma e non sulla media.
 
-    Se la formula chiede un'acqua oltre 35 °C (o sotto 0) si consiglia il limite e si dice a che
+    Se la formula chiede un'acqua oltre 35 °C (o sotto 4) si consiglia il limite e si dice a che
     temperatura uscirà l'impasto.
     """
     rise = FRICTION_RISE_C.get(kneading, FRICTION_RISE_C[DEFAULT_KNEADING])
@@ -64,15 +65,14 @@ def water_temperature(
     elif wanted < MIN_WATER_C:
         level = "cold"
         message = (
-            f"Neanche l'acqua gelata basta (la formula chiederebbe {_comma(wanted)} °C): usa acqua e ghiaccio. "
-            f"L'impasto uscirà a circa {_comma(dough)} °C; raffredda la farina o impasta nelle ore fresche."
+            f"La formula chiederebbe {_comma(wanted)} °C, ma sotto i {MIN_WATER_C:g} °C (acqua del frigorifero) è "
+            f"un'acqua quasi ghiacciata: usa {MIN_WATER_C:g} °C. L'impasto uscirà a circa {_comma(dough)} °C; per "
+            f"arrivare a {_comma(target_c)} °C raffredda la farina, impasta nelle ore fresche o alza la T° desiderata."
         )
     elif value > 25:
         level, message = "ok", "Acqua tiepida: l'ambiente o la farina sono freddi rispetto all'impasto."
     elif value >= 10:
         level, message = "ok", "Acqua a temperatura ambiente, dal rubinetto."
-    elif value >= 4:
-        level, message = "ok", "Acqua fredda, dal frigorifero."
     else:
-        level, message = "cold", "Acqua molto fredda: sostituisci una parte con ghiaccio."
+        level, message = "ok", "Acqua fredda, dal frigorifero."
     return WaterAdvice(value, formula, message, level, dough, wanted)
