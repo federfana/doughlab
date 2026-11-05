@@ -6,6 +6,7 @@
   <p class="hint" style="margin:0 0 .8rem">Collegata a un piano DoughLab{% if diary_form.plan.started_at is string %}, partenza prevista {{ diary_form.plan.started_at[:16]|replace('T', ' ') }}{% endif %}: pronto stimato {{ diary_form.plan.predicted_ready_at[:16]|replace('T', ' ') }}. Correggi "Inizio impasto" e "Pronto alle" con gli orari e le date reali: il confronto è sulla durata.</p>
   {% endif %}
   {% if not diary_form.entry_id and diary_form.plan %}<input type="hidden" name="plan_json" value="{{ diary_form.plan | tojson | forceescape }}">{% endif %}
+  {% if not diary_form.entry_id and diary_form.plan and diary_form.plan.flours %}<label class="check" style="display:flex;gap:.5rem;align-items:center;margin:0 0 .8rem"><input type="checkbox" name="use_stock" checked> Scala la farina usata dalla dispensa (solo per le farine che hai registrato lì)</label>{% endif %}
 
   <fieldset>
     <legend>La prova</legend>

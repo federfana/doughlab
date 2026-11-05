@@ -22,6 +22,7 @@ from .services.flour_blend import (
 )
 from .services.flour_seed import DRAFT_NOTE, FLOUR_SEEDS, SEED_CORRECTIONS, SEED_REMOVED, SEED_SINCE, SEED_VERSION
 from .services.flour_suggest import suggest_flours
+from .services.pantry import MAX_STOCK_G, format_grams, plan_consumption
 from .web import RowId, common_ctx, templates
 
 router = APIRouter(prefix="/farine")
@@ -168,7 +169,14 @@ def _item(flour: Flour) -> dict[str, Any]:
         "notes": flour.notes,
         "source_url": flour.source_url if flour.source_url.startswith("https://") else "",
         "builtin": flour.builtin,
+        "stock_g": flour.stock_g,
+        "stock_text": format_grams(flour.stock_g) if flour.stock_g is not None else "",
     }
+
+
+def in_pantry(flour: Flour) -> bool:
+    """In dispensa e non finita."""
+    return flour.stock_g is not None and flour.stock_g > 0
 
 
 def _values(flour: Flour | None) -> dict[str, str]:
@@ -180,6 +188,11 @@ def _values(flour: Flour | None) -> dict[str, str]:
         for key in NUMBER_LIMITS:
             values[key] = format_number(getattr(flour, key))
     return values
+
+
+def _option(flour: Flour, with_brand: bool = False) -> dict[str, Any]:
+    label = f"{flour.brand} · {flour.name}" if with_brand and flour.brand else flour.name
+    return {"id": flour.id, "label": label}
 
 
 async def panel_context(
@@ -197,16 +210,25 @@ async def panel_context(
     groups: dict[str, list[dict[str, Any]]] = {}
     for flour in shown:
         groups.setdefault(flour.brand or "Altre", []).append(_item(flour))
+    pantry = [_item(f) for f in flours if f.stock_g is not None]
+    pantry.sort(key=lambda item: (item["stock_g"] <= 0, f"{item['brand']} {item['name']}"))
+    in_stock = [f for f in flours if in_pantry(f)]
+    option_groups = [("In dispensa", [_option(f, with_brand=True) for f in in_stock])] if in_stock else []
+    brand_groups: dict[str, list[dict[str, Any]]] = {}
+    for flour in flours:
+        if not in_pantry(flour):
+            brand_groups.setdefault(flour.brand or "Altre", []).append(_option(flour))
+    option_groups += list(brand_groups.items())
     return {
+        "flours_pantry": [] if words else pantry,
+        "flours_pantry_count": len(in_stock),
+        "flours_option_groups": option_groups,
         "flours_groups": list(groups.items()),
         "flours_total": len(flours),
         "flours_shown": len(shown),
         "flours_query": query,
         "flours_form": form,
         "flours_message": message,
-        "flours_options": [
-            {"id": f.id, "brand": f.brand or "Altre", "label": f.name} for f in flours
-        ],
         "flours_brands": sorted({f.brand for f in flours if f.brand}),
     }
 
@@ -308,6 +330,32 @@ async def flours_restore(request: Request) -> HTMLResponse:
     )
 
 
+@router.post("/{flour_id:int}/scorta", response_class=HTMLResponse)
+async def flour_stock(request: Request, flour_id: RowId) -> HTMLResponse:
+    """Magazzino: imposta o aggiunge i grammi in dispensa, oppure toglie la farina dalla dispensa."""
+    form = await request.form()
+    data = {k: str(v) for k, v in form.items()}
+    operation = data.get("op", "")
+    amount = parse_float(data.get("stock_g"), 0.0, MAX_STOCK_G)
+    async with SessionLocal() as session:
+        flour = await session.get(Flour, flour_id)
+        if flour is None:
+            return await _panel(request, message="Farina non trovata.")
+        label = f"{flour.brand} {flour.name}".strip()
+        if operation == "clear":
+            flour.stock_g, message = None, f"«{label}» tolta dalla dispensa."
+        elif amount is None:
+            return await _panel(request, message="Scrivi quanti grammi hai in dispensa.")
+        elif operation == "add":
+            flour.stock_g = min(MAX_STOCK_G, (flour.stock_g or 0.0) + amount)
+            message = f"«{label}»: ora hai {format_grams(flour.stock_g)} in dispensa."
+        else:
+            flour.stock_g = amount
+            message = f"«{label}»: {format_grams(amount)} in dispensa."
+        await session.commit()
+    return await _panel(request, message=message)
+
+
 # --- Miscela nel piano ------------------------------------------------------------------------
 
 
@@ -343,20 +391,52 @@ async def blend_context(
 
 
 async def suggest_context(
-    *, style: str, total_hours: float, hydration_pct: float, has_preferment: bool
+    *, style: str, total_hours: float, hydration_pct: float, has_preferment: bool, needed_g: float = 0.0
 ) -> dict[str, Any]:
-    """Farine consigliate per stile, durata, idratazione e metodo del piano."""
+    """Farine consigliate per stile, durata, idratazione e metodo del piano.
+
+    Se hai registrato farine in dispensa, consiglia quelle; se nessuna va bene mostra le altre, separate.
+    Senza dispensa registrata consiglia tra tutte, come prima.
+    """
     async with SessionLocal() as session:
         flours = list(await session.scalars(select(Flour)))
-    return {
-        "flour_suggestions": suggest_flours(
-            flours,
-            style=style,
-            total_hours=total_hours,
-            hydration_pct=hydration_pct,
-            has_preferment=has_preferment,
+
+    def pick(candidates: list[Flour]) -> list[Any]:
+        return suggest_flours(
+            candidates, style=style, total_hours=total_hours,
+            hydration_pct=hydration_pct, has_preferment=has_preferment,
         )
+
+    pantry = [f for f in flours if in_pantry(f)]
+    context: dict[str, Any] = {
+        "flour_pantry_active": bool(pantry),
+        "flour_suggestions": pick(pantry if pantry else flours),
+        "flour_suggestions_other": [],
+        "flour_needed_g": round(needed_g),
     }
+    if pantry and not context["flour_suggestions"]:
+        context["flour_suggestions_other"] = pick([f for f in flours if not in_pantry(f)])
+    return context
+
+
+async def consume_stock(plan: Any) -> list[str]:
+    """Scala dalla dispensa la farina usata da un piano; restituisce una riga per farina scalata."""
+    rows = plan_consumption(plan)
+    if not rows:
+        return []
+    notes: list[str] = []
+    async with SessionLocal() as session:
+        found = {
+            f.id: f for f in await session.scalars(select(Flour).where(Flour.id.in_([i for i, _ in rows])))
+        }
+        for flour_id, grams in rows:
+            flour = found.get(flour_id)
+            if flour is None or flour.stock_g is None:
+                continue
+            flour.stock_g = max(0.0, float(round(flour.stock_g - grams)))
+            notes.append(f"{flour.brand} {flour.name}".strip() + f" −{grams:.0f} g (restano {format_grams(flour.stock_g)})")
+        await session.commit()
+    return notes
 
 
 def snapshot_extras(blend: Blend | None) -> dict[str, Any]:

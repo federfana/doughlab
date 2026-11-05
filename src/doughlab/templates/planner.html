@@ -130,8 +130,8 @@
           <div class="flour-row" {% if i %}x-show="rows > {{ i }}" x-cloak{% else %}:class="{ single: rows === 1 }"{% endif %}>
             <select name="flour_id_{{ i }}" aria-label="Farina {{ loop.index }}">
               <option value="">{{ 'Nessuna farina scelta' if i == 0 else 'Aggiungi un\'altra farina' }}</option>
-              {% for brand, group in flours_options|default([])|groupby('brand') %}
-              <optgroup label="{{ brand }}">{% for o in group %}<option value="{{ o.id }}" {% if row and row[0] == o.id %}selected{% endif %}>{{ o.label }}</option>{% endfor %}</optgroup>
+              {% for label, options in flours_option_groups|default([]) %}
+              <optgroup label="{{ label }}">{% for o in options %}<option value="{{ o.id }}" {% if row and row[0] == o.id %}selected{% endif %}>{{ o.label }}</option>{% endfor %}</optgroup>
               {% endfor %}
             </select>
             <input type="number" name="flour_pct_{{ i }}" value="{{ 100 if (i == 0 and flour_rows|length <= 1) else (('%g'|format(row[1])) if row else '') }}" min="0" max="100" step="any" inputmode="decimal" aria-label="Percentuale della farina {{ loop.index }}" {% if i == 0 %}x-show="rows > 1"{% endif %}><span {% if i == 0 %}x-show="rows > 1"{% endif %}>%</span>
@@ -985,6 +985,8 @@ document.body.addEventListener('htmx:oobAfterSwap', event => {
     select.value = previous;
     if (select.value !== previous) select.dispatchEvent(new Event('change', { bubbles: true }));
   });
+  // Dispensa o farine cambiate: i consigli del passo 2 si ricalcolano.
+  htmx.trigger('#planForm', 'change');
 });
 </script>
 {% endblock %}

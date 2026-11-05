@@ -225,19 +225,32 @@
 
 <div id="flourSuggest" hx-swap-oob="innerHTML">
   {% set selected = flour_blend.components|map(attribute='flour.id')|list if flour_blend else [] %}
-  {% if flour_suggestions %}
-  <div class="lab-row">Consigliate per questo impasto</div>
+  {% macro suggestion_list(items) %}
   <ul class="suggest-list">
-    {% for sg in flour_suggestions %}
+    {% for sg in items %}
     <li>
       <div>
         <strong>{{ sg.flour.brand }} {{ sg.flour.name }}</strong> <span class="hint">{{ sg.flour.kind }}</span>
         <small class="hint">{{ sg.reason }}</small>
+        {% if flour_pantry_active and sg.flour.stock_g is not none and sg.flour.stock_g > 0 %}
+        <small class="{{ 'flour-advice sotto' if flour_needed_g and sg.flour.stock_g < flour_needed_g else 'hint' }}">In dispensa {{ '{:,.0f}'.format(sg.flour.stock_g).replace(',', '.') }} g{% if flour_needed_g and sg.flour.stock_g < flour_needed_g %}: per questo impasto ne servono {{ '{:,.0f}'.format(flour_needed_g).replace(',', '.') }} g, non bastano da sole{% endif %}</small>
+        {% endif %}
       </div>
       {% if sg.flour.id in selected %}<span class="hint">in uso</span>{% else %}<button type="button" class="btn-ghost" @click="useFlour({{ sg.flour.id }})">Usa</button>{% endif %}
     </li>
     {% endfor %}
   </ul>
+  {% endmacro %}
+  {% if flour_suggestions %}
+  <div class="lab-row">{{ 'Consigliate tra quelle in dispensa' if flour_pantry_active else 'Consigliate per questo impasto' }}</div>
+  {{ suggestion_list(flour_suggestions) }}
+  {% if not flour_pantry_active %}<p class="hint">Per vedere solo le farine che hai in casa, segnale in dispensa nel tab «Farine».</p>{% endif %}
+  {% elif flour_pantry_active %}
+  <p class="hint">Nessuna delle farine in dispensa è adatta a questo impasto.</p>
+  {% if flour_suggestions_other %}
+  <div class="lab-row">Non in dispensa, adatte a questo impasto</div>
+  {{ suggestion_list(flour_suggestions_other) }}
+  {% endif %}
   {% else %}
   <p class="hint">Nessuna farina dell'archivio corrisponde bene a questo impasto: aggiungine una nel tab «Farine».</p>
   {% endif %}

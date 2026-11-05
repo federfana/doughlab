@@ -40,6 +40,7 @@ Laboratorio digitale per impasti pizza/pane. Prevede **quando** l'impasto è dav
 - **In corso (Live Bake)**: *Avvia in cucina* segue le fasi in tempo reale con timer, avanzamento manuale, ±15 min, controlli per fase, temperatura misurata, avviso a fine fase e schermo acceso. Lo stato resta nel browser (sopravvive a ricarica e chiusura) e a fine impasto precompila il diario con gli orari reali.
 - **Ricerca nel Diario** per nome, tipo, note, forno.
 - **Farine**: un archivio con W, P/L, proteine e idratazione consigliata, già carico con le farine di Agricola Piano, Caputo, Casillo, Le Farine Magiche, Vigevano, Molino Cipolla (dati dichiarati dai produttori), altre dai siti dei produttori (Caputo Nuvola Super, Le 5 Stagioni, Molino Quaglia Petra, Garofalo, Polselli; dove la scheda non riporta W e P/L restano vuoti, e quelle senza W non entrano nei consigli) e alcune categorie generiche. Nel passo *Formula* il piano **consiglia fino a 3 farine** (marca e tipo) per stile, ore di maturazione, idratazione e metodo (diretto/indiretto), con il motivo e un pulsante *Usa*. Nel piano scegli una farina (una riga; *+ farina* ne aggiunge fino a 3 per una miscela, percentuali in parti uguali che puoi correggere): vedi W, P/L e proteine medi, i grammi per farina e l'**idratazione consigliata** (dal produttore, oppure stimata dalla forza W) confrontata con la tua, con un pulsante per adottarla. Ogni farina dice se è indicata per impasti **diretti o indiretti** (come sulle schede di Agricola Piano) e il piano avvisa se una farina "solo diretta" incontra un prefermento, o viceversa. La miscela passa a Diario (farina, W, proteine) e ricette salvate.
+- **Dispensa (magazzino farine)**: nel tab *Farine* scrivi i grammi che hai di ogni farina (*Imposta*, oppure *Aggiungi* quando compri un sacco nuovo, *Togli* per toglierla); le farine in dispensa compaiono in cima nell'elenco e nel menu di scelta del piano. Al passo 2 i consigli sono limitati a quelle: se hai segnato almeno una farina in dispensa, vedi solo quelle (con i grammi che hai e un avviso se non bastano per l'impasto); se nessuna è adatta, un messaggio e le altre, in un elenco separato. Senza dispensa registrata i consigli restano su tutto l'archivio. Salvando nel Diario una prova nata da un piano, la casella *Scala la farina usata dalla dispensa* (spuntata di default) sottrae i grammi usati dalle farine che hai registrato, in proporzione alla miscela e mai sotto zero; modificare o importare una prova non scala nulla.
 - **Backup**: importa ed esporta il Diario in JSON con le foto (formato compatibile con il backup di [Pizza Lab](https://pizzalab.sibellutu.com/)). L'importazione è ripetibile: le voci già presenti non si duplicano e non sovrascrivono modifiche locali più recenti.
 - **Export `.ics`** per il Calendario, **PWA** installabile e tema chiaro/scuro. Le librerie JS sono locali (`static/vendor/`): su `localhost` o in HTTPS, dopo la prima visita, l'app si apre e funziona anche offline, tranne le operazioni che passano dal server.
 
@@ -153,6 +154,7 @@ doughlab/
 │   │   ├── flour_blend.py         # medie pesate della miscela e idratazione consigliata
 │   │   ├── db_backup.py           # copia giornaliera del database con rotazione
 │   │   ├── flour_seed.py          # farine predefinite con fonte
+│   │   ├── pantry.py              # dispensa: formato dei grammi e consumo di un impasto
 │   │   ├── flour_suggest.py       # farine consigliate per stile, ore, idratazione e metodo
 │   │   ├── images.py              # controllo del tipo di immagine dai primi byte
 │   │   ├── backup.py              # parsing/scrittura del backup JSON del Diario
@@ -185,6 +187,7 @@ doughlab/
     ├── test_diary.py              # rotte del Diario su SQLite temporaneo
     ├── test_recipes.py            # ricette salvate, versioni, collegamento al Diario
     ├── test_flours.py             # farine, miscele, idratazione, rotte
+    ├── test_pantry.py             # dispensa: scorta, consigli limitati, consumo dalle prove
     └── test_main.py               # form, template, .ics
 ```
 
@@ -373,7 +376,7 @@ Cinque modelli ORM:
 - **`Recipe`**: metadati della ricetta (nome, stile, note).
 - **`RecipeVersion`**: ogni modifica è una nuova riga → **ricettario versionato**. Payload JSON contiene fasi/ingredienti/parametri, utile come MVP prima di normalizzare lo schema.
 - **`DiaryEntry`**: una prova del diario. Colonne per i campi del backup (nome, data, tipo, forno, farina, idratazione, ore frigo/ambiente, panetti, temperature, voto 0.5-5, ingredienti, procedimento, note, "da cambiare", etichette), più `started_at`/`ready_at` reali, `plan` (snapshot JSON del piano di origine, se c'è) ed `extra` (chiavi di backup sconosciute, restituite nell'export). `external_id` (uuid o id del backup) rende l'importazione ripetibile.
-- **`Flour`**: una farina (produttore, nome, tipo, `w`, `pl`, `protein`, `hydration_min/max`, `hydration_note`, `method` (diretto / indiretto / entrambi / vuoto), `method_note`, uso, note, `source_url`, `builtin`). Unica per coppia produttore+nome. Alla prima apertura (tabella vuota) viene caricata da `services/flour_seed.py`; poi le tue modifiche e cancellazioni restano tue, e *Ripristina predefinite* aggiunge solo quelle mancanti. Una volta per versione dell'archivio (`SEED_VERSION`, oggi 6, salvata in `app_settings`) `sync_builtin_seeds` toglie le predefinite ritirate (`SEED_REMOVED`), aggiunge le nuove e riempie i dati mancanti (W, P/L, proteine, idratazione, tipo, uso) delle predefinite, senza sovrascrivere valori presenti né rimettere le farine che hai eliminato. Ad ogni avvio corregge anche le farine della versione 2 rimaste con i dati provvisori (`DRAFT_NOTE`, `SEED_CORRECTIONS`), solo se non le hai modificate.
+- **`Flour`**: una farina (produttore, nome, tipo, `stock_g` (grammi in dispensa: vuoto = non la tieni, 0 = finita), `w`, `pl`, `protein`, `hydration_min/max`, `hydration_note`, `method` (diretto / indiretto / entrambi / vuoto), `method_note`, uso, note, `source_url`, `builtin`). Unica per coppia produttore+nome. Alla prima apertura (tabella vuota) viene caricata da `services/flour_seed.py`; poi le tue modifiche e cancellazioni restano tue, e *Ripristina predefinite* aggiunge solo quelle mancanti. Una volta per versione dell'archivio (`SEED_VERSION`, oggi 6, salvata in `app_settings`) `sync_builtin_seeds` toglie le predefinite ritirate (`SEED_REMOVED`), aggiunge le nuove e riempie i dati mancanti (W, P/L, proteine, idratazione, tipo, uso) delle predefinite, senza sovrascrivere valori presenti né rimettere le farine che hai eliminato. Ad ogni avvio corregge anche le farine della versione 2 rimaste con i dati provvisori (`DRAFT_NOTE`, `SEED_CORRECTIONS`), solo se non le hai modificate.
 - **`DiaryPhoto`**: fino a 5 foto per voce (`main`, `extra1`..`extra4`), binario `deferred` (si legge solo quando serve una foto o l'export), con didascalia e inquadratura.
 
 > `Recipe` e `RecipeVersion` esistono ma non sono ancora usati: arriveranno con la persistenza ricette (fase 2). La vecchia tabella `bakes` non viene più usata (era vuota) e non viene eliminata dal database.
@@ -526,9 +529,10 @@ Router `/farine` (risposte HTML di `partials/flours_panel.html`).
 | `GET` | `/farine?q=<testo>`, `/farine/nuova`, `/farine/{id}/modifica` | elenco raggruppato per produttore con ricerca, modulo vuoto, modulo di modifica |
 | `POST` | `/farine`, `/farine/{id}` | crea o modifica (nome obbligatorio; idratazione min e max insieme o nessuna; produttore+nome unici) |
 | `POST` | `/farine/{id}/elimina` | elimina (ricette e prove già salvate restano) |
+| `POST` | `/farine/{id}/scorta` | dispensa: `op=set` imposta i grammi (`stock_g`), `op=add` li aggiunge, `op=clear` toglie la farina dalla dispensa |
 | `POST` | `/farine/ripristina` | aggiunge le farine predefinite mancanti |
 
-`suggest_context(...)` restituisce le farine consigliate per il piano (usata da `/plan`, vedi `services/flour_suggest.py`: `target_w`, `suggest_flours`); `sync_builtin_seeds()` allinea l'archivio alla versione corrente (vedi sotto, modello `Flour`).
+`suggest_context(...)` restituisce le farine consigliate per il piano (solo tra quelle in dispensa se ce ne sono, altrimenti tra tutte; se nessuna in dispensa va bene, le altre in `flour_suggestions_other`); `consume_stock(plan)` scala dalla dispensa la farina usata da un piano salvato nel Diario (usa `services/pantry.py`: `plan_consumption`); `in_pantry(flour)` è vero con `stock_g > 0`. Le farine in dispensa sono nel gruppo «In dispensa» di `flours_option_groups` (menu del piano). Il suggerimento (usata da `/plan`, vedi `services/flour_suggest.py`: `target_w`, `suggest_flours`); `sync_builtin_seeds()` allinea l'archivio alla versione corrente (vedi sotto, modello `Flour`).
 
 `blend_context(data, hydration)` legge `flour_id_N`/`flour_pct_N` dal form del piano (max 3, percentuali normalizzate a 100) e restituisce la miscela; `snapshot_extras` aggiunge allo snapshot `flours`, `flour_label`, `flour_w`, `flour_protein`, che il Diario usa per precompilare farina, W e proteine.
 
@@ -579,7 +583,7 @@ Nota UX: nel form le percentuali sono inserite in formato umano (`62`, `2.8`) e 
 
 ## Testing
 
-210 test (al 2026-11-05). Lanciali con `uv run pytest`.
+219 test (al 2026-11-05). Lanciali con `uv run pytest`.
 
 ### [tests/test_thermal.py](tests/test_thermal.py)
 
@@ -707,6 +711,20 @@ Nota UX: nel form le percentuali sono inserite in formato umano (`62`, `2.8`) e 
 | `test_missing_columns_are_added_with_defaults_and_old_rows_survive` | le colonne nuove vengono aggiunte con default e le righe esistenti restano |
 | `test_nothing_to_add_returns_empty_set` | senza differenze non cambia nulla |
 | `test_new_not_null_column_without_a_simple_default_is_refused` | una colonna `NOT NULL` senza default semplice viene rifiutata con un errore chiaro |
+
+### [tests/test_pantry.py](tests/test_pantry.py)
+
+| Test | Proprietà verificata |
+|---|---|
+| `test_format_grams_uses_the_italian_thousands_dot` | `2.500 g` |
+| `test_plan_consumption_splits_the_total_flour_by_blend_percentages` | i grammi si dividono per le percentuali della miscela |
+| `test_plan_consumption_ignores_malformed_plans` | piani malformati, NaN, id non interi o booleani non scalano nulla |
+| `test_stock_can_be_set_added_and_cleared_and_rejects_bad_input` | imposta, aggiunge, toglie; valori vuoti o non finiti ignorati; negativi → 0 |
+| `test_flour_picker_lists_pantry_flours_first` | il menu del piano mette «In dispensa» in cima e si aggiorna con le modifiche |
+| `test_suggestions_are_limited_to_the_pantry_and_warn_when_flour_is_not_enough` | consigli solo dalla dispensa; avviso se i grammi non bastano |
+| `test_when_nothing_in_the_pantry_fits_the_others_are_shown_separately` | messaggio più elenco separato delle altre |
+| `test_saving_a_trial_from_a_plan_takes_the_flour_out_of_the_pantry_once` | scala alla creazione (non sotto zero), non se la casella non è spuntata, non alle modifiche |
+| `test_flours_not_in_the_pantry_are_left_alone_when_a_trial_is_saved` | le farine non registrate in dispensa non vengono toccate |
 
 ### [tests/test_flours.py](tests/test_flours.py)
 

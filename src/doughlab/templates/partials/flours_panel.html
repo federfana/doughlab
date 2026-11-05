@@ -1,3 +1,13 @@
+{# Controlli della dispensa di una farina; `scope` evita id doppi quando la stessa farina compare in due elenchi. #}
+{% macro stock_controls(flour, scope) %}
+<div class="stock-row">
+  {% if flour.stock_g is not none %}<span class="stock-badge{{ ' empty' if flour.stock_g <= 0 }}">{{ 'Finita' if flour.stock_g <= 0 else 'In dispensa: ' ~ flour.stock_text }}</span>{% endif %}
+  <input type="number" id="stock-{{ scope }}-{{ flour.id }}" name="stock_g" min="0" max="1000000" step="any" inputmode="decimal" placeholder="grammi" aria-label="Grammi di {{ flour.name }}" style="width:6.5rem">
+  <button type="button" class="btn-ghost" hx-post="/farine/{{ flour.id }}/scorta" hx-include="#stock-{{ scope }}-{{ flour.id }}" hx-vals='{"op":"set"}' title="Imposta i grammi che hai ora">Imposta</button>
+  <button type="button" class="btn-ghost" hx-post="/farine/{{ flour.id }}/scorta" hx-include="#stock-{{ scope }}-{{ flour.id }}" hx-vals='{"op":"add"}' title="Aggiunge ai grammi già in dispensa (es. un sacco nuovo)">Aggiungi</button>
+  {% if flour.stock_g is not none %}<button type="button" class="btn-ghost" hx-post="/farine/{{ flour.id }}/scorta" hx-vals='{"op":"clear"}'>Togli</button>{% endif %}
+</div>
+{% endmacro %}
 {# Pannello "Le mie farine": fuori dal form del piano, sostituito da HTMX come blocco unico. #}
 {% set flours_total = flours_total|default(0) %}
 <div id="floursPanel" class="space-y" hx-target="#floursPanel" hx-swap="outerHTML">
@@ -41,6 +51,23 @@
   </form>
   {% endif %}
 
+  {% if flours_pantry %}
+  <details class="flour-group" open>
+    <summary>In dispensa <span class="hint">({{ flours_pantry_count }}{% if flours_pantry|length > flours_pantry_count %} + {{ flours_pantry|length - flours_pantry_count }} finite{% endif %})</span></summary>
+    <ul class="recipe-list">
+      {% for flour in flours_pantry %}
+      <li class="recipe-item">
+        <div class="recipe-head"><strong>{{ flour.brand }} {{ flour.name }}</strong><span class="hint">{{ flour.kind }}</span></div>
+        <p class="flour-numbers">{{ flour.numbers }}</p>
+        {{ stock_controls(flour, 'p') }}
+      </li>
+      {% endfor %}
+    </ul>
+  </details>
+  {% else %}
+  <p class="hint">Dispensa vuota: per ogni farina che hai in casa scrivi i grammi e premi «Imposta». Il piano consiglierà solo quelle e, salvando la prova nel Diario, scalerà la farina usata.</p>
+  {% endif %}
+
   <div id="floursList">
     {% for brand, items in flours_groups|default([]) %}
     <details class="flour-group" {% if flours_query %}open{% endif %}>
@@ -54,6 +81,7 @@
           {% if flour.method or flour.method_note %}<p class="flour-numbers">Impasto: {% if flour.method %}{{ flour.method }}{% endif %}{% if flour.method_note %} <span class="hint">«{{ flour.method_note }}»</span>{% endif %}</p>{% endif %}
           {% if flour.use %}<p class="hint" style="margin:.2rem 0 0">{{ flour.use }}</p>{% endif %}
           {% if flour.notes %}<p class="hint" style="margin:.2rem 0 0">{{ flour.notes }}</p>{% endif %}
+          {{ stock_controls(flour, 'l') }}
           <div class="diary-actions" style="margin-top:.4rem">
             <button type="button" class="btn-ghost" hx-get="/farine/{{ flour.id }}/modifica">Modifica</button>
             <button type="button" class="btn-ghost" hx-post="/farine/{{ flour.id }}/elimina" hx-confirm="Eliminare «{{ flour.name }}»? Le ricette e le prove già salvate restano.">Elimina</button>

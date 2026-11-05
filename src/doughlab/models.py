@@ -88,6 +88,8 @@ class Flour(Base):
     use: Mapped[str] = mapped_column(String(200), default="")
     notes: Mapped[str] = mapped_column(Text, default="")
     source_url: Mapped[str] = mapped_column(String(300), default="")
+    # Grammi in dispensa: None = non la tengo in casa, 0 = finita.
+    stock_g: Mapped[float | None] = mapped_column(Float, default=None)
     builtin: Mapped[bool] = mapped_column(default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 

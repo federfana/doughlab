@@ -104,6 +104,7 @@ async def _plan_bundle(data: dict[str, str]) -> dict[str, Any]:
             total_hours=bundle["plan"].total_hours,
             hydration_pct=hydration_pct,
             has_preferment=has_preferment,
+            needed_g=bundle["plan_snapshot"]["ingredients"]["flour_g"],
         )
     )
     bundle["plan_snapshot"].update(flours.snapshot_extras(bundle["flour_blend"]))

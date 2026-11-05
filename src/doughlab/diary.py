@@ -14,6 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload, undefer
 from starlette.datastructures import FormData, UploadFile
 
+from . import flours
 from .db import SessionLocal
 from .models import DiaryEntry, DiaryPhoto, Flour, utcnow
 from .services.backup import (
@@ -488,7 +489,12 @@ async def diary_create(request: Request) -> HTMLResponse:
     async with SessionLocal() as session:
         session.add(entry)
         await session.commit()
-    return await _panel(request, message="Prova salvata nel diario.")
+    message = "Prova salvata nel diario."
+    if data.get("use_stock") == "on":
+        used = await flours.consume_stock(plan)
+        if used:
+            message += " Scalato dalla dispensa: " + "; ".join(used) + "."
+    return await _panel(request, message=message)
 
 
 @router.post("/{entry_id:int}", response_class=HTMLResponse)
