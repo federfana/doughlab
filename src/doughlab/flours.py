@@ -20,7 +20,7 @@ from .services.flour_blend import (
     method_warnings,
     parse_rows,
 )
-from .services.flour_seed import DRAFT_NOTE, FLOUR_SEEDS, SEED_CORRECTIONS, SEED_SINCE, SEED_VERSION
+from .services.flour_seed import DRAFT_NOTE, FLOUR_SEEDS, SEED_CORRECTIONS, SEED_REMOVED, SEED_SINCE, SEED_VERSION
 from .services.flour_suggest import suggest_flours
 from .web import RowId, common_ctx, templates
 
@@ -75,7 +75,7 @@ async def sync_builtin_seeds() -> int:
     """Allinea le predefinite alla versione corrente dell'archivio; restituisce quante ne ha aggiunte.
 
     Ad ogni avvio corregge le predefinite della versione 2 ancora con la nota provvisoria (mai
-    modificate da te). Una volta per versione aggiunge le nuove e riempie i dati mancanti. Non
+    modificate da te). Una volta per versione toglie le predefinite ritirate, aggiunge le nuove e riempie i dati mancanti. Non
     rimette le farine eliminate e non sovrascrive altri valori presenti.
     """
     async with SessionLocal() as session:
@@ -92,6 +92,10 @@ async def sync_builtin_seeds() -> int:
                 corrected = True
         added = 0
         if stored < SEED_VERSION:
+            for key in SEED_REMOVED:
+                retired = existing.pop(key, None)
+                if retired is not None and retired.builtin:
+                    await session.delete(retired)
             for seed in FLOUR_SEEDS:
                 flour = existing.get((seed["brand"], seed["name"]))
                 if flour is None:

@@ -8,7 +8,7 @@ from sqlalchemy import func, select
 
 from doughlab.flours import seed_if_empty, sync_builtin_seeds
 from doughlab.models import AppSetting, Flour
-from doughlab.services.flour_seed import DRAFT_NOTE, FLOUR_SEEDS, SEED_SINCE
+from doughlab.services.flour_seed import DRAFT_NOTE, FLOUR_SEEDS, SEED_SINCE, SEED_VERSION
 from doughlab.services.flour_suggest import suggest_flours, target_w
 
 from .test_diary import run_with_db
@@ -111,11 +111,11 @@ def test_sync_adds_new_seeds_once_fills_gaps_and_respects_user_choices(tmp_path,
             await session.delete(await session.get(AppSetting, "flour_seed_version"))
             for flour in await session.scalars(select(Flour).where(Flour.brand.in_(["Le 5 Stagioni", "Polselli"]))):
                 await session.delete(flour)
-            polselli_gone = len(SEED_SINCE)  # tutte le nuove, tranne quelle di altre marche, restano
+            polselli_gone = sum(v == 2 for v in SEED_SINCE.values())  # tutte le nuove, tranne quelle di altre marche, restano
             nuvola = await session.scalar(select(Flour).where(Flour.name == "Nuvola"))
             assert nuvola is not None
             nuvola.pl = None
-            casillo = await session.scalar(select(Flour).where(Flour.name == "Zero M"))
+            casillo = await session.scalar(select(Flour).where(Flour.brand == "Molino Casillo", Flour.name == "La Pizza"))
             assert casillo is not None
             casillo.protein = 99
             mine = Flour(brand="Mia", name="Mia farina", w=None, builtin=False)
@@ -135,10 +135,58 @@ def test_sync_adds_new_seeds_once_fills_gaps_and_respects_user_choices(tmp_path,
             assert "Aria" not in names  # le eliminate non tornano
             refilled = await session.scalar(select(Flour).where(Flour.name == "Nuvola"))
             assert refilled is not None and refilled.pl == 0.55
-            kept = await session.scalar(select(Flour).where(Flour.name == "Zero M"))
+            kept = await session.scalar(select(Flour).where(Flour.brand == "Molino Casillo", Flour.name == "La Pizza"))
             assert kept is not None and kept.protein == 99
             own = await session.scalar(select(Flour).where(Flour.name == "Mia farina"))
             assert own is not None and own.w is None
+
+    run_with_db(tmp_path, monkeypatch, check)
+
+
+def test_sync_adds_molino_cipolla_flours_to_a_version_3_archive(tmp_path, monkeypatch) -> None:
+    async def check(client, sessions) -> None:
+        await seed_if_empty()
+        cipolla = [s for s in FLOUR_SEEDS if s["brand"] == "Molino Cipolla"]
+        assert len(cipolla) == sum(SEED_SINCE.get((s['brand'], s['name']), 1) >= 4 for s in cipolla) > 0
+        async with sessions() as session:
+            for flour in await session.scalars(select(Flour).where(Flour.brand == "Molino Cipolla")):
+                await session.delete(flour)
+            (await session.get(AppSetting, "flour_seed_version")).value = "3"
+            await session.commit()
+
+        assert await sync_builtin_seeds() == len(cipolla)
+        assert await sync_builtin_seeds() == 0
+
+        async with sessions() as session:
+            manitoba = await session.scalar(select(Flour).where(Flour.brand == "Molino Cipolla", Flour.name == "Manitoba"))
+            assert manitoba is not None and manitoba.w == 400 and manitoba.builtin
+
+    run_with_db(tmp_path, monkeypatch, check)
+
+
+def test_sync_retires_casillo_flours_not_sold_online_and_adds_the_shop_ones(tmp_path, monkeypatch) -> None:
+    async def check(client, sessions) -> None:
+        await seed_if_empty()
+        casillo = [s["name"] for s in FLOUR_SEEDS if s["brand"] == "Molino Casillo"]
+        assert not {"Zero M", "Zero L", "Zero XL", "Origine Pizza Ideale"} & set(casillo)
+        async with sessions() as session:
+            for flour in await session.scalars(select(Flour).where(Flour.brand == "Molino Casillo")):
+                await session.delete(flour)
+            await session.commit()
+            session.add_all([
+                Flour(brand="Molino Casillo", name="Zero M", w=290, builtin=True),
+                Flour(brand="Molino Casillo", name="Zero L", w=340, builtin=False),
+                Flour(brand="Molino Casillo", name="La Pizza", w=260, builtin=True),
+            ])
+            (await session.get(AppSetting, "flour_seed_version")).value = "5"
+            await session.commit()
+
+        assert await sync_builtin_seeds() == len(casillo) - 1
+        assert await sync_builtin_seeds() == 0
+
+        async with sessions() as session:
+            names = set(await session.scalars(select(Flour.name).where(Flour.brand == "Molino Casillo")))
+            assert names == set(casillo) | {"Zero L"}  # la farina tua (non predefinita) resta
 
     run_with_db(tmp_path, monkeypatch, check)
 
@@ -156,7 +204,7 @@ def test_sync_corrects_untouched_draft_flours_and_leaves_edited_ones(tmp_path, m
                       protein=13.5, notes="la mia nota", builtin=True),
             ])
             await session.delete(await session.get(AppSetting, "flour_seed_version"))
-            session.add(AppSetting(key="flour_seed_version", value="3"))  # già alla versione corrente
+            session.add(AppSetting(key="flour_seed_version", value=str(SEED_VERSION)))  # già alla versione corrente
             await session.commit()
 
         await sync_builtin_seeds()

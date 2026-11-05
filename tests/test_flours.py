@@ -99,7 +99,7 @@ def test_builtin_data_is_consistent_and_covers_the_requested_producers() -> None
     assert len(keys) == len(set(keys))
     brands = {b for b, _ in keys}
     assert {"Agricola Piano", "Molino Caputo", "Molino Casillo", "Le Farine Magiche",
-            "Molino Vigevano", "Generica"} <= brands
+            "Molino Vigevano", "Molino Cipolla", "Generica"} <= brands
     for seed in FLOUR_SEEDS:
         low, high = seed.get("hydration_min"), seed.get("hydration_max")
         assert (low is None) == (high is None)

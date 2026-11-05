@@ -76,26 +76,11 @@ _BASE_SEEDS: tuple[dict[str, Any], ...] = (
          source_url=CAPUTO + "manitoba-oro/"),
     dict(brand="Molino Caputo", name="Integrale", kind="Integrale", w=180, pl=0.85, protein=13,
          use="", notes="W 170-190; P/L 0,80-0,90.", source_url=CAPUTO + "integrale/"),
-    # Molino Casillo
+    # Molino Casillo (solo prodotti acquistabili nello shop online)
     dict(brand="Molino Casillo", name="La Pizza", kind="Tipo 00", w=260, protein=12,
          use="Pizza fatta in casa, alta e soffice oppure leggera e croccante.",
          notes="Proteine dal valore nutrizionale (g/100 g).",
          source_url=CASILLO + "farine-e-semole/la-pizza/la-pizza"),
-    dict(brand="Molino Casillo", name="Zero M", kind="Tipo 0", w=290, protein=12,
-         use="Pizze e focacce a lievitazione media.", notes="Proteine dal valore nutrizionale.",
-         source_url=CASILLO + "farine-e-semole-per-professionisti/pizzeria/zero-m"),
-    dict(brand="Molino Casillo", name="Zero L", kind="Tipo 0", w=340, protein=12.5,
-         use="Pizza ad alta idratazione e lievitazione medio-lunga.",
-         notes="Proteine dal valore nutrizionale.",
-         source_url=CASILLO + "farine-e-semole-per-professionisti/pizzeria/zero-l"),
-    dict(brand="Molino Casillo", name="Zero XL", kind="Tipo 0", w=380, protein=13.5,
-         use="Pizza a lunga lievitazione e preparazione di bighe.",
-         notes="Proteine dal valore nutrizionale.",
-         source_url=CASILLO + "farine-e-semole-per-professionisti/pizzeria/zero-xl"),
-    dict(brand="Molino Casillo", name="Origine Pizza Ideale", kind="Tipo 0 con germe", w=290,
-         protein=12.5, use="Pizze e focacce a lievitazione media.",
-         notes="Proteine dal valore nutrizionale.",
-         source_url=CASILLO + "farine-e-semole-per-professionisti/origine/pizza-ideale"),
     # Le Farine Magiche (Lo Conte)
     dict(brand="Le Farine Magiche", name="Farina per Pizza", kind="Mix a base 00 con germe fermentato",
          w=260, protein=12.4, use="Pizza tradizionale, pizzette, calzoni e panuozzi.",
@@ -147,7 +132,7 @@ _BASE_SEEDS: tuple[dict[str, Any], ...] = (
 # Dove la scheda non riporta W e P/L (Le 5 Stagioni) o non li esprime (Petra 3) restano vuoti.
 FIVE = "https://le5stagioni.com/prodotto/"
 PETRA = "https://www.farinapetra.it/pg23/?bn=farinapetra&ct=card&dfbg=catalogopetra&mt=no&nosh=1&nmm=1&codice=10555"
-SEED_VERSION = 3
+SEED_VERSION = 6
 
 _V2_SEEDS: tuple[dict[str, Any], ...] = (
     dict(brand="Molino Caputo", name="Nuvola Super", kind="Tipo 0", w=330, pl=0.55, protein=13.5,
@@ -206,6 +191,152 @@ SEED_CORRECTIONS: dict[tuple[str, str], tuple[str, str]] = {
     ("Polselli", "Vivace"): ("Polselli", "Vivace"),
 }
 
+# Versioni 4-5: farine del Molino Cipolla (catalogo "Farine", novembre 2026). Dove la scheda dà un
+# intervallo, `w`, `pl` e `protein` sono il valore centrale e l'intervallo sta in `notes`.
+# L'assorbimento della scheda è un dato di laboratorio, non un'idratazione consigliata: resta in `notes`.
+MC = "https://www.molinocipolla.it/index.php?controller=product&id_lang=2&id_product="
+_V4_SEEDS: tuple[dict[str, Any], ...] = (
+    dict(brand="Molino Cipolla", name="00 speciale pizza e dolci lievitati", kind="Tipo 00", w=330, pl=0.65,
+         protein=13.5, use="Pizza e dolci lievitati.",
+         notes="W 320-340; P/L 0,60-0,70; proteine 13-14%; assorbimento 65-70%; ceneri 0,50-0,55%.",
+         source_url=MC + "8"),
+    dict(brand="Molino Cipolla", name="Tipo 00", kind="Tipo 00", w=275, pl=0.575, protein=12,
+         use="Pane e focacce casarecce a breve lievitazione.",
+         notes="W 270-280; P/L 0,55-0,60; proteine 11,5-12,5%; assorbimento 60-70%; ceneri 0,50-0,55%.",
+         source_url=MC + "15"),
+    dict(brand="Molino Cipolla", name="Tipo 0", kind="Tipo 0", w=270, pl=0.60, protein=12.25,
+         use="Pane e paste fresche.",
+         notes="W 260-280; P/L 0,55-0,65; proteine 12-12,5%; assorbimento 60-65%; ceneri 0,56-0,65%.",
+         source_url=MC + "12"),
+    dict(brand="Molino Cipolla", name="Tipo 1", kind="Tipo 1", w=275, pl=0.65, protein=13,
+         notes="W 270-280; P/L 0,60-0,70; proteine 12,5-13,5%; assorbimento 60%; ceneri 0,75-0,80%.",
+         source_url=MC + "9"),
+    dict(brand="Molino Cipolla", name="Tipo 2", kind="Tipo 2", w=260, pl=0.575, protein=12,
+         use="Pane casereccio e pizze a breve lievitazione; anche pala o teglia con lievitazioni medie o medio-lunghe.",
+         notes="W 250-270; P/L 0,55-0,60; proteine 11,5-12,5%; assorbimento 60-65%; ceneri 0,85-0,95%.",
+         source_url=MC + "11"),
+    dict(brand="Molino Cipolla", name="Integrale", kind="Integrale", w=305, pl=0.65, protein=13.25,
+         notes="W 300-310; P/L 0,60-0,70; proteine 13-13,5%; assorbimento 60-70%; ceneri 1,30-1,70%.",
+         source_url=MC + "10"),
+    dict(brand="Molino Cipolla", name="Manitoba", kind="Tipo 0", w=400, pl=0.55, protein=15,
+         use="Farina di forza.",
+         notes="W 390-410; P/L 0,50-0,60; proteine 14-16%; assorbimento 65-75%; ceneri 0,56-0,63%.",
+         source_url=MC + "13"),
+    dict(brand="Molino Cipolla", name="Grandi lievitati", kind="Tipo 00", w=390,
+         use="Panettoni, pandori, colombe e altri grandi lievitati.",
+         notes="W 380-400. La scheda non riporta P/L e proteine.", source_url=MC + "35"),
+    dict(brand="Molino Cipolla", name="Pinsa romana", kind="Mix di farina, riso e soia tostata", w=320,
+         protein=14, use="Pinsa romana.",
+         notes="W 320 dalla scheda; proteine 14 g (valore nutrizionale). P/L non indicato.",
+         source_url=MC + "25"),
+    dict(brand="Molino Cipolla", name="Doppia M", kind="Tipo 0 con germe di grano", w=290, protein=12.8,
+         use="Pizza e pane.",
+         notes="Miscela di tipo 0 e germe di grano. Assorbimento 65-70%; ceneri 0,58%. P/L non indicato.",
+         source_url=MC + "59"),
+    dict(brand="Molino Cipolla", name="Doppia M Revolution", kind="Tipo 0 con germe e malto diastasico", w=300,
+         protein=13, use="Pizza in poche ore; per chiudere impasti con prefermenti.",
+         notes="Miscela di tipo 0, malto diastasico e germe di grano: tempi di lievitazione molto ristretti. "
+               "Assorbimento 65-70%; ceneri 0,58%. P/L non indicato.",
+         source_url=MC + "60"),
+    dict(brand="Molino Cipolla", name="Doppia M Special", kind="Tipo 00 con germe e semintegrale", w=335,
+         protein=13.2, use="Lunghe lievitazioni e prefermenti.",
+         notes="W 330-340. Farina 00 con germe di grano e farina semintegrale; assorbimento 70-80%; ceneri 0,62%. "
+               "Il produttore consiglia di chiudere i prefermenti con Doppia M Revolution. P/L non indicato.",
+         source_url=MC + "61"),
+    dict(brand="Molino Cipolla", name="Frontoni", kind="", w=315, protein=14, use="Pane e pizza.",
+         notes="Farina nata con Daniele Frontoni, ispirata a quella dei forni e delle pizzerie romane Frontoni. "
+               "W 310-320. P/L non indicato.",
+         source_url=MC + "150"),
+    dict(brand="Molino Cipolla", name="Integrale saporita", kind="Integrale con grano arso e germe di grano",
+         w=335, protein=14.1,
+         notes="Miscela esclusiva del molino. Umidità 13,3%; assorbimento 57,4%. P/L non indicato.",
+         source_url=MC + "36"),
+    dict(brand="Molino Cipolla", name="Grano arso", kind="Farina con grano arso", w=330, protein=14,
+         use="Pane, pizza e focaccia.", notes="Sapore intenso e profumato. P/L non indicato.",
+         source_url=MC + "26"),
+    dict(brand="Molino Cipolla", name="10 cereali", kind="Mix di tipo 0 e 9 cereali", w=378, protein=12,
+         notes="Tipo 0, farro, mais, avena, orzo, segale integrale, semola rimacinata, sesamo, crusca tostata, "
+               "fiocchi e semi di lino. P/L non indicato.",
+         source_url=MC + "21"),
+    dict(brand="Molino Cipolla", name="10 cereali scura", kind="Mix di tipo 0 e 9 cereali con malto tostato",
+         notes="Come la 10 cereali, con malto d'orzo tostato. La scheda non riporta W, P/L e proteine.",
+         source_url=MC + "55"),
+    dict(brand="Molino Cipolla", name="Farro monococco", kind="Farro monococco",
+         use="Pane, piadine e prodotti da forno; farina ad alta digeribilità.",
+         notes="La scheda non riporta W, P/L e proteine.", source_url=MC + "58"),
+    dict(brand="Molino Cipolla", name="Farro integrale", kind="Farro integrale",
+         use="Pasta, piadina e prodotti da forno.",
+         notes="La scheda non riporta W, P/L e proteine.", source_url=MC + "56"),
+    dict(brand="Molino Cipolla", name="Semola di grano duro S2", kind="Semola di grano duro", protein=11.5,
+         use="Pasta fatta in casa; anche pane, focaccia e pizza (colore dorato).",
+         notes="Proteine 11-12%; glutine secco 10,5-10,7%; ceneri 0,65-0,66%. La scheda non riporta W e P/L.",
+         source_url=MC + "16"),
+)
+SEED_SINCE.update({(s["brand"], s["name"]): 4 for s in _V4_SEEDS})
+SEED_SINCE[("Molino Cipolla", "Doppia M Special")] = 5
+
+# Versione 6: farine Casillo dello shop online. Le altre farine Casillo (Zero M, Zero L, Zero XL, Origine
+# Pizza Ideale) non sono acquistabili online e vengono ritirate. W e proteine sono quelli della scheda.
+_V6_SEEDS: tuple[dict[str, Any], ...] = (
+    dict(brand="Molino Casillo", name="Il Pane", kind="Tipo 0", w=200, protein=11,
+         use="Pane, focacce e taralli.", notes="Proteine dal valore nutrizionale. P/L non indicato.",
+         source_url=CASILLO + "farine-e-semole/il-pane/il-pane"),
+    dict(brand="Molino Casillo", name="Le Essenziali Tipo 00", kind="Tipo 00", w=200, protein=10,
+         use="Pane, pasta, pizza, focacce e dolci.", notes="Proteine dal valore nutrizionale. P/L non indicato.",
+         source_url=CASILLO + "farine-e-semole/le-essenziali/tipo-00"),
+    dict(brand="Molino Casillo", name="Le Essenziali Tipo 0", kind="Tipo 0", w=200, protein=11,
+         use="Pane, pizza e focacce che non richiedono lunghi tempi di lievitazione.",
+         notes="Proteine dal valore nutrizionale. P/L non indicato.",
+         source_url=CASILLO + "farine-e-semole/le-essenziali/tipo-0"),
+    dict(brand="Molino Casillo", name="Le Essenziali Tipo 1", kind="Tipo 1", w=240, protein=12,
+         use="Pane, pasta, pizza, focacce e dolci dal sapore delicatamente rustico.",
+         notes="Proteine dal valore nutrizionale. P/L non indicato.",
+         source_url=CASILLO + "farine-e-semole/le-essenziali/tipo-1"),
+    dict(brand="Molino Casillo", name="Le Essenziali Tipo 2", kind="Tipo 2", w=240, protein=13,
+         use="Pane, pasta, pizza, focacce e dolci.", notes="Proteine dal valore nutrizionale. P/L non indicato.",
+         source_url=CASILLO + "farine-e-semole/le-essenziali/tipo-2"),
+    dict(brand="Molino Casillo", name="Le Essenziali Integrale", kind="Integrale", w=220, protein=12,
+         use="Pane, pasta, pizza, focacce e dolci non lievitati.",
+         notes="Proteine dal valore nutrizionale; fibre 8,9 g. P/L non indicato.",
+         source_url=CASILLO + "farine-e-semole/le-essenziali/integrale"),
+    dict(brand="Molino Casillo", name="Le Essenziali Manitoba", kind="Tipo 0", w=350, protein=13,
+         use="Pane, pizza, focacce e dolci a lunga lievitazione.",
+         notes="Proteine dal valore nutrizionale. P/L non indicato.",
+         source_url=CASILLO + "farine-e-semole/le-essenziali/tipo-manitoba"),
+    dict(brand="Molino Casillo", name="Il Germe", kind="Tipo 1 con germe di grano",
+         use="Pane, pasta, pizza, focacce e dolci.",
+         notes="La scheda non riporta W, P/L e proteine.",
+         source_url=CASILLO + "farine-e-semole/le-speciali/il-germe"),
+    dict(brand="Molino Casillo", name="Multicereali con semi", kind="Mix di cereali e semi", protein=12,
+         use="Pane, pasta, pizza, focacce e dolci.",
+         notes="Grano tenero, segale, orzo, avena, girasole, sesamo e lino. Proteine dal valore nutrizionale; "
+               "W e P/L non indicati.",
+         source_url=CASILLO + "farine-e-semole/le-speciali/multicereali"),
+    dict(brand="Molino Casillo", name="Altograno per pane", kind="Integrale con germe di grano", protein=15,
+         use="Pane nutriente, anche al 100%.",
+         notes="Assorbe più liquidi delle farine tradizionali; da cuocere a temperature più basse e più a lungo. "
+               "Proteine dal valore nutrizionale; fibre 8 g. W e P/L non indicati.",
+         source_url=CASILLO + "farine-e-semole/altograno/altograno-per-pane"),
+    dict(brand="Molino Casillo", name="Altograno per pizza", kind="Integrale con germe di grano", protein=15.8,
+         use="Pizza tonda al piatto e in pala, fatta in casa.",
+         notes="Assorbe più liquidi delle farine tradizionali e richiede una lievitazione più attenta. "
+               "Proteine dal valore nutrizionale; fibre 8 g. W e P/L non indicati.",
+         source_url=CASILLO + "farine-e-semole/altograno/altograno-per-pizza"),
+    dict(brand="Molino Casillo", name="Semola rimacinata", kind="Semola di grano duro rimacinata", protein=12,
+         use="Pane, pasta fresca, pizza, focaccia e dolci.",
+         notes="Proteine dal valore nutrizionale. W e P/L non indicati.",
+         source_url=CASILLO + "farine-e-semole/le-essenziali/semola-rimacinata"),
+    dict(brand="Molino Casillo", name="Semola rimacinata per pizze e focacce", kind="Semola di grano duro rimacinata",
+         protein=12, use="Pizze e focacce croccanti, anche a lunga lievitazione.",
+         notes="Proteine dal valore nutrizionale. W e P/L non indicati.",
+         source_url=CASILLO + "farine-e-semole/semole-d-autore/semola-rimacinata-per-pizze-e-focacce"),
+)
+SEED_SINCE.update({(s["brand"], s["name"]): 6 for s in _V6_SEEDS})
+SEED_REMOVED: tuple[tuple[str, str], ...] = (
+    ("Molino Casillo", "Zero M"), ("Molino Casillo", "Zero L"), ("Molino Casillo", "Zero XL"),
+    ("Molino Casillo", "Origine Pizza Ideale"),
+)
+
 # (produttore, nome) -> (impasto, parole del produttore). L'impasto è "diretto" o "indiretto" solo
 # se la scheda dice "esclusivamente"; se ammette entrambi è "entrambi"; se cita solo un uso, resta vuoto.
 _METHODS: dict[tuple[str, str], tuple[str, str]] = {
@@ -225,11 +356,11 @@ _METHODS: dict[tuple[str, str], tuple[str, str]] = {
         "entrambi", "Diretto ad alta idratazione, indiretto con biga o poolish, lievito madre"),
     ("Molino Vigevano", "Vesuvio"): ("entrambi", "Adatta anche a impasti indiretti"),
     ("Molino Vigevano", "Pizza in Teglia"): ("entrambi", "Adatta anche a prefermenti"),
-    ("Molino Casillo", "Zero XL"): ("", "Ottima per lunghe lievitazioni e per la preparazione di bighe"),
     ("Molino Caputo", "Nuvola Super"): ("entrambi", "Ideale sia per pre-fermenti che per impasti diretti"),
     ("Le 5 Stagioni", "Superiore"): ("entrambi", "Adatta a tutti gli impasti diretti e indiretti con lunga lievitazione"),
     ("Le 5 Stagioni", "Mora"): ("entrambi", "In purezza, al 100%, in impasti diretti o indiretti"),
     ("Molino Quaglia", "Petra 5037"): ("entrambi", "Impasti diretti, indiretti e con lievito madre"),
+    ("Molino Cipolla", "Doppia M Revolution"): ("", "Miscela ideale per chiudere impasti con prefermenti"),
 }
 
 FLOUR_SEEDS: tuple[dict[str, Any], ...] = tuple(
@@ -237,5 +368,5 @@ FLOUR_SEEDS: tuple[dict[str, Any], ...] = tuple(
         **seed,
         **dict(zip(("method", "method_note"), _METHODS.get((seed["brand"], seed["name"]), ("", "")), strict=True)),
     }
-    for seed in (*_BASE_SEEDS, *_V2_SEEDS)
+    for seed in (*_BASE_SEEDS, *_V2_SEEDS, *_V4_SEEDS, *_V6_SEEDS)
 )
